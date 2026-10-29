@@ -5417,7 +5417,7 @@
 				);
 				MARKETING_VERSION = 2022.11.17;
 				OTHER_SWIFT_FLAGS = "$(inherited)";
-				PRODUCT_BUNDLE_IDENTIFIER = app.organicmaps.debug;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mikshat.maps.debug;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 			};
 			name = Debug;
@@ -5426,7 +5426,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				CODE_SIGN_ENTITLEMENTS = "OMaps-Release.entitlements";
+				CODE_SIGN_ENTITLEMENTS = "Mikshat-Release.entitlements";
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 0;
@@ -5438,7 +5438,7 @@
 				);
 				MARKETING_VERSION = 2022.11.17;
 				OTHER_SWIFT_FLAGS = "$(inherited)";
-				PRODUCT_BUNDLE_IDENTIFIER = app.organicmaps;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mikshat.maps;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 			};
 			name = Release;
@@ -5451,7 +5451,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
-				PRODUCT_BUNDLE_IDENTIFIER = app.organicmaps.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mikshat.maps.tests;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Organic Maps (Debug).app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Organic Maps (Debug)";
 			};
@@ -5465,7 +5465,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
-				PRODUCT_BUNDLE_IDENTIFIER = app.organicmaps.tests;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mikshat.maps.tests;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Organic Maps (Debug).app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Organic Maps (Debug)";
 			};
@@ -5493,7 +5493,7 @@
 				);
 				MARKETING_VERSION = 2022.11.17;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
-				PRODUCT_BUNDLE_IDENTIFIER = app.organicmaps.debug.widgetextension;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mikshat.maps.debug.widgetextension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
@@ -5521,7 +5521,7 @@
 					"@executable_path/../../Frameworks",
 				);
 				MARKETING_VERSION = 2022.11.17;
-				PRODUCT_BUNDLE_IDENTIFIER = app.organicmaps.widgetextension;
+				PRODUCT_BUNDLE_IDENTIFIER = com.mikshat.maps.widgetextension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SKIP_INSTALL = YES;
@@ -5538,9 +5538,9 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				BUNDLE_IDENTIFIER = app.organicmaps.debug;
+				BUNDLE_IDENTIFIER = com.mikshat.maps.debug;
 				CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES;
-				DEVELOPMENT_TEAM = 9Z6432XD7L;
+				DEVELOPMENT_TEAM = 6W3WJ7KLLY;
 				GCC_PRECOMPILE_PREFIX_HEADER = NO;
 				GCC_PREFIX_HEADER = Maps_Prefix.pch;
 				HEADER_SEARCH_PATHS = (
@@ -5579,9 +5579,9 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
-				BUNDLE_IDENTIFIER = app.organicmaps;
+				BUNDLE_IDENTIFIER = com.mikshat.maps;
 				CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES = YES;
-				DEVELOPMENT_TEAM = 9Z6432XD7L;
+				DEVELOPMENT_TEAM = 6W3WJ7KLLY;
 				GCC_PRECOMPILE_PREFIX_HEADER = NO;
 				GCC_PREFIX_HEADER = Maps_Prefix.pch;
 				HEADER_SEARCH_PATHS = (
