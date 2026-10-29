@@ -26,6 +26,8 @@ struct NavigationMathTests {
       } catch {}
     }
     check(math.ddm(24.99999999, latitude: true) == "N 25° 00.000′", "DDM minute rollover")
+    check(math.ddm(0, latitude: true) == "N 00° 00.000′", "DDM zero padding")
+    check(math.ddm(-46.6753, latitude: false) == "W 046° 40.518′", "DDM west and fractional minutes")
     check(!math.usesGPS(mode: 0, speed: 30), "Sensor preference")
     check(math.usesGPS(mode: 1, speed: 0), "GPS preference")
     check(!math.usesGPS(mode: 2, speed: 9.9 / 3.6), "Auto below threshold")
