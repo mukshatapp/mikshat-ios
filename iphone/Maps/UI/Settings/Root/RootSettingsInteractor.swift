@@ -167,7 +167,8 @@ final class RootSettingsInteractor {
       if !enabled {
         MWMSearchFrameworkHelper.clearSearchHistory()
       }
-    case .profile,
+    case .mikshatTools,
+         .profile,
          .units,
          .mobileInternet,
          .powerManagement,

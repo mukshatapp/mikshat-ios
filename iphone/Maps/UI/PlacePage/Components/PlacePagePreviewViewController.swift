@@ -105,7 +105,14 @@ final class PlacePagePreviewViewController: UIViewController {
     fullScreenDirectionView.updateDistance(distance)
   }
 
+  func clearHeading() {
+    heading = nil
+    placePageDirectionView?.imageView.isHidden = true
+    fullScreenDirectionView.setHeadingAvailable(false)
+  }
+
   func updateHeading(_ angle: CGFloat) {
+    fullScreenDirectionView.setHeadingAvailable(true)
     placePageDirectionView?.imageView.isHidden = false
     let duration = heading == nil ? .zero : AppConstants.defaultAnimationDuration // skip the initial setup animation
     UIView.animate(withDuration: duration,

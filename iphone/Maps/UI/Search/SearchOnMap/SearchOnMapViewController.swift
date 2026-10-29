@@ -149,6 +149,12 @@ final class SearchOnMapViewController: UIViewController {
 
   private func setupHeaderView() {
     headerView.delegate = self
+    headerView.mikshatToolsDidTap = { [weak self] tab in
+      guard let self else { return }
+      self.view.endEditing(true)
+      let controller = UINavigationController(rootViewController: MikshatToolsViewController(tab: tab))
+      self.present(controller, animated: true)
+    }
   }
 
   private func setupSearchResultsView() {

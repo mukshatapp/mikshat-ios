@@ -70,7 +70,8 @@ CGFloat const kButtonsBottomOffset = 6;
   CGFloat const centerShift = (self.height - self.zoomIn.midY - self.zoomOut.midY) / 2;
   [UIView animateWithDuration:AppConstants.defaultAnimationDuration
                    animations:^{
-                     self.midY = centerShift + self.superview.height / 2;
+                     CGFloat const landscapeOffset = self.superview.width > self.superview.height ? 12 : 0;
+                     self.midY = centerShift + self.superview.height / 2 + landscapeOffset;
                      if (self.maxY > self.bottomBound)
                        self.maxY = self.bottomBound;
                    }];

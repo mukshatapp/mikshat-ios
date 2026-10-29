@@ -92,8 +92,6 @@ final class RootSettingsPresenter {
 
   private func buildSections(from state: RootSettingsState) -> [RootSettingsSectionViewModel] {
     [
-      SettingsSectionViewModel(section: .profile,
-                               items: [profileItem(state)]),
       SettingsSectionViewModel(section: .general,
                                items: generalItems(state)),
       SettingsSectionViewModel(section: .map,
@@ -115,6 +113,7 @@ final class RootSettingsPresenter {
 
   private func generalItems(_ state: RootSettingsState) -> [RootSettingsItemViewModel] {
     [
+      SettingsItemViewModel(setting: .mikshatTools, kind: .link),
       SettingsItemViewModel(setting: .appearance,
                             detail: state.theme.title,
                             kind: .link),
@@ -124,9 +123,6 @@ final class RootSettingsPresenter {
       SettingsItemViewModel(setting: .powerManagement,
                             detail: state.powerManagement.title,
                             kind: .link),
-      SettingsItemViewModel(setting: .logging,
-                            detail: logFileDetail(state.logFileSize),
-                            kind: .switcher(isOn: state.fileLoggingEnabled, isEnabled: true)),
     ]
   }
 

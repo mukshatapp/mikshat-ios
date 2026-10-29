@@ -1,0 +1,14 @@
+--- a/libs/indexer/data_header.cpp
++++ b/libs/indexer/data_header.cpp
+@@ -83 +83 @@
+-    return {worldH + 1, high};
++    return {worldH, high};
+--- a/libs/indexer/data_source.cpp
++++ b/libs/indexer/data_source.cpp
+@@ -2,0 +3 @@
++#include <type_traits>
+@@ -50,0 +52,4 @@
++
++      // Read richer indexed features for normal rectangular map requests.
++      if constexpr (std::is_same_v<CoveringT, covering::CoveringGetter>)
++        scale += 4;

@@ -13,6 +13,7 @@ private final class RouteActionButton: UIButton {
 }
 
 final class SearchOnMapHeaderView: UIView {
+  var mikshatToolsDidTap: ((Int) -> Void)?
   weak var delegate: SearchOnMapHeaderViewDelegate? {
     didSet {
       searchBar.delegate = delegate
@@ -80,12 +81,23 @@ final class SearchOnMapHeaderView: UIView {
     }
   }
 
+  @objc private func openCoordinates() { mikshatToolsDidTap?(0) }
+  @objc private func openQibla() { mikshatToolsDidTap?(1) }
+
   private func setupSearchBar() {
     searchBar.setStyle(.searchOnMapSearchBar)
     searchBar.placeholder = L("search")
     searchBar.showsCancelButton = false
     searchBar.searchBarStyle = .minimal
     searchBar.searchTextField.clearButtonMode = .always
+    let toolbar = UIToolbar()
+    toolbar.sizeToFit()
+    toolbar.items = [
+      UIBarButtonItem(title: L("mikshat_coordinates"), style: .plain, target: self, action: #selector(openCoordinates)),
+      UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
+      UIBarButtonItem(title: L("mikshat_qibla"), style: .plain, target: self, action: #selector(openQibla)),
+    ]
+    searchBar.searchTextField.inputAccessoryView = toolbar
     searchBar.returnKeyType = .search
     searchBar.searchTextField.enablesReturnKeyAutomatically = true
     // setSearchText only runs for programmatic fills, so typing needs its own signal.
