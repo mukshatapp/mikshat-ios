@@ -1,0 +1,55 @@
+workflows:
+  mikshat-ios-simulator:
+    name: Mikshat iOS - first simulator build
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+    environment:
+      xcode: latest
+      vars:
+        XCODE_WORKSPACE: xcode/omim.xcworkspace
+        XCODE_SCHEME: OMaps
+    scripts:
+      - name: Check Xcode and Metal
+        script: |
+          set -euo pipefail
+          xcodebuild -version
+          if ! xcrun metal -v >/dev/null 2>&1; then
+            xcodebuild -downloadComponent MetalToolchain
+            xcrun -k
+          fi
+          xcrun metal -v
+      - name: Download pinned dependencies
+        script: |
+          set -euo pipefail
+          git submodule update --init --recursive --depth 1 --jobs 8
+      - name: Build for iOS Simulator without signing
+        script: |
+          set -euo pipefail
+          mkdir -p build
+          xcodebuild build \
+            -workspace "$XCODE_WORKSPACE" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/DerivedData \
+            -resultBundlePath build/Mikshat-Build.xcresult \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee build/xcodebuild.log
+      - name: Package simulator application
+        script: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          apps = list(Path("build/DerivedData/Build/Products/Debug-iphonesimulator").glob("*.app"))
+          if len(apps) != 1:
+              raise SystemExit(f"Expected one simulator app; found {len(apps)}")
+          subprocess.run(["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent",
+                          str(apps[0]), "build/Mikshat-Simulator.zip"], check=True)
+          PY
+    artifacts:
+      - build/Mikshat-Simulator.zip
+      - build/xcodebuild.log
+      - build/Mikshat-Build.xcresult
