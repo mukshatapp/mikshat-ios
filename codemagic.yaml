@@ -113,6 +113,31 @@ workflows:
             --workspace "$XCODE_WORKSPACE" \
             --scheme "$XCODE_SCHEME" \
             --config Release
+      - name: Validate versions in signed IPA
+        script: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import plistlib
+          import re
+          import zipfile
+          ipas = list(Path("build/ios/ipa").glob("*.ipa"))
+          if len(ipas) != 1:
+              raise SystemExit(f"Expected one IPA, found {len(ipas)}")
+          errors = []
+          with zipfile.ZipFile(ipas[0]) as archive:
+              for name in archive.namelist():
+                  if not re.search(r"\.(app|appex|framework)/Info\.plist$", name):
+                      continue
+                  info = plistlib.loads(archive.read(name))
+                  for key in ("CFBundleShortVersionString", "CFBundleVersion"):
+                      value = info.get(key, "")
+                      if not isinstance(value, str) or not re.fullmatch(r"[0-9]+(?:\.[0-9]+){0,2}", value):
+                          errors.append(f"{name}: invalid {key}={value!r}")
+                  print(f"{name}: version={info.get('CFBundleShortVersionString')}, build={info.get('CFBundleVersion')}")
+          if errors:
+              raise SystemExit("\n".join(errors))
+          PY
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
