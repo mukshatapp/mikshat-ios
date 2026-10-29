@@ -54,8 +54,15 @@ enum MikshatNavigationMath {
   static func ddm(_ value: Double, latitude: Bool) -> String {
     let total = Int((abs(value) * 60_000).rounded())
     let direction = latitude ? (value < 0 ? "S" : "N") : (value < 0 ? "W" : "E")
-    return String(format: "%@ %0*d° %06.3f′", locale: Locale(identifier: "en_US_POSIX"),
-                  direction, latitude ? 2 : 3, total / 60_000, Double(total % 60_000) / 1000)
+    // Assemble the rounded integer components so locale formatting cannot remove zero padding.
+    func padded(_ number: Int, width: Int) -> String {
+      let digits = String(number)
+      return String(repeating: "0", count: max(0, width - digits.count)) + digits
+    }
+    let degrees = padded(total / 60_000, width: latitude ? 2 : 3)
+    let minutes = padded((total % 60_000) / 1000, width: 2)
+    let fraction = padded(total % 1000, width: 3)
+    return "\(direction) \(degrees)° \(minutes).\(fraction)′"
   }
 
   // 0: phone sensor, 1: GPS course, 2: GPS at 10 km/h or faster.
