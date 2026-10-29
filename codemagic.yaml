@@ -94,6 +94,10 @@ workflows:
         script: |
           set -euo pipefail
           LATEST_BUILD_NUMBER=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID")
+          # A successful query returns no number before the first upload.
+          if [[ -z "$LATEST_BUILD_NUMBER" ]]; then
+            LATEST_BUILD_NUMBER=0
+          fi
           if [[ ! "$LATEST_BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
             echo "Expected a numeric TestFlight build number."
             exit 1
