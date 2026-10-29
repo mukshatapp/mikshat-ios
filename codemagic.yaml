@@ -34,6 +34,8 @@ workflows:
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath build/DerivedData \
             -resultBundlePath build/Mikshat-Build.xcresult \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=YES \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             2>&1 | tee build/xcodebuild.log
