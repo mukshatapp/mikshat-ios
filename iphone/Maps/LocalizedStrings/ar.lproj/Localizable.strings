@@ -1222,3 +1222,69 @@
 
 /* Accessibility label for the button that reverses the complete planned route, including intermediate stops. */
 "reverse_route" = "عكس اتجاه المسار";
+
+/* Mikshat navigation tools */
+"mikshat_tools" = "أدوات مكشات";
+
+/* Mikshat navigation tools */
+"mikshat_coordinates" = "الإحداثيات";
+
+/* Mikshat navigation tools */
+"mikshat_qibla" = "القبلة";
+
+/* Mikshat navigation tools */
+"mikshat_heading" = "البوصلة";
+
+/* Mikshat navigation tools */
+"mikshat_lat_degrees" = "درجات خط العرض";
+
+/* Mikshat navigation tools */
+"mikshat_lat_minutes" = "دقائق خط العرض";
+
+/* Mikshat navigation tools */
+"mikshat_lon_degrees" = "درجات خط الطول";
+
+/* Mikshat navigation tools */
+"mikshat_lon_minutes" = "دقائق خط الطول";
+
+/* Mikshat navigation tools */
+"mikshat_coordinate_hint" = "أدخل الدرجات والدقائق العشرية، مثل N 24° 42.810′ وE 046° 40.518′. يدعم الأرقام العربية والإنجليزية.";
+
+/* Mikshat navigation tools */
+"mikshat_latitude" = "خط العرض: الدرجات / الدقائق / الاتجاه";
+
+/* Mikshat navigation tools */
+"mikshat_longitude" = "خط الطول: الدرجات / الدقائق / الاتجاه";
+
+/* Mikshat navigation tools */
+"mikshat_show_map" = "عرض على الخريطة";
+
+/* Mikshat navigation tools */
+"mikshat_coordinate_error" = "تحقق من الدرجات والدقائق. الدقائق أقل من ٦٠، برقمين قبل الفاصلة وحتى ثلاثة بعدها. الحد الأقصى لخط العرض ٩٠° ولخط الطول ١٨٠°، والدقائق صفر عند هذين الحدين.";
+
+/* Mikshat navigation tools */
+"mikshat_qibla_hint" = "ضع الهاتف بشكل أفقي واستدر حتى يشير السهم الذهبي إلى الأمام. تستخدم القبلة بوصلة الهاتف ولا تتأثر بإعداد اتجاه الوجهة.";
+
+/* Mikshat navigation tools */
+"mikshat_heading_hint" = "اختر مصدر الاتجاه لمؤشرات الوجهة. الوضع التلقائي يستخدم GPS عند سرعة ١٠ كم/س فأكثر، وبوصلة الهاتف عند انخفاض السرعة. لا يؤثر هذا الإعداد على القبلة.";
+
+/* Mikshat navigation tools */
+"mikshat_heading_sensor" = "حساس بوصلة الهاتف";
+
+/* Mikshat navigation tools */
+"mikshat_heading_gps" = "اتجاه الحركة من GPS";
+
+/* Mikshat navigation tools */
+"mikshat_heading_auto" = "تبديل تلقائي بين GPS والحساس";
+
+/* Mikshat navigation tools */
+"mikshat_location_unavailable" = "نحتاج موقعًا حديثًا للهاتف. فعّل إذن الموقع وانتظر وصول قراءة GPS.";
+
+/* Mikshat navigation tools */
+"mikshat_heading_unavailable" = "البوصلة غير متاحة أو غير دقيقة. ابتعد عن المغناطيس والمعادن وعاير بوصلة الهاتف.";
+
+/* Mikshat navigation tools */
+"mikshat_qibla_bearing" = "اتجاه القبلة: %.0f° من الشمال الحقيقي";
+
+/* Mikshat navigation tools */
+"mikshat_my_location" = "موقعي";
