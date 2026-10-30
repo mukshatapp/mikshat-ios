@@ -86,7 +86,7 @@ struct MikshatTravelEstimate {
     }
     samples.removeAll { now - $0.time > 30 }
     guard !samples.isEmpty else { return nil }
-    let average = samples.map(\.speed).reduce(0, +) / Double(samples.count)
+    let average = samples.reduce(0) { $0 + $1.speed } / Double(samples.count)
     return distance / average
   }
 }
