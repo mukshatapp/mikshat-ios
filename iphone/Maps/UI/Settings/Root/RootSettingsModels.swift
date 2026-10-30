@@ -9,6 +9,7 @@ enum RootSettingsSection: String, CaseIterable, Hashable {
 
 enum RootSettings: String, Hashable {
   case mikshatTools
+  case downloadMaps
   case profile
   case units
   case zoomButtons
@@ -54,7 +55,8 @@ extension RootSettingsSection {
 extension RootSettings {
   var title: String {
     switch self {
-    case .mikshatTools: return L("mikshat_tools")
+    case .downloadMaps: return L("download_maps")
+    case .mikshatTools: return L("mikshat_heading_source")
     case .profile: return L("profile")
     case .units: return L("measurement_units")
     case .zoomButtons: return L("pref_zoom_title")
@@ -82,6 +84,7 @@ extension RootSettings {
 extension RootSettings {
   var screen: SettingsScreen? {
     switch self {
+    case .downloadMaps: return nil
     case .mikshatTools: return .mikshatTools
     case .profile: return .profile
     case .units: return .units

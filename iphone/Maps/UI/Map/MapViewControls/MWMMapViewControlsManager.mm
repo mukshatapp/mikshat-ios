@@ -311,8 +311,7 @@ NSString * const kMapToCategorySelectorSegue = @"MapToCategorySelectorSegue";
 
 - (void)setTrafficButtonHidden:(BOOL)trafficButtonHidden
 {
-  BOOL const isNavigation = self.navigationManager.state == MWMNavigationDashboardStateNavigation;
-  _trafficButtonHidden = isNavigation || trafficButtonHidden;
+  _trafficButtonHidden = YES;
   self.trafficButton.hidden = self.hidden || _trafficButtonHidden;
 }
 

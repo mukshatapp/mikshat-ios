@@ -70,3 +70,40 @@ enum MikshatNavigationMath {
     mode == 1 || (mode == 2 && speed.isFinite && speed >= 10 / 3.6)
   }
 }
+
+struct MikshatTravelEstimate {
+  private var samples: [(time: Double, speed: Double)] = []
+  private var lastTime: Double?
+
+  mutating func update(distance: Double, speed: Double, timestamp: Double, now: Double) -> Double? {
+    guard distance.isFinite, distance >= 0, speed.isFinite, speed >= 0,
+          abs(now - timestamp) <= 15 else { samples.removeAll(); return nil }
+    if distance <= 10 { return 0 }
+    guard speed >= 0.5 else { samples.removeAll(); return nil }
+    if lastTime != timestamp {
+      samples.append((timestamp, speed))
+      lastTime = timestamp
+    }
+    samples.removeAll { now - $0.time > 30 }
+    guard !samples.isEmpty else { return nil }
+    let average = samples.map(\.speed).reduce(0, +) / Double(samples.count)
+    return distance / average
+  }
+}
+
+extension MikshatNavigationMath {
+  static func dms(_ value: Double, latitude: Bool) -> String {
+    let total = Int((abs(value) * 360_000).rounded())
+    func pad(_ n: Int, _ width: Int) -> String {
+      let digits = String(n)
+      return String(repeating: "0", count: max(0, width - digits.count)) + digits
+    }
+    let direction = latitude ? (value < 0 ? "S" : "N") : (value < 0 ? "W" : "E")
+    return "\(direction) \(pad(total / 360_000, latitude ? 2 : 3))° \(pad(total / 6000 % 60, 2))′ \(pad(total / 100 % 60, 2)).\(pad(total % 100, 2))″"
+  }
+  static func coordinatePairs(latitude: Double, longitude: Double) -> [String] {
+    [String(format: "%.6f, %.6f", latitude, longitude),
+     ddm(latitude, latitude: true) + "\n" + ddm(longitude, latitude: false),
+     dms(latitude, latitude: true) + "\n" + dms(longitude, latitude: false)]
+  }
+}

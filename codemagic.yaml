@@ -77,7 +77,7 @@ workflows:
         APP_STORE_APPLE_ID: "6828427541"
         XCODE_WORKSPACE: xcode/omim.xcworkspace
         XCODE_SCHEME: OMaps
-        APP_VERSION: "4.6.1"
+        APP_VERSION: "4.6.2"
     scripts:
       - name: Prepare Mikshat branding and check navigation math
         script: |

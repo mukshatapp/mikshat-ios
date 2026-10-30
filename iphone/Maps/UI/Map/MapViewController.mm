@@ -493,6 +493,7 @@ NSString * const kCategorySelectorSegue = @"MapToCategorySelectorSegue";
 - (void)viewDidLoad
 {
   [super viewDidLoad];
+  [MikshatHomeControls installInView:self.view];
   [self setupPlacePageContainer];
   [self setupSearchContainer];
 

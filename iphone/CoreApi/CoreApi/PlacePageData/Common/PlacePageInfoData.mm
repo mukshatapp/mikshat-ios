@@ -138,6 +138,8 @@ NSString * GetLocalizedMetadataValueString(MapObject::MetadataID metaID, std::st
     // Built in id order, so the array index equals the stable format id that the Swift VC persists.
     // An unavailable format (OS Grid outside Great Britain, UTM/MGRS near the poles) is an empty
     // string; the Swift VC skips empties and shows the next available format.
+    _latitude = rawData.GetLatLon().m_lat;
+    _longitude = rawData.GetLatLon().m_lon;
     NSMutableArray<NSString *> * coordFormats = [NSMutableArray array];
     for (auto const format : place_page::AllCoordinateFormats())
       [coordFormats addObject:@(rawData.GetFormattedCoordinate(format).c_str())];

@@ -14,7 +14,7 @@ NSString * titleForButton(MWMActionBarButtonType type, BOOL isSelected)
   case MWMActionBarButtonTypeSaveTrackRecording: return L(@"save");
   case MWMActionBarButtonTypeDeleteTrackRecording: return L(@"delete");
   case MWMActionBarButtonTypeRouteFrom: return L(@"p2p_from_here");
-  case MWMActionBarButtonTypeRouteTo: return L(@"p2p_to_here");
+  case MWMActionBarButtonTypeRouteTo: return L(@"mikshat_go_to");
   case MWMActionBarButtonTypeMore: return L(@"placepage_more_button");
   case MWMActionBarButtonTypeRouteAddStop: return L(@"placepage_add_stop");
   case MWMActionBarButtonTypeRouteAddDestination: return L(@"route_add_destination");
@@ -49,7 +49,7 @@ typedef NS_ENUM(NSInteger, MWMBookmarksButtonState) {
 - (void)configButton:(BOOL)isSelected primary:(BOOL)isPrimary
 {
   self.label.text = titleForButton(self.type, isSelected);
-  self.button.coloring = isPrimary ? MWMButtonColoringBlue : MWMButtonColoringBlack;
+  self.button.coloring = (isPrimary || self.type == MWMActionBarButtonTypeBookmark) ? MWMButtonColoringBlue : MWMButtonColoringBlack;
   [self.button.imageView setContentMode:UIViewContentModeScaleAspectFit];
 
   switch (self.type)
@@ -98,10 +98,10 @@ typedef NS_ENUM(NSInteger, MWMBookmarksButtonState) {
     [self.button setImage:[UIImage imageNamed:@"ic_route_from"] forState:UIControlStateNormal];
     break;
   case MWMActionBarButtonTypeRouteTo:
-    [self.button setImage:[UIImage imageNamed:@"ic_route_to"] forState:UIControlStateNormal];
+    [self.button setImage:[MikshatSymbols imageNamed:@"arrow.up"] forState:UIControlStateNormal];
     break;
   case MWMActionBarButtonTypeRouteAddDestination:
-    [self.button setImage:[UIImage imageNamed:@"ic_route_to"] forState:UIControlStateNormal];
+    [self.button setImage:[MikshatSymbols imageNamed:@"arrow.up"] forState:UIControlStateNormal];
     break;
   case MWMActionBarButtonTypeMore:
     [self.button setImage:[UIImage imageNamed:@"ic_placepage_more"] forState:UIControlStateNormal];

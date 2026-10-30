@@ -149,11 +149,12 @@ final class SearchOnMapViewController: UIViewController {
 
   private func setupHeaderView() {
     headerView.delegate = self
-    headerView.mikshatToolsDidTap = { [weak self] tab in
-      guard let self else { return }
-      self.view.endEditing(true)
-      let controller = UINavigationController(rootViewController: MikshatToolsViewController(tab: tab))
-      self.present(controller, animated: true)
+    headerView.coordinateDidSubmit = { [weak self] coordinate in
+      self?.view.endEditing(true)
+      let pair = String(format: "%.8f,%.8f", coordinate.latitude, coordinate.longitude)
+      guard let url = URL(string: "om://map?ll=\(pair)") else { return }
+      self?.close()
+      _ = DeepLinkHandler.shared.applicationDidOpenUrl(url)
     }
   }
 

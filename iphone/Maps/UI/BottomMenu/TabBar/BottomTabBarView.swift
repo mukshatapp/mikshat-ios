@@ -1,4 +1,4 @@
-let kExtendedTabBarTappableMargin: CGFloat = -15
+let kExtendedTabBarTappableMargin: CGFloat = -28
 
 final class BottomTabBarView: SolidTouchView {
   @IBOutlet var mainButtonsView: ExtendedBottomTabBarContainerView!

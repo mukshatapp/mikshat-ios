@@ -166,6 +166,7 @@ final class RootSettingsPresenter {
 
   private func networkItems(_ state: RootSettingsState) -> [RootSettingsItemViewModel] {
     [
+      SettingsItemViewModel(setting: .downloadMaps, kind: .link),
       SettingsItemViewModel(setting: .autoDownload,
                             detail: nil,
                             kind: .switcher(isOn: state.autoDownloadEnabled, isEnabled: true)),

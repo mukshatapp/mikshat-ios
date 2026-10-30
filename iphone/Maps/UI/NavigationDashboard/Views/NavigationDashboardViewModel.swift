@@ -75,7 +75,7 @@ extension NavigationDashboard.ViewModel {
     if progress < 1 {
       return .loading(progress: progress)
     }
-    let isStartEnabled = routerType != .ruler && routerType != .publicTransport
+    let isStartEnabled = routerType == .ruler || routerType == .vehicle
     return isStartEnabled ? .enabled : .disabled
   }
 

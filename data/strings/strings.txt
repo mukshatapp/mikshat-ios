@@ -46571,3 +46571,141 @@ comment = Mikshat navigation tools
 tags = apple-maps
 en = My location
 ar = موقعي
+
+[mikshat_kmh]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = km/h
+ar = كم/س
+
+[mikshat_speed]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Speed
+ar = السرعة
+
+[mikshat_remaining_distance]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Distance remaining
+ar = المسافة المتبقية
+
+[mikshat_remaining_time]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Time remaining
+ar = الزمن المتبقي
+
+[mikshat_arrival]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Estimated arrival
+ar = وقت الوصول المتوقع
+
+[mikshat_waiting]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Waiting for movement
+ar = بانتظار الحركة
+
+[mikshat_north]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = North
+ar = شمال
+
+[mikshat_south]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = South
+ar = جنوب
+
+[mikshat_east]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = East
+ar = شرق
+
+[mikshat_west]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = West
+ar = غرب
+
+[mikshat_qibla_title]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Mikshat • Qibla compass
+ar = مكشات • بوصلة القبلة
+
+[mikshat_location_settings]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Location settings
+ar = إعدادات الموقع
+
+[mikshat_arrow_to_point]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Arrow points to the destination
+ar = السهم نحو النقطة
+
+[mikshat_heading_source]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Compass direction source
+ar = مصدر اتجاه البوصلة
+
+[mikshat_record_track]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Record track
+ar = تسجيل المسار
+
+[mikshat_enter_coordinates]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Enter coordinates
+ar = إدخال الإحداثيات
+
+[mikshat_go_to]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Go to
+ar = اذهب إلى
+
+[mikshat_copy]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Copy
+ar = نسخ
+
+[mikshat_navigation_modes]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Direct guidance, car, compass
+ar = توجيه مباشر، سيارة، بوصلة
+
+[mikshat_direct]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Direct
+ar = توجيه مباشر
+
+[mikshat_car]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Car
+ar = سيارة
+
+[mikshat_stop]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Stop
+ar = إنهاء
+
+[mikshat_direct_notice]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Direct guidance • straight-line distance • arrival time is an estimate
+ar = توجيه مباشر • المسافة بخط مستقيم • وقت الوصول تقديري

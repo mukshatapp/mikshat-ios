@@ -694,6 +694,9 @@
 		A13813000000000000000002 /* TransportRulerAppearanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A13813000000000000000001 /* TransportRulerAppearanceTests.swift */; };
 		A6B8C0010000000000000001 /* MikshatNavigationMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6B8C0010000000000000002 /* MikshatNavigationMath.swift */; };
 		A6B8C0010000000000000003 /* MikshatToolsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6B8C0010000000000000004 /* MikshatToolsViewController.swift */; };
+		A6B8C0020000000000000001 /* MikshatInterface.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6B8C0020000000000000002 /* MikshatInterface.swift */; };
+		A6B8C0020000000000000003 /* MikshatCoordinateInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6B8C0020000000000000004 /* MikshatCoordinateInputView.swift */; };
+		A6B8C0020000000000000005 /* MikshatNavigationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6B8C0020000000000000006 /* MikshatNavigationCoordinator.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1873,6 +1876,9 @@
 		A13813000000000000000001 /* TransportRulerAppearanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransportRulerAppearanceTests.swift; sourceTree = "<group>"; };
 		A6B8C0010000000000000002 /* MikshatNavigationMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MikshatNavigationMath.swift; path = UI/Mikshat/MikshatNavigationMath.swift; sourceTree = SOURCE_ROOT; };
 		A6B8C0010000000000000004 /* MikshatToolsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MikshatToolsViewController.swift; path = UI/Mikshat/MikshatToolsViewController.swift; sourceTree = SOURCE_ROOT; };
+		A6B8C0020000000000000002 /* MikshatInterface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MikshatInterface.swift; path = UI/Mikshat/MikshatInterface.swift; sourceTree = SOURCE_ROOT; };
+		A6B8C0020000000000000004 /* MikshatCoordinateInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MikshatCoordinateInputView.swift; path = UI/Mikshat/MikshatCoordinateInputView.swift; sourceTree = SOURCE_ROOT; };
+		A6B8C0020000000000000006 /* MikshatNavigationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MikshatNavigationCoordinator.swift; path = UI/Mikshat/MikshatNavigationCoordinator.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -2276,6 +2282,9 @@
 				ED82BCAE2F900F8200FA103D /* Bridging-Header.h */,
 				ED82BCAF2F900F8200FA103D /* main.mm */,
 				ED82BCB02F900F8200FA103D /* Maps_Prefix.pch */,
+				A6B8C0020000000000000006 /* MikshatNavigationCoordinator.swift */,
+				A6B8C0020000000000000004 /* MikshatCoordinateInputView.swift */,
+				A6B8C0020000000000000002 /* MikshatInterface.swift */,
 				A6B8C0010000000000000004 /* MikshatToolsViewController.swift */,
 				A6B8C0010000000000000002 /* MikshatNavigationMath.swift */,
 				347526FA1DC0B00F00918CF5 /* common-debug.xcconfig */,
@@ -5032,6 +5041,9 @@
 				ED82C6102F90180300FA103D /* SettingsTableViewSelectableCell.swift in Sources */,
 				ED82C6112F90180300FA103D /* SettingsTableViewSwitchCell.swift in Sources */,
 				A10000000000000000000001 /* SettingsBuilder.swift in Sources */,
+				A6B8C0020000000000000005 /* MikshatNavigationCoordinator.swift in Sources */,
+				A6B8C0020000000000000003 /* MikshatCoordinateInputView.swift in Sources */,
+				A6B8C0020000000000000001 /* MikshatInterface.swift in Sources */,
 				A6B8C0010000000000000003 /* MikshatToolsViewController.swift in Sources */,
 				A6B8C0010000000000000001 /* MikshatNavigationMath.swift in Sources */,
 				A10000000000000000000002 /* RootSettingsInteractor.swift in Sources */,
@@ -5423,7 +5435,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 4.6.1;
+				MARKETING_VERSION = 4.6.2;
 				OTHER_SWIFT_FLAGS = "$(inherited)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.mikshat.maps.debug;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -5444,7 +5456,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 4.6.1;
+				MARKETING_VERSION = 4.6.2;
 				OTHER_SWIFT_FLAGS = "$(inherited)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.mikshat.maps;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -5499,7 +5511,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 4.6.1;
+				MARKETING_VERSION = 4.6.2;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mikshat.maps.debug.widgetextension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -5528,7 +5540,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 4.6.1;
+				MARKETING_VERSION = 4.6.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mikshat.maps.widgetextension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";

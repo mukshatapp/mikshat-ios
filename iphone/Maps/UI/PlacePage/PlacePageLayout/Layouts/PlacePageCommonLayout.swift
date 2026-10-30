@@ -113,9 +113,7 @@ class PlacePageCommonLayout: NSObject, IPlacePageLayout {
       viewControllers.append(productsViewController)
     }
 
-    if placePageData.osmContributionData != nil {
-      viewControllers.append(buttonsViewController)
-    }
+
 
     LocationManager.add(observer: self)
     if let lastLocation = LocationManager.lastLocation() {

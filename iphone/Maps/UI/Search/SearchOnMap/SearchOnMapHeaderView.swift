@@ -1,3 +1,6 @@
+import UIKit
+import CoreLocation
+
 protocol SearchOnMapHeaderViewDelegate: UISearchBarDelegate {
   func cancelButtonDidTap()
   func grabberDidTap()
@@ -13,7 +16,10 @@ private final class RouteActionButton: UIButton {
 }
 
 final class SearchOnMapHeaderView: UIView {
-  var mikshatToolsDidTap: ((Int) -> Void)?
+  var coordinateDidSubmit: ((CLLocationCoordinate2D) -> Void)?
+  private let coordinateInput = MikshatCoordinateInputView()
+  private let coordinateArea = UIScrollView()
+  private var coordinateAreaHeight: NSLayoutConstraint?
   weak var delegate: SearchOnMapHeaderViewDelegate? {
     didSet {
       searchBar.delegate = delegate
@@ -81,23 +87,12 @@ final class SearchOnMapHeaderView: UIView {
     }
   }
 
-  @objc private func openCoordinates() { mikshatToolsDidTap?(0) }
-  @objc private func openQibla() { mikshatToolsDidTap?(1) }
-
   private func setupSearchBar() {
     searchBar.setStyle(.searchOnMapSearchBar)
     searchBar.placeholder = L("search")
     searchBar.showsCancelButton = false
     searchBar.searchBarStyle = .minimal
     searchBar.searchTextField.clearButtonMode = .always
-    let toolbar = UIToolbar()
-    toolbar.sizeToFit()
-    toolbar.items = [
-      UIBarButtonItem(title: L("mikshat_coordinates"), style: .plain, target: self, action: #selector(openCoordinates)),
-      UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
-      UIBarButtonItem(title: L("mikshat_qibla"), style: .plain, target: self, action: #selector(openQibla)),
-    ]
-    searchBar.searchTextField.inputAccessoryView = toolbar
     searchBar.returnKeyType = .search
     searchBar.searchTextField.enablesReturnKeyAutomatically = true
     // setSearchText only runs for programmatic fills, so typing needs its own signal.
@@ -153,6 +148,14 @@ final class SearchOnMapHeaderView: UIView {
     addSubview(cancelContainer)
     addSubview(routeActionsStackView)
     addSubview(searchBar)
+    addSubview(coordinateArea)
+    coordinateArea.addSubview(coordinateInput)
+    coordinateArea.translatesAutoresizingMaskIntoConstraints = false
+    coordinateArea.keyboardDismissMode = .interactive
+    coordinateAreaHeight = coordinateArea.heightAnchor.constraint(equalToConstant: 184)
+    coordinateAreaHeight?.isActive = true
+    coordinateInput.onSubmit = { [weak self] coordinate in self?.coordinateDidSubmit?(coordinate) }
+    coordinateInput.translatesAutoresizingMaskIntoConstraints = false
 
     cancelContainer.addSubview(cancelButton)
     if #available(iOS 26.0, *) {}
@@ -197,7 +200,15 @@ final class SearchOnMapHeaderView: UIView {
       searchBar.topAnchor.constraint(equalTo: grabberView.bottomAnchor, constant: Constants.searchBarInsets.top).withPriority(.defaultLow),
       searchBarLeadingDefaultConstraint,
       searchBar.trailingAnchor.constraint(equalTo: cancelContainer.leadingAnchor),
-      searchBar.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -Constants.searchBarInsets.bottom),
+      coordinateArea.topAnchor.constraint(equalTo: searchBar.bottomAnchor, constant: 6),
+      coordinateArea.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
+      coordinateArea.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
+      coordinateArea.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -10),
+      coordinateInput.topAnchor.constraint(equalTo: coordinateArea.contentLayoutGuide.topAnchor),
+      coordinateInput.bottomAnchor.constraint(equalTo: coordinateArea.contentLayoutGuide.bottomAnchor),
+      coordinateInput.leadingAnchor.constraint(equalTo: coordinateArea.contentLayoutGuide.leadingAnchor),
+      coordinateInput.trailingAnchor.constraint(equalTo: coordinateArea.contentLayoutGuide.trailingAnchor),
+      coordinateInput.widthAnchor.constraint(equalTo: coordinateArea.frameLayoutGuide.widthAnchor),
       searchBar.heightAnchor.constraint(greaterThanOrEqualToConstant: Constants.minSearchBarHeight),
 
       cancelContainer.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -209,6 +220,13 @@ final class SearchOnMapHeaderView: UIView {
       cancelButton.trailingAnchor.constraint(equalTo: cancelContainer.trailingAnchor, constant: -Constants.cancelButtonInsets.right),
       cancelButton.bottomAnchor.constraint(equalTo: cancelContainer.bottomAnchor),
     ])
+  }
+
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    let size = window?.bounds.size ?? UIScreen.main.bounds.size
+    let height: CGFloat = size.width > size.height ? 84 : 184
+    if coordinateAreaHeight?.constant != height { coordinateAreaHeight?.constant = height }
   }
 
   @objc private func grabberDidTap() {
