@@ -317,8 +317,7 @@ NSString * const kMapToCategorySelectorSegue = @"MapToCategorySelectorSegue";
 
 - (void)setTrackRecordingButtonState:(TrackRecordingButtonState)state
 {
-  BOOL const isNavigation = self.navigationManager.state == MWMNavigationDashboardStateNavigation;
-  if (state == TrackRecordingButtonStateVisible && isNavigation)
+  if (state == TrackRecordingButtonStateVisible)
     state = TrackRecordingButtonStateHidden;
   if ((state == TrackRecordingButtonStateHidden || state == TrackRecordingButtonStateClosed) && !_trackRecordingButton)
     return;
