@@ -269,13 +269,14 @@ final class NavigationDashboardViewController: UIViewController {
 
     startRouteButton.addTarget(self, action: #selector(didTapStartRouteButton), for: .touchUpInside)
 
-    bottomActionsMenu.addActionView(searchButton)
-    bottomActionsMenu.addActionView(bookmarksButton)
-    bottomActionsMenu.addActionView(saveRouteAsTrackButton)
+    searchButton.isHidden = true
+    bookmarksButton.isHidden = true
+    saveRouteAsTrackButton.isHidden = true
     bottomActionsMenu.addActionView(startRouteButton)
   }
 
   private func setupRoutePointsView() {
+    routePointsView.isHidden = true
     routePointsView.interactor = interactor
     routePointsView.scrollViewDelegate = self
   }
@@ -385,7 +386,7 @@ final class NavigationDashboardViewController: UIViewController {
     availableAreaView.addSubview(transportOptionsView)
 
     estimatesStackView.addArrangedSubview(estimatesView)
-    routeControlsStackView.addArrangedSubview(reverseRoutePointsButton)
+    reverseRoutePointsButton.isHidden = true
     routeControlsStackView.addArrangedSubview(settingsButton)
     estimatesStackView.addArrangedSubview(routeControlsStackView)
 
@@ -587,8 +588,9 @@ extension NavigationDashboardViewController {
 
     bottomActionsMenu.setHidden(viewModel.isBottomActionsMenuHidden)
     startRouteButton.setState(viewModel.startButtonState)
-    reverseRoutePointsButton.isEnabled = viewModel.canReverseRoutePoints
+    reverseRoutePointsButton.isHidden = true
+    reverseRoutePointsButton.isEnabled = false
 
-    updatePresentationStep(viewModel.presentationStep)
+    updatePresentationStep(MikshatNavigationCoordinator.isDirectActive ? .hidden : viewModel.presentationStep)
   }
 }

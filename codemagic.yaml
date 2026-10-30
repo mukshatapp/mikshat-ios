@@ -1,0 +1,161 @@
+workflows:
+  mikshat-ios-simulator:
+    name: Mikshat iOS - first simulator build
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+    environment:
+      xcode: latest
+      vars:
+        XCODE_WORKSPACE: xcode/omim.xcworkspace
+        XCODE_SCHEME: OMaps
+    scripts:
+      - name: Prepare Mikshat branding and check navigation math
+        script: |
+          set -euo pipefail
+          python3 mikshat/prepare_branding.py
+          swiftc iphone/Maps/UI/Mikshat/MikshatNavigationMath.swift mikshat/tests/NavigationMathTests.swift -o /tmp/mikshat-navigation-tests
+          /tmp/mikshat-navigation-tests
+      - name: Check Xcode and Metal
+        script: |
+          set -euo pipefail
+          xcodebuild -version
+          if ! xcrun metal -v >/dev/null 2>&1; then
+            xcodebuild -downloadComponent MetalToolchain
+            xcrun -k
+          fi
+          xcrun metal -v
+      - name: Download pinned dependencies
+        script: |
+          set -euo pipefail
+          git submodule update --init --recursive --depth 1 --jobs 8
+      - name: Build for iOS Simulator without signing
+        script: |
+          set -euo pipefail
+          mkdir -p build
+          xcodebuild build \
+            -workspace "$XCODE_WORKSPACE" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/DerivedData \
+            -resultBundlePath build/Mikshat-Build.xcresult \
+            ARCHS=arm64 \
+            ONLY_ACTIVE_ARCH=YES \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee build/xcodebuild.log
+      - name: Package simulator application
+        script: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          apps = list(Path("build/DerivedData/Build/Products/Debug-iphonesimulator").glob("*.app"))
+          if len(apps) != 1:
+              raise SystemExit(f"Expected one simulator app; found {len(apps)}")
+          subprocess.run(["ditto", "-c", "-k", "--sequesterRsrc", "--keepParent",
+                          str(apps[0]), "build/Mikshat-Simulator.zip"], check=True)
+          PY
+    artifacts:
+      - build/Mikshat-Simulator.zip
+      - build/xcodebuild.log
+      - build/Mikshat-Build.xcresult
+
+  mikshat-ios-testflight:
+    name: Mikshat iOS - signed TestFlight build
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+    integrations:
+      app_store_connect: Mikshat-Codemagic
+    environment:
+      xcode: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.mikshat.maps
+      vars:
+        APP_STORE_APPLE_ID: "6828427541"
+        XCODE_WORKSPACE: xcode/omim.xcworkspace
+        XCODE_SCHEME: OMaps
+        APP_VERSION: "4.6.2"
+    scripts:
+      - name: Prepare Mikshat branding and check navigation math
+        script: |
+          set -euo pipefail
+          python3 mikshat/prepare_branding.py
+          swiftc iphone/Maps/UI/Mikshat/MikshatNavigationMath.swift mikshat/tests/NavigationMathTests.swift -o /tmp/mikshat-navigation-tests
+          /tmp/mikshat-navigation-tests
+      - name: Check Xcode and Metal
+        script: |
+          set -euo pipefail
+          xcodebuild -version
+          if ! xcrun metal -v >/dev/null 2>&1; then
+            xcodebuild -downloadComponent MetalToolchain
+            xcrun -k
+          fi
+          xcrun metal -v
+      - name: Download pinned dependencies
+        script: |
+          set -euo pipefail
+          git submodule update --init --recursive --depth 1 --jobs 8
+      - name: Apply distribution provisioning profiles
+        script: |
+          set -euo pipefail
+          xcode-project use-profiles --project iphone/Maps/Maps.xcodeproj
+      - name: Set app and widget versions
+        script: |
+          set -euo pipefail
+          LATEST_BUILD_NUMBER=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID")
+          # A successful query returns no number before the first upload.
+          if [[ -z "$LATEST_BUILD_NUMBER" ]]; then
+            LATEST_BUILD_NUMBER=0
+          fi
+          if [[ ! "$LATEST_BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
+            echo "Expected a numeric TestFlight build number."
+            exit 1
+          fi
+          NEXT_BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1))
+          cd iphone/Maps
+          agvtool new-version -all "$NEXT_BUILD_NUMBER"
+          agvtool new-marketing-version "$APP_VERSION"
+      - name: Archive and export signed IPA
+        script: |
+          set -euo pipefail
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME" \
+            --config Release
+      - name: Validate versions in signed IPA
+        script: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import plistlib
+          import re
+          import zipfile
+          ipas = list(Path("build/ios/ipa").glob("*.ipa"))
+          if len(ipas) != 1:
+              raise SystemExit(f"Expected one IPA, found {len(ipas)}")
+          errors = []
+          with zipfile.ZipFile(ipas[0]) as archive:
+              for name in archive.namelist():
+                  if not re.search(r"\.(app|appex|framework)/Info\.plist$", name):
+                      continue
+                  info = plistlib.loads(archive.read(name))
+                  for key in ("CFBundleShortVersionString", "CFBundleVersion"):
+                      value = info.get(key, "")
+                      if not isinstance(value, str) or not re.fullmatch(r"[0-9]+(?:\.[0-9]+){0,2}", value):
+                          errors.append(f"{name}: invalid {key}={value!r}")
+                  print(f"{name}: version={info.get('CFBundleShortVersionString')}, build={info.get('CFBundleVersion')}")
+          if errors:
+              raise SystemExit("\n".join(errors))
+          PY
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - build/ios/xcarchive/*.xcarchive/dSYMs/*.dSYM
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: false

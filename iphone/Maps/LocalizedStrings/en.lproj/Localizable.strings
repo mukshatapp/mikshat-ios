@@ -1222,3 +1222,138 @@
 
 /* Accessibility label for the button that reverses the complete planned route, including intermediate stops. */
 "reverse_route" = "Reverse route";
+
+/* Mikshat navigation tools */
+"mikshat_tools" = "Mikshat tools";
+
+/* Mikshat navigation tools */
+"mikshat_coordinates" = "Coordinates";
+
+/* Mikshat navigation tools */
+"mikshat_qibla" = "Qibla";
+
+/* Mikshat navigation tools */
+"mikshat_heading" = "Compass";
+
+/* Mikshat navigation tools */
+"mikshat_lat_degrees" = "Latitude degrees";
+
+/* Mikshat navigation tools */
+"mikshat_lat_minutes" = "Latitude minutes";
+
+/* Mikshat navigation tools */
+"mikshat_lon_degrees" = "Longitude degrees";
+
+/* Mikshat navigation tools */
+"mikshat_lon_minutes" = "Longitude minutes";
+
+/* Mikshat navigation tools */
+"mikshat_coordinate_hint" = "Enter degrees and decimal minutes, for example N 24° 42.810′, E 046° 40.518′. Arabic and English digits are supported.";
+
+/* Mikshat navigation tools */
+"mikshat_latitude" = "Latitude: degrees / minutes / direction";
+
+/* Mikshat navigation tools */
+"mikshat_longitude" = "Longitude: degrees / minutes / direction";
+
+/* Mikshat navigation tools */
+"mikshat_show_map" = "Show on map";
+
+/* Mikshat navigation tools */
+"mikshat_coordinate_error" = "Check the degrees and minutes. Minutes must be below 60, with two digits before the decimal point and up to three after it. Latitude is at most 90° and longitude 180°; minutes must be zero at these limits.";
+
+/* Mikshat navigation tools */
+"mikshat_qibla_hint" = "Hold your phone flat and turn until the gold arrow points forward. Qibla uses the phone compass and is independent of the destination heading setting.";
+
+/* Mikshat navigation tools */
+"mikshat_heading_hint" = "Choose the heading used by destination arrows. Automatic mode uses GPS course at 10 km/h or faster, and the phone compass below that speed. This does not change Qibla.";
+
+/* Mikshat navigation tools */
+"mikshat_heading_sensor" = "Phone compass";
+
+/* Mikshat navigation tools */
+"mikshat_heading_gps" = "GPS direction of travel";
+
+/* Mikshat navigation tools */
+"mikshat_heading_auto" = "Automatic GPS / compass";
+
+/* Mikshat navigation tools */
+"mikshat_location_unavailable" = "A recent location is required. Enable location access and wait for a GPS fix.";
+
+/* Mikshat navigation tools */
+"mikshat_heading_unavailable" = "The compass is unavailable or inaccurate. Keep away from magnets and metal, and calibrate your phone.";
+
+/* Mikshat navigation tools */
+"mikshat_qibla_bearing" = "Qibla: %.0f° from true north";
+
+/* Mikshat navigation tools */
+"mikshat_my_location" = "My location";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_kmh" = "km/h";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_speed" = "Speed";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_remaining_distance" = "Distance remaining";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_remaining_time" = "Time remaining";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_arrival" = "Estimated arrival";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_waiting" = "Waiting for movement";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_north" = "North";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_south" = "South";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_east" = "East";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_west" = "West";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_qibla_title" = "Mikshat • Qibla compass";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_location_settings" = "Location settings";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_arrow_to_point" = "Arrow points to the destination";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_heading_source" = "Compass direction source";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_record_track" = "Record track";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_enter_coordinates" = "Enter coordinates";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_go_to" = "Go to";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_copy" = "Copy";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_navigation_modes" = "Direct guidance, car, compass";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_direct" = "Direct";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_car" = "Car";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_stop" = "Stop";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_direct_notice" = "Direct guidance • straight-line distance • arrival time is an estimate";

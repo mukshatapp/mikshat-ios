@@ -228,6 +228,7 @@
 			baseConfigurationReference = FA4C8E54263B1FA80048FA99 /* common-debug.xcconfig */;
 			buildSettings = {
 				CURRENT_PROJECT_VERSION = 1;
+				MARKETING_VERSION = 1.0.0;
 				DEFINES_MODULE = YES;
 				SDKROOT = iphoneos;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -240,6 +241,7 @@
 			baseConfigurationReference = FA4C8E53263B1FA80048FA99 /* common-release.xcconfig */;
 			buildSettings = {
 				CURRENT_PROJECT_VERSION = 1;
+				MARKETING_VERSION = 1.0.0;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEFINES_MODULE = YES;
 				SDKROOT = iphoneos;

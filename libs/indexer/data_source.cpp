@@ -6,6 +6,8 @@
 
 #include "base/stl_helpers.hpp"
 
+#include <type_traits>
+
 using platform::CountryFile;
 using platform::LocalCountryFile;
 
@@ -48,6 +50,10 @@ public:
       // ProcessElement.
       feature::DataHeader const & header = mwmValue->GetHeader();
       CheckUniqueIndexes checkUnique;
+
+      // Read richer indexed features for normal rectangular map requests.
+      if constexpr (std::is_same_v<CoveringT, covering::CoveringGetter>)
+        scale += 4;
 
       // In case of WorldCoasts we should pass correct scale in ForEachInIntervalAndScale.
       auto const lastScale = header.GetLastScale();

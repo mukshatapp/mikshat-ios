@@ -17,6 +17,26 @@
                     <view key="view" contentMode="scaleToFill" id="QhW-Nv-tjG">
                         <rect key="frame" x="0.0" y="0.0" width="414" height="896"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <imageView userInteractionEnabled="NO" contentMode="scaleAspectFit" image="MikshatBrand" translatesAutoresizingMaskIntoConstraints="NO" id="mk-logo">
+                                <rect key="frame" x="127" y="338" width="160" height="160"/>
+                                <constraints>
+                                    <constraint firstAttribute="width" constant="160" id="mk-width"/>
+                                    <constraint firstAttribute="height" constant="160" id="mk-height"/>
+                                </constraints>
+                            </imageView>
+                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" text="مكشات" textAlignment="center" translatesAutoresizingMaskIntoConstraints="NO" id="mk-title">
+                                <rect key="frame" x="157" y="518" width="100" height="40"/>
+                                <fontDescription key="fontDescription" type="system" weight="bold" pointSize="28"/>
+                                <color key="textColor" red="0.086" green="0.306" blue="0.247" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                            </label>
+                        </subviews>
+                        <constraints>
+                            <constraint firstItem="mk-logo" firstAttribute="centerX" secondItem="QhW-Nv-tjG" secondAttribute="centerX" id="mk-center-x"/>
+                            <constraint firstItem="mk-logo" firstAttribute="centerY" secondItem="QhW-Nv-tjG" secondAttribute="centerY" constant="-30" id="mk-center-y"/>
+                            <constraint firstItem="mk-title" firstAttribute="top" secondItem="mk-logo" secondAttribute="bottom" constant="20" id="mk-label-top"/>
+                            <constraint firstItem="mk-title" firstAttribute="centerX" secondItem="QhW-Nv-tjG" secondAttribute="centerX" id="mk-label-x"/>
+                        </constraints>
                         <viewLayoutGuide key="safeArea" id="yp4-hp-ug2"/>
                         <color key="backgroundColor" name="backgroundColor"/>
                     </view>
@@ -27,6 +47,7 @@
         </scene>
     </scenes>
     <resources>
+        <image name="MikshatBrand" width="1254" height="1254"/>
         <namedColor name="backgroundColor">
             <color red="0.8901960784313725" green="0.88235294117647056" blue="0.82352941176470584" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
         </namedColor>

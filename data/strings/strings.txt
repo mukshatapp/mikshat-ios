@@ -46439,3 +46439,273 @@ uk = Трамвай
 vi = Xe điện
 zh-Hans = 有轨电车
 zh-Hant = 路面電車
+
+[mikshat_tools]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Mikshat tools
+ar = أدوات مكشات
+
+[mikshat_coordinates]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Coordinates
+ar = الإحداثيات
+
+[mikshat_qibla]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Qibla
+ar = القبلة
+
+[mikshat_heading]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Compass
+ar = البوصلة
+
+[mikshat_lat_degrees]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Latitude degrees
+ar = درجات خط العرض
+
+[mikshat_lat_minutes]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Latitude minutes
+ar = دقائق خط العرض
+
+[mikshat_lon_degrees]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Longitude degrees
+ar = درجات خط الطول
+
+[mikshat_lon_minutes]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Longitude minutes
+ar = دقائق خط الطول
+
+[mikshat_coordinate_hint]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Enter degrees and decimal minutes, for example N 24° 42.810′, E 046° 40.518′. Arabic and English digits are supported.
+ar = أدخل الدرجات والدقائق العشرية، مثل N 24° 42.810′ وE 046° 40.518′. يدعم الأرقام العربية والإنجليزية.
+
+[mikshat_latitude]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Latitude: degrees / minutes / direction
+ar = خط العرض: الدرجات / الدقائق / الاتجاه
+
+[mikshat_longitude]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Longitude: degrees / minutes / direction
+ar = خط الطول: الدرجات / الدقائق / الاتجاه
+
+[mikshat_show_map]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Show on map
+ar = عرض على الخريطة
+
+[mikshat_coordinate_error]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Check the degrees and minutes. Minutes must be below 60, with two digits before the decimal point and up to three after it. Latitude is at most 90° and longitude 180°; minutes must be zero at these limits.
+ar = تحقق من الدرجات والدقائق. الدقائق أقل من ٦٠، برقمين قبل الفاصلة وحتى ثلاثة بعدها. الحد الأقصى لخط العرض ٩٠° ولخط الطول ١٨٠°، والدقائق صفر عند هذين الحدين.
+
+[mikshat_qibla_hint]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Hold your phone flat and turn until the gold arrow points forward. Qibla uses the phone compass and is independent of the destination heading setting.
+ar = ضع الهاتف بشكل أفقي واستدر حتى يشير السهم الذهبي إلى الأمام. تستخدم القبلة بوصلة الهاتف ولا تتأثر بإعداد اتجاه الوجهة.
+
+[mikshat_heading_hint]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Choose the heading used by destination arrows. Automatic mode uses GPS course at 10 km/h or faster, and the phone compass below that speed. This does not change Qibla.
+ar = اختر مصدر الاتجاه لمؤشرات الوجهة. الوضع التلقائي يستخدم GPS عند سرعة ١٠ كم/س فأكثر، وبوصلة الهاتف عند انخفاض السرعة. لا يؤثر هذا الإعداد على القبلة.
+
+[mikshat_heading_sensor]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Phone compass
+ar = حساس بوصلة الهاتف
+
+[mikshat_heading_gps]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = GPS direction of travel
+ar = اتجاه الحركة من GPS
+
+[mikshat_heading_auto]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Automatic GPS / compass
+ar = تبديل تلقائي بين GPS والحساس
+
+[mikshat_location_unavailable]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = A recent location is required. Enable location access and wait for a GPS fix.
+ar = نحتاج موقعًا حديثًا للهاتف. فعّل إذن الموقع وانتظر وصول قراءة GPS.
+
+[mikshat_heading_unavailable]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = The compass is unavailable or inaccurate. Keep away from magnets and metal, and calibrate your phone.
+ar = البوصلة غير متاحة أو غير دقيقة. ابتعد عن المغناطيس والمعادن وعاير بوصلة الهاتف.
+
+[mikshat_qibla_bearing]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Qibla: %.0f° from true north
+ar = اتجاه القبلة: %.0f° من الشمال الحقيقي
+
+[mikshat_my_location]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = My location
+ar = موقعي
+
+[mikshat_kmh]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = km/h
+ar = كم/س
+
+[mikshat_speed]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Speed
+ar = السرعة
+
+[mikshat_remaining_distance]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Distance remaining
+ar = المسافة المتبقية
+
+[mikshat_remaining_time]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Time remaining
+ar = الزمن المتبقي
+
+[mikshat_arrival]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Estimated arrival
+ar = وقت الوصول المتوقع
+
+[mikshat_waiting]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Waiting for movement
+ar = بانتظار الحركة
+
+[mikshat_north]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = North
+ar = شمال
+
+[mikshat_south]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = South
+ar = جنوب
+
+[mikshat_east]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = East
+ar = شرق
+
+[mikshat_west]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = West
+ar = غرب
+
+[mikshat_qibla_title]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Mikshat • Qibla compass
+ar = مكشات • بوصلة القبلة
+
+[mikshat_location_settings]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Location settings
+ar = إعدادات الموقع
+
+[mikshat_arrow_to_point]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Arrow points to the destination
+ar = السهم نحو النقطة
+
+[mikshat_heading_source]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Compass direction source
+ar = مصدر اتجاه البوصلة
+
+[mikshat_record_track]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Record track
+ar = تسجيل المسار
+
+[mikshat_enter_coordinates]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Enter coordinates
+ar = إدخال الإحداثيات
+
+[mikshat_go_to]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Go to
+ar = اذهب إلى
+
+[mikshat_copy]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Copy
+ar = نسخ
+
+[mikshat_navigation_modes]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Direct guidance, car, compass
+ar = توجيه مباشر، سيارة، بوصلة
+
+[mikshat_direct]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Direct
+ar = توجيه مباشر
+
+[mikshat_car]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Car
+ar = سيارة
+
+[mikshat_stop]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Stop
+ar = إنهاء
+
+[mikshat_direct_notice]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Direct guidance • straight-line distance • arrival time is an estimate
+ar = توجيه مباشر • المسافة بخط مستقيم • وقت الوصول تقديري

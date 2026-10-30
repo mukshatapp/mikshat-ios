@@ -101,12 +101,12 @@ private extension AboutController {
 
     func setupLogo() {
       logoImageView.contentMode = .scaleAspectFit
-      logoImageView.image = UIImage(named: "logo")
+      logoImageView.image = UIImage(named: "MikshatBrand")
     }
 
     func setupHeaderTitle() {
       headerTitleLabel.setFontStyle(.semibold18, color: .blackPrimary)
-      headerTitleLabel.text = L("about_headline")
+      headerTitleLabel.text = "مكشات"
       headerTitleLabel.textAlignment = .center
       headerTitleLabel.configureSingleLineAutoScaling()
     }

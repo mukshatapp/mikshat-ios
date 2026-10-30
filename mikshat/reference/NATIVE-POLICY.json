@@ -1,0 +1,63 @@
+[
+  {
+    "abi": "arm64-v8a",
+    "source_sha256": "de70f3498c383c958aafc190d971aa1aa877448e9326c5aa5d56ca6101e551a5",
+    "patched_sha256": "cd0e47cc39b886ead27923c5550dd89f5b3e23109d3dc9da8ec4eca6b8e54972",
+    "changed_byte_offset": "0xb18afc",
+    "changed_bytes": 6,
+    "patch_ranges": [
+      {
+        "offset": "0xb18afc",
+        "before": "4b018052",
+        "after": "2b018052"
+      },
+      {
+        "offset": "0xb19214",
+        "before": "48018052",
+        "after": "28018052"
+      },
+      {
+        "offset": "0xb1b898",
+        "before": "f903032a",
+        "after": "79100011"
+      }
+    ],
+    "rectangular_index_detail_boost": 4,
+    "country_min_draw_scale": 9,
+    "world_max_draw_scale": 9,
+    "upper_data_scale": 17
+  },
+  {
+    "abi": "x86",
+    "source_sha256": "520088acff20dca12e80bd5b32242ec60b271a9a85885d85e158dadfdf55fd69",
+    "patched_sha256": "bda3f246154acf9aaf99b1b9c77bd50ac2c0f38bbc3a68ae9dc529332d54416b",
+    "changed_byte_offset": "0x1064a0",
+    "changed_bytes": 16,
+    "patch_ranges": [
+      {
+        "offset": "0x1064a0",
+        "before": "0a00000011000000",
+        "after": "0900000011000000"
+      },
+      {
+        "offset": "0xbd873f",
+        "before": "0a",
+        "after": "09"
+      },
+      {
+        "offset": "0xbdb302",
+        "before": "8b4d0c39c1",
+        "after": "e8c0ccffff"
+      },
+      {
+        "offset": "0xbd7fc7",
+        "before": "cccccccccccccccccc",
+        "after": "8b4d0c83c10439c1c3"
+      }
+    ],
+    "rectangular_index_detail_boost": 4,
+    "country_min_draw_scale": 9,
+    "world_max_draw_scale": 9,
+    "upper_data_scale": 17
+  }
+]

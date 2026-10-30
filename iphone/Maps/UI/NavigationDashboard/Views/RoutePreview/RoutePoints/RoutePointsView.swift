@@ -14,7 +14,7 @@ final class RoutePointsView: UIView {
   weak var scrollViewDelegate: UIScrollViewDelegate?
 
   var contentBottom: CGPoint {
-    origin.applying(CGAffineTransform(translationX: .zero, y: collectionView.contentSize.height))
+    origin
   }
 
   init() {
@@ -122,7 +122,7 @@ extension RoutePointsView: UIScrollViewDelegate {
 
 extension RoutePointsView: UICollectionViewDataSource, UICollectionViewDelegate {
   func collectionView(_: UICollectionView, numberOfItemsInSection _: Int) -> Int {
-    routePoints.hasStartAndFinish ? routePoints.count + 1 : routePoints.count
+    min(2, routePoints.count)
   }
 
   func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {

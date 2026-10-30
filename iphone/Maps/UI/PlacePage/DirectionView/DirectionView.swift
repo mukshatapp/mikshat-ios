@@ -57,6 +57,10 @@ class DirectionView: SolidTouchView {
     distanceLabel?.text = distance
   }
 
+  func setHeadingAvailable(_ available: Bool) {
+    directionArrow?.isHidden = !available
+  }
+
   func updateHeading(_ angle: CGFloat) {
     UIView.animate(withDuration: AppConstants.defaultAnimationDuration,
                    delay: 0,

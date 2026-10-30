@@ -149,6 +149,13 @@ final class SearchOnMapViewController: UIViewController {
 
   private func setupHeaderView() {
     headerView.delegate = self
+    headerView.coordinateDidSubmit = { [weak self] coordinate in
+      self?.view.endEditing(true)
+      let pair = String(format: "%.8f,%.8f", coordinate.latitude, coordinate.longitude)
+      guard let url = URL(string: "om://map?ll=\(pair)") else { return }
+      self?.close()
+      _ = DeepLinkHandler.shared.applicationDidOpenUrl(url)
+    }
   }
 
   private func setupSearchResultsView() {
