@@ -1288,3 +1288,72 @@
 
 /* Mikshat navigation tools */
 "mikshat_my_location" = "My location";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_kmh" = "km/h";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_speed" = "Speed";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_remaining_distance" = "Distance remaining";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_remaining_time" = "Time remaining";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_arrival" = "Estimated arrival";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_waiting" = "Waiting for movement";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_north" = "North";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_south" = "South";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_east" = "East";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_west" = "West";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_qibla_title" = "Mikshat • Qibla compass";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_location_settings" = "Location settings";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_arrow_to_point" = "Arrow points to the destination";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_heading_source" = "Compass direction source";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_record_track" = "Record track";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_enter_coordinates" = "Enter coordinates";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_go_to" = "Go to";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_copy" = "Copy";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_navigation_modes" = "Direct guidance, car, compass";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_direct" = "Direct";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_car" = "Car";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_stop" = "Stop";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_direct_notice" = "Direct guidance • straight-line distance • arrival time is an estimate";
