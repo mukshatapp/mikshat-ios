@@ -2,6 +2,9 @@ package com.mikshat.prototype;
 
 import static org.junit.Assert.*;
 import android.Manifest;
+import app.organicmaps.sdk.Framework;
+import app.organicmaps.sdk.routing.RoutingController;
+import app.organicmaps.sdk.routing.RoutingInfo;
 import android.app.Instrumentation;
 import android.content.Context;
 import android.content.Intent;
@@ -87,10 +90,28 @@ public class OfflineEngineTest {
       runtime.select("اختبار الملاحة",24.7165,46.6758,false);
       runtime.navigate("vehicle");
     });
-    waitFor(()->runtime.navigating,"Offline vehicle route did not build",60000);
+    waitFor(()->runtime.navigating && Framework.nativeIsRouteBuilt(),"Offline vehicle route did not build in the native engine",60000);
+    ui(()->{
+      RoutingInfo route=Framework.nativeGetRouteFollowingInfo();
+      assertNotNull("No native vehicle route information",route);
+      assertTrue("Vehicle route distance is invalid",route.distToTarget.isValid());
+      assertTrue("Vehicle route distance is empty",route.distToTarget.mDistance>0);
+    });
     ui(runtime::stopNavigation);
-    ui(()->runtime.navigate("direct"));
-    waitFor(()->runtime.navigating,"Offline direct route did not build",30000);
+
+    ui(()->{
+      runtime.select("منطقة غير محملة",51.5074,-0.1278,false);
+      runtime.navigate("vehicle");
+    });
+    waitFor(()->!RoutingController.get().isBuilding(),"Missing-map route did not finish",60000);
+    ui(()->assertFalse("A missing-map route activated navigation",runtime.navigating));
+    ui(runtime::stopNavigation);
+
+    ui(()->{
+      runtime.select("اختبار الملاحة",24.7165,46.6758,false);
+      runtime.navigate("direct");
+    });
+    waitFor(()->runtime.navigating && Framework.nativeIsRouteBuilt(),"Offline direct route did not build in the native engine",30000);
     ui(runtime::stopNavigation);
 
     ui(()->{try{runtime.startRecording();}catch(Exception e){throw new RuntimeException(e);}});

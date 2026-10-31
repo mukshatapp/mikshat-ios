@@ -159,14 +159,19 @@ public final class MapRuntime implements LocationListener, SearchListener, Routi
   }
   @Override public void showRoutePlan(boolean show,Runnable completion) { if(completion!=null) completion.run(); }
   @Override public void onBuiltRoute() {
+    // The SDK also invokes this callback when maps are missing.
+    if(!Framework.nativeIsRouteBuilt()) return;
     if(!navigating) { navigating=true;RoutingController.get().start();updateService(); }
     publishRoute();
   }
   @Override public void onCommonBuildError(int code,String[] missing) {
+    navigating=false;updateService();
+    emit("route","active",false);
     emit("error","message",missing!=null && missing.length>0 ? "المسار يحتاج خرائط إضافية: "+String.join(", ",missing) : "تعذر حساب المسار ("+code+")");
   }
   void stopNavigation() {
     navigating=false;RoutingController.get().cancel();updateService();
+    emit("route","active",false);
   }
   private void publishRoute() {
     if(location==null) return;
