@@ -60,7 +60,7 @@ public final class MapRuntime implements LocationListener, SearchListener, Routi
     initializing = true;
     Executors.newSingleThreadExecutor().execute(() -> {
       try {
-        File maps = new File(context.getFilesDir(), "maps/260714");
+        File maps = new File(context.getFilesDir(), "260714");
         if (!maps.exists() && !maps.mkdirs()) throw new IOException("Cannot create map directory");
         install(maps, "Saudi Arabia_North.mwm", 71760131L,
           "6cd35fcb5b2bcd8c0ce5f9249426126c1a3c56635033c07fde855b9316651fe0");
@@ -69,7 +69,7 @@ public final class MapRuntime implements LocationListener, SearchListener, Routi
         // Set before constructing the SDK so it registers the installed country files on first load.
         File settings = new File(context.getFilesDir(), "settings.ini");
         if (!settings.exists()) try (FileOutputStream out = new FileOutputStream(settings)) {
-          out.write(("StoragePath=" + new File(context.getFilesDir(), "maps").getAbsolutePath() + "/\nMapLanguageCode=ar\nMapStyle=MapStyleOutdoorsLight\n").getBytes(StandardCharsets.UTF_8));
+          out.write(("StoragePath=" + context.getFilesDir().getAbsolutePath() + "/\nMapLanguageCode=ar\nMapStyle=MapStyleOutdoorsLight\n").getBytes(StandardCharsets.UTF_8));
         }
         main.post(() -> {
           try {
@@ -115,6 +115,7 @@ public final class MapRuntime implements LocationListener, SearchListener, Routi
     if(!part.renameTo(file)) throw new IOException("Cannot install map: "+name);
   }
   private void failInitialization(Throwable e) {
+    android.util.Log.e("MukshatEngine","Native initialization failed",e);
     initializing=false;
     for(MethodChannel.Result waiter:waiters) waiter.error("ENGINE_INIT",e.toString(),null);
     waiters.clear();

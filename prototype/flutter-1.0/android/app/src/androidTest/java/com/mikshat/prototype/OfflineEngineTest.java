@@ -58,8 +58,8 @@ public class OfflineEngineTest {
     Intent open=new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
     test.startActivitySync(open);
     waitFor(()->runtime.ready && app.organicmaps.sdk.Map.isEngineCreated(),"Native map renderer did not initialize",120000);
-    assertTrue(new File(context.getFilesDir(),"maps/260714/Saudi Arabia_North.mwm").isFile());
-    assertTrue(new File(context.getFilesDir(),"maps/260714/Saudi Arabia_South.mwm").isFile());
+    assertTrue(new File(context.getFilesDir(),"260714/Saudi Arabia_North.mwm").isFile());
+    assertTrue(new File(context.getFilesDir(),"260714/Saudi Arabia_South.mwm").isFile());
     shell("svc wifi disable");shell("svc data disable");
 
     ui(()->runtime.search("الرياض",91));

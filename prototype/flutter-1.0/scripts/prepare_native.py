@@ -49,10 +49,12 @@ with tarfile.open(source) as archive:
             member.name = relative
             archive.extract(member, vendor, filter='data')
 assets = ROOT / 'android/organic-sdk/src/main/assets'
+# APK baseline profiles belong to the original application, not this SDK consumer.
+if (assets / 'dexopt').is_dir(): shutil.rmtree(assets / 'dexopt')
 libs = ROOT / 'android/organic-sdk/src/main/jniLibs'
 with zipfile.ZipFile(apk) as archive:
     for entry in archive.infolist():
-        if entry.filename.startswith('assets/') and not entry.is_dir():
+        if entry.filename.startswith('assets/') and not entry.filename.startswith('assets/dexopt/') and not entry.is_dir():
             relative = Path(entry.filename).relative_to('assets')
             if '..' in relative.parts: raise RuntimeError('Invalid asset path')
             target = assets / relative; target.parent.mkdir(parents=True, exist_ok=True)

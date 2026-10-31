@@ -48,8 +48,26 @@ jobs:
             xcodebuild -downloadComponent MetalToolchain
             xcrun -k
           fi
-      - name: Build Organic Maps native engine for iOS simulator
-        run: bash scripts/build_ios_core.sh iphonesimulator
+      - name: Restore verified native archive
+        id: native-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            prototype/flutter-1.0/ios/Native/Artifacts/libMukshatCore.a
+            prototype/flutter-1.0/ios/Native/Artifacts/core-build-key.txt
+          key: mukshat-core-iphonesimulator-20260929-${{ runner.arch }}-${{ hashFiles('prototype/flutter-1.0/scripts/upstream/country-scale.patch','prototype/flutter-1.0/scripts/build_ios_core.sh') }}
+      - name: Build Organic Maps C++ archive
+        run: bash scripts/build_ios_core.sh iphonesimulator core-only
+      - name: Save native archive before Flutter linking
+        if: steps.native-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            prototype/flutter-1.0/ios/Native/Artifacts/libMukshatCore.a
+            prototype/flutter-1.0/ios/Native/Artifacts/core-build-key.txt
+          key: mukshat-core-iphonesimulator-20260929-${{ runner.arch }}-${{ hashFiles('prototype/flutter-1.0/scripts/upstream/country-scale.patch','prototype/flutter-1.0/scripts/build_ios_core.sh') }}
+      - name: Compile Metal shaders and copy native resources
+        run: bash scripts/build_ios_core.sh iphonesimulator rendering-only
       - name: Build Flutter iOS simulator application
         run: |
           cd ios
