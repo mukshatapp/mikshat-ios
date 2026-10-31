@@ -75,7 +75,7 @@ public final class MapRuntime implements LocationListener, SearchListener, Routi
           try {
             Locale.setDefault(Locale.forLanguageTag("ar"));
             sdk = new OrganicMaps(context,"prototype","com.mikshat.prototype",1,"1.0.0");
-            sdk.init(() -> {});
+            sdk.init(() -> main.post(this::completeInitialization));
             app.organicmaps.sdk.util.Config.setTransliteration(false);
             sdk.getLocationHelper().addListener(this);
             sdk.getSensorHelper().addListener(north -> {
@@ -91,13 +91,18 @@ public final class MapRuntime implements LocationListener, SearchListener, Routi
               }
               public void onPlacePageDeactivated() {}
             });
-            ready = true; initializing = false;
-            for (MethodChannel.Result waiter : waiters) waiter.success(null);
-            waiters.clear();
+            // Ready is reported by the SDK callback after all map files are registered.
           } catch (Throwable e) { failInitialization(e); }
         });
       } catch (Throwable e) { main.post(() -> failInitialization(e)); }
     });
+  }
+  private void completeInitialization() {
+    if(!initializing) return;
+    android.util.Log.d("MukshatEngine","Native map registration completed");
+    ready = true; initializing = false;
+    for (MethodChannel.Result waiter : waiters) waiter.success(null);
+    waiters.clear();
   }
   private void install(File directory,String name,long size,String expected) throws Exception {
     File file=new File(directory,name);

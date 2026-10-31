@@ -27,12 +27,12 @@ public final class RecordingService extends Service {
   }
   @Override public int onStartCommand(Intent intent,int flags,int startId) {
     MapRuntime runtime=MapRuntime.get(this);
+    showForegroundNotification(runtime);
     if(!runtime.ready || !(runtime.recording||runtime.navigating)) {
       stopForeground(STOP_FOREGROUND_REMOVE);
       stopSelf(startId);
       return START_NOT_STICKY;
     }
-    showForegroundNotification(runtime);
     runtime.sdk.getLocationHelper().start();
     return START_NOT_STICKY;
   }
