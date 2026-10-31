@@ -17,11 +17,11 @@ permissions:
   contents: read
 concurrency:
   group: mukshat-prototype-native-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   native:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: prototype/flutter-1.0
@@ -73,11 +73,7 @@ jobs:
             adb shell pm grant com.mikshat.prototype android.permission.ACCESS_COARSE_LOCATION
             adb shell pm grant com.mikshat.prototype android.permission.POST_NOTIFICATIONS
             adb shell appops set com.mikshat.prototype android:mock_location allow
-            adb shell am instrument -w com.mikshat.prototype.test/androidx.test.runner.AndroidJUnitRunner | tee artifacts/native-result.txt
-            adb logcat -d > artifacts/native-logcat.txt
-            grep -E 'MukshatEngine|MukshatSearch|SecurityException|AndroidRuntime|FATAL|OMcore|flutter' artifacts/native-logcat.txt | tail -150 || true
-            adb exec-out run-as com.mikshat.prototype cat files/prototype-map-proof.png > artifacts/native-map.png
-            python3 -c "from pathlib import Path; assert 'OK (1 test)' in Path('artifacts/native-result.txt').read_text()"
+            python3 scripts/run_android_integration.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:

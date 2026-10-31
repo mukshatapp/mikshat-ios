@@ -9,6 +9,7 @@ Pod::Spec.new do |s|
   s.platform = :ios, '15.0'
   s.source_files = 'Classes/**/*.{h,hpp,mm}'
   s.public_header_files = 'Classes/MKOrganicPlugin.h'
+  s.requires_arc = true
   s.dependency 'Flutter'
   s.vendored_libraries = 'Artifacts/libMukshatCore.a'
   s.resources = ['Artifacts/MukshatData.bundle', 'Artifacts/default.metallib']
@@ -16,6 +17,7 @@ Pod::Spec.new do |s|
   s.libraries = 'c++', 'z', 'bz2', 'sqlite3', 'icucore'
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
+    'CLANG_ENABLE_OBJC_ARC' => 'YES',
     'CLANG_CXX_LANGUAGE_STANDARD' => 'c++23',
     'OTHER_CPLUSPLUSFLAGS' => '$(inherited) -include "$(PODS_TARGET_SRCROOT)/Classes/MKCoreBuildConfig.h"',
     'GCC_PREPROCESSOR_DEFINITIONS' => '$(inherited) OMIM_METAL_AVAILABLE=1 RELEASE=1',

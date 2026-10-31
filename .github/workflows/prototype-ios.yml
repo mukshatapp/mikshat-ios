@@ -123,3 +123,13 @@ jobs:
             prototype/flutter-1.0/ios/Podfile.lock
           if-no-files-found: error
           retention-days: 14
+      - name: Verify the actual simulator application stays running
+        run: python3 scripts/run_ios_smoke.py build/ios/iphonesimulator/Runner.app
+      - name: Upload runtime evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mukshat-1.0-iOS-runtime-evidence
+          path: prototype/flutter-1.0/artifacts/ios-runtime/
+          if-no-files-found: warn
+          retention-days: 14

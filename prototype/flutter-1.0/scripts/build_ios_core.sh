@@ -17,6 +17,16 @@ actual_tag=$(git -C "$engine_root" describe --tags --exact-match)
 if ! git -C "$engine_root" apply --reverse --check "$prototype_root/scripts/upstream/country-scale.patch" 2>/dev/null; then
   git -C "$engine_root" apply "$prototype_root/scripts/upstream/country-scale.patch"
 fi
+# The Xcode generator must retain Objective-C members in the Metal contexts.
+python3 - "$engine_root" <<'PY'
+from pathlib import Path
+import sys
+source=Path(sys.argv[1])/'libs/drape/metal/metal_base_context.mm'
+marker='#error Mukshat Metal contexts require Objective-C ARC'
+text=source.read_text()
+if marker not in text:
+    source.write_text('#if !__has_feature(objc_arc)\n'+marker+'\n#endif\n'+text)
+PY
 mkdir -p "$native_root/Artifacts"
 native_build="$native_root/Build-$sdk_name"
 core_signature=$(python3 - "$engine_root" "$sdk_name" "$prototype_root/scripts/upstream/country-scale.patch" "$0" <<'PY'
@@ -40,7 +50,8 @@ if [[ "$phase" != rendering-only ]]; then
       -DCMAKE_SYSTEM_NAME=iOS -DCMAKE_OSX_SYSROOT="$sdk_name" \
       -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_DEPLOYMENT_TARGET=15.0 \
       -DSKIP_QT_GUI=ON -DBUILD_TESTING=OFF -DCMAKE_UNITY_BUILD=OFF \
-      -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO
+      -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
+      -DCMAKE_XCODE_ATTRIBUTE_CLANG_ENABLE_OBJC_ARC=YES
     cmake --build "$native_build" --config Release --target map --parallel 3
     python3 - "$native_build" "$native_root/Artifacts/libMukshatCore.a" <<'PY'
 import pathlib,subprocess,sys

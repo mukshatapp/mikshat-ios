@@ -66,12 +66,15 @@ public class OfflineEngineTest {
   }
   @Test public void offlineMapSearchRoutesAndLockedRecording() throws Exception {
     Intent open=new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+    android.util.Log.i("MukshatCheck","launch");
     test.startActivitySync(open);
+    android.util.Log.i("MukshatCheck","activity-started");
     waitFor(()->runtime.ready && runtime.renderingReady && app.organicmaps.sdk.Map.isEngineCreated(),"Native map renderer did not initialize",120000);
     assertTrue(new File(context.getFilesDir(),"260714/Saudi Arabia_North.mwm").isFile());
     assertTrue(new File(context.getFilesDir(),"260714/Saudi Arabia_South.mwm").isFile());
     shell("svc wifi disable");shell("svc data disable");
 
+    android.util.Log.i("MukshatCheck","search");
     ui(()->runtime.search("الرياض",91));
     Field results=MapRuntime.class.getDeclaredField("cachedResults");results.setAccessible(true);
     waitFor(()->{
@@ -87,6 +90,7 @@ public class OfflineEngineTest {
     waitFor(()->runtime.location!=null,"Native GPS did not receive emulator fix",15000);
 
     ui(()->{
+      android.util.Log.i("MukshatCheck","vehicle");
       runtime.select("اختبار الملاحة",24.7165,46.6758,false);
       runtime.navigate("vehicle");
     });
@@ -100,6 +104,7 @@ public class OfflineEngineTest {
     ui(runtime::stopNavigation);
 
     ui(()->{
+      android.util.Log.i("MukshatCheck","missing-map");
       runtime.select("منطقة غير محملة",51.5074,-0.1278,false);
       runtime.navigate("vehicle");
     });
@@ -109,11 +114,13 @@ public class OfflineEngineTest {
 
     ui(()->{
       runtime.select("اختبار الملاحة",24.7165,46.6758,false);
+      android.util.Log.i("MukshatCheck","direct");
       runtime.navigate("direct");
     });
     waitFor(()->runtime.navigating && Framework.nativeIsRouteBuilt(),"Offline direct route did not build in the native engine",30000);
     ui(runtime::stopNavigation);
 
+    android.util.Log.i("MukshatCheck","recording");
     ui(()->{try{runtime.startRecording();}catch(Exception e){throw new RuntimeException(e);}});
     fix(manager,24.7137,46.6754);
     int before=runtime.points;
