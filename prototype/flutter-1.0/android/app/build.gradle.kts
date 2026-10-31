@@ -27,6 +27,7 @@ android {
         // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)
         // You can force using the value of versionCode by specifying the `-P force-version-code-ignoring-abi=true`
         // flag during build.
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         ndk { abiFilters.addAll((project.findProperty("prototypeAbis")?.toString() ?: "arm64-v8a,x86_64").split(",")) }
@@ -44,6 +45,8 @@ android {
 }
 
 dependencies {
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    androidTestImplementation("androidx.test:runner:1.7.0")
     implementation(project(":organic-sdk"))
     implementation("androidx.fragment:fragment:1.8.9")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
