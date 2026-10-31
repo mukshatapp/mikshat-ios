@@ -222,7 +222,7 @@
     routing::FollowingInfo info;MukshatFramework().GetRoutingManager().GetRouteFollowingInfo(info);
     distance=info.m_distToTarget.To(platform::Distance::Units::Meters).GetDistance();
   }
-  [self emit:@{@"type":@"route",@"distance":@(distance),@"bearing":@(bearing),@"message":@"ملاحة دون اتصال"}];
+  [self emit:@{@"type":@"route",@"active":@(self.navigating),@"distance":@(distance),@"bearing":@(bearing),@"message":@"ملاحة دون اتصال"}];
 }
 - (void)locationManager:(CLLocationManager *)manager didUpdateLocations:(NSArray<CLLocation *> *)locations
 {

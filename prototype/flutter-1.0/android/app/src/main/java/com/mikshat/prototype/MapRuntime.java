@@ -167,7 +167,7 @@ public final class MapRuntime implements LocationListener, SearchListener, Routi
     float[] values=new float[3];Location.distanceBetween(location.getLatitude(),location.getLongitude(),targetLat,targetLon,values);
     RoutingInfo info=Framework.nativeGetRouteFollowingInfo();
     double distance=navigationMode.equals("vehicle") && info!=null?info.distToTarget.mDistance:values[0];
-    emit("route","distance",distance,"bearing",(double)values[1],"message",
+    emit("route","active",navigating,"distance",distance,"bearing",(double)values[1],"message",
       navigationMode.equals("vehicle")?"ملاحة بالسيارة دون اتصال":"توجيه "+(navigationMode.equals("compass")?"بالبوصلة":"مباشر"));
   }
   @Override public void onLocationUpdated(Location fix) {

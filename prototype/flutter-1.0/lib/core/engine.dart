@@ -37,6 +37,7 @@ class MapEngine extends ChangeNotifier {
   int _queryId = 0;
 
   Future<void> initialize() async {
+    if (ready) return;
     _subscription = events.receiveBroadcastStream().listen(
       _onEvent,
       onError: (Object e) {
@@ -83,6 +84,7 @@ class MapEngine extends ChangeNotifier {
             .toList();
         searching = !(data['done'] as bool? ?? false);
       case 'route':
+        if (data['active'] is bool) navigating = data['active'] as bool;
         distance = (data['distance'] as num? ?? 0).toDouble();
         bearing = (data['bearing'] as num? ?? 0).toDouble();
         status = data['message'] as String? ?? 'الملاحة تعمل';
