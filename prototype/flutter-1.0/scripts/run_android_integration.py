@@ -7,6 +7,7 @@ def adb(*args,timeout=30):
     return subprocess.run(['adb',*args],capture_output=True,timeout=timeout)
 adb('root')
 adb('wait-for-device')
+adb('emu','geo','fix','46.6753','24.7136')
 adb('logcat','-c')
 with (root/'native-logcat.txt').open('wb') as log, (root/'native-result.txt').open('wb') as result:
     logger=subprocess.Popen(['adb','logcat','-v','time'],stdout=log,stderr=subprocess.STDOUT)

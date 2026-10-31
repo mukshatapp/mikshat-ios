@@ -10,6 +10,7 @@ on:
       - 'prototype/flutter-1.0/pubspec.*'
       - 'prototype/flutter-1.0/native-resources/**'
       - 'prototype/flutter-1.0/scripts/prepare_native.py'
+      - 'prototype/flutter-1.0/scripts/run_android_integration.py'
       - 'prototype/flutter-1.0/scripts/upstream/patch_country_scale.py'
       - 'prototype/flutter-1.0/test/**'
       - '.github/workflows/prototype-smoke.yml'
