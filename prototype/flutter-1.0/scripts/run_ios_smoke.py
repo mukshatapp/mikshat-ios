@@ -8,13 +8,14 @@ proof=pathlib.Path('artifacts/ios-runtime');proof.mkdir(parents=True,exist_ok=Tr
 data=json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','--json']))
 candidates=[(r,d) for r,ds in data['devices'].items() if '.iOS-' in r for d in ds if 'iPhone' in d['name']]
 if not candidates: raise SystemExit('No available iPhone simulator')
-runtime,device=sorted(candidates,key=lambda pair:pair[0])[-1]
+sdk=subprocess.check_output(['xcrun','--sdk','iphonesimulator','--show-sdk-version'],text=True).strip()
+matching=[pair for pair in candidates if pair[0].endswith('.iOS-'+sdk.replace('.','-'))]
+print('Simulator SDK:',sdk,'available runtimes:',sorted({r for r,d in candidates}),flush=True)
+runtime,device=sorted(matching or candidates,key=lambda pair:pair[0])[-1]
 uid=device['udid'];print('Simulator:',device['name'],runtime,flush=True)
 if device['state']!='Booted': subprocess.run(['xcrun','simctl','boot',uid],check=True,timeout=240)
 subprocess.run(['xcrun','simctl','bootstatus',uid,'-b'],check=True,timeout=240)
-developer=pathlib.Path(subprocess.check_output(['xcode-select','-p'],text=True).strip())
-subprocess.run(['open','-a',str(developer/'Applications/Simulator.app'),'--args','-CurrentDeviceUDID',uid],check=True,timeout=30)
-subprocess.run(['xcrun','simctl','install',uid,str(app)],check=True,timeout=90)
+subprocess.run(['xcrun','simctl','install',uid,str(app)],check=True,timeout=240)
 launch=subprocess.run(['xcrun','simctl','launch','--terminate-running-process',
                       '--stdout='+str((proof/'stdout.log').resolve()),
                       '--stderr='+str((proof/'stderr.log').resolve()),

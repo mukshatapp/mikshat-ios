@@ -11,6 +11,7 @@ on:
       - 'prototype/flutter-1.0/native-resources/**'
       - 'prototype/flutter-1.0/scripts/build_ios_core.sh'
       - 'prototype/flutter-1.0/scripts/prepare_ios_resources.py'
+      - 'prototype/flutter-1.0/scripts/run_ios_smoke.py'
       - 'prototype/flutter-1.0/scripts/prepare_native.py'
       - 'prototype/flutter-1.0/scripts/upstream/country-scale.patch'
       - '.github/workflows/prototype-ios.yml'
@@ -18,7 +19,7 @@ permissions:
   contents: read
 concurrency:
   group: mukshat-prototype-ios-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   ios:
     runs-on: macos-15
