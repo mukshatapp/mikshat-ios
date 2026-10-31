@@ -34,6 +34,8 @@ jobs:
           if device['state'] != 'Booted':
               subprocess.run(['xcrun','simctl','boot',uid],check=True)
           subprocess.run(['xcrun','simctl','bootstatus',uid,'-b'],check=True,timeout=240)
+          developer = pathlib.Path(subprocess.check_output(['xcode-select','-p'],text=True).strip())
+          subprocess.run(['open','-a',str(developer/'Applications/Simulator.app'),'--args','-CurrentDeviceUDID',uid],check=True,timeout=30)
           subprocess.run(['xcrun','simctl','install',uid,str(app)],check=True)
           log = proof / 'console.log'
           launch = subprocess.run(['xcrun','simctl','launch','--terminate-running-process',
@@ -43,8 +45,25 @@ jobs:
           launch.check_returncode()
           pid = launch.stdout.strip().rsplit(':',1)[-1].strip()
           if not pid.isdigit(): raise SystemExit('No simulator app PID returned')
-          time.sleep(35)
-          alive = subprocess.run(['xcrun','simctl','spawn',uid,'launchctl','procinfo',pid],capture_output=True).returncode == 0
+          time.sleep(20)
+          subprocess.run(['xcrun','simctl','io',uid,'screenshot',str(proof/'first-launch.png')],check=True)
+          launch = subprocess.run(['xcrun','simctl','launch','--terminate-running-process',
+                                   '--stdout='+str(log),'--stderr='+str(proof/'stderr.log'),
+                                   uid,'com.mikshat.prototype'],capture_output=True,text=True,timeout=180)
+          print('Second launch:',launch.returncode,launch.stdout,launch.stderr,flush=True)
+          launch.check_returncode()
+          pid = launch.stdout.strip().rsplit(':',1)[-1].strip()
+          time.sleep(20)
+          status = subprocess.run(['ps','-p',pid,'-o','stat=','-o','comm='],capture_output=True,text=True)
+          print('Actual app process:',status.returncode,status.stdout,flush=True)
+          alive = status.returncode == 0 and not status.stdout.strip().startswith('Z')
+          crashes = list((pathlib.Path.home()/'Library/Logs/DiagnosticReports').glob('Runner*'))
+          for report in crashes[-2:]:
+              if report.is_file():
+                  text = report.read_text(errors='replace')
+                  (proof/report.name).write_text(text)
+                  print('Crash report:',report.name,text[:20000])
+
           screenshot = proof / 'native-map.png'
           subprocess.run(['xcrun','simctl','io',uid,'screenshot',str(screenshot)],check=True)
           for source in [log,proof/'stderr.log']:
