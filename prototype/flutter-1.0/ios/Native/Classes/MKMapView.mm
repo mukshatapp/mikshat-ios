@@ -21,9 +21,9 @@
     layer.device = MTLCreateSystemDefaultDevice();
     layer.opaque = YES;
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(background)
-      name:UIApplicationDidEnterBackgroundNotification object:nil];
+      name:UIApplicationWillResignActiveNotification object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(foreground)
-      name:UIApplicationWillEnterForegroundNotification object:nil];
+      name:UIApplicationDidBecomeActiveNotification object:nil];
   }
   return self;
 }
@@ -53,8 +53,8 @@
   }
   else framework.OnSize(pixels.width,pixels.height);
 }
-- (void)background { if (m_factory) m_factory->SetPresentAvailable(false); }
-- (void)foreground { if (m_factory) m_factory->SetPresentAvailable(true); }
+- (void)background { if (m_factory) { m_factory->SetPresentAvailable(false); MukshatFramework().EnterBackground(); } }
+- (void)foreground { if (m_factory) { MukshatFramework().EnterForeground(); m_factory->SetPresentAvailable(true); } }
 - (void)sendTouches:(NSSet<UITouch *> *)touches type:(df::TouchEvent::ETouchType)type
 {
   df::TouchEvent event; event.SetTouchType(type);

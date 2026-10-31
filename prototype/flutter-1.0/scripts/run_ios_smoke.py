@@ -27,6 +27,14 @@ time.sleep(30)
 status=subprocess.run(['ps','-p',pid,'-o','stat=','-o','comm='],capture_output=True,text=True)
 alive=status.returncode==0 and not status.stdout.strip().startswith('Z')
 print('Actual app process:',status.returncode,status.stdout,flush=True)
+if alive:
+    subprocess.run(['xcrun','simctl','launch',uid,'com.apple.Preferences'],check=True,capture_output=True,timeout=60)
+    time.sleep(5)
+    subprocess.run(['xcrun','simctl','launch',uid,'com.mikshat.prototype'],check=True,capture_output=True,timeout=60)
+    time.sleep(10)
+    status=subprocess.run(['ps','-p',pid,'-o','stat=','-o','comm='],capture_output=True,text=True)
+    alive=status.returncode==0 and not status.stdout.strip().startswith('Z')
+    print('Process after background/foreground:',status.returncode,status.stdout,flush=True)
 screenshot=proof/'native-map.png'
 subprocess.run(['xcrun','simctl','io',uid,'screenshot',str(screenshot)],check=True,timeout=30)
 for source in [proof/'stdout.log',proof/'stderr.log']:
