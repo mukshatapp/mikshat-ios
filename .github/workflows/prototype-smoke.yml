@@ -3,7 +3,16 @@ on:
   workflow_dispatch:
   push:
     branches: ['prototype/flutter-1.0']
-    paths: ['prototype/flutter-1.0/**', '.github/workflows/prototype-smoke.yml']
+    paths:
+      - 'prototype/flutter-1.0/android/**'
+      - 'prototype/flutter-1.0/lib/**'
+      - 'prototype/flutter-1.0/assets/**'
+      - 'prototype/flutter-1.0/pubspec.*'
+      - 'prototype/flutter-1.0/native-resources/**'
+      - 'prototype/flutter-1.0/scripts/prepare_native.py'
+      - 'prototype/flutter-1.0/scripts/upstream/patch_country_scale.py'
+      - 'prototype/flutter-1.0/test/**'
+      - '.github/workflows/prototype-smoke.yml'
 permissions:
   contents: read
 concurrency:

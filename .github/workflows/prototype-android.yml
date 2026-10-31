@@ -3,12 +3,21 @@ on:
   workflow_dispatch:
   push:
     branches: ['prototype/flutter-1.0']
-    paths: ['prototype/flutter-1.0/**', '.github/workflows/prototype-android.yml']
+    paths:
+      - 'prototype/flutter-1.0/android/**'
+      - 'prototype/flutter-1.0/lib/**'
+      - 'prototype/flutter-1.0/assets/**'
+      - 'prototype/flutter-1.0/pubspec.*'
+      - 'prototype/flutter-1.0/native-resources/**'
+      - 'prototype/flutter-1.0/scripts/prepare_native.py'
+      - 'prototype/flutter-1.0/scripts/upstream/patch_country_scale.py'
+      - 'prototype/flutter-1.0/test/**'
+      - '.github/workflows/prototype-android.yml'
 permissions:
   contents: read
 concurrency:
   group: mukshat-prototype-android-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   android:
     runs-on: ubuntu-latest
