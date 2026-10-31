@@ -19,7 +19,6 @@
     self.contentScaleFactor = UIScreen.mainScreen.nativeScale;
     CAMetalLayer * layer = (CAMetalLayer *)self.layer;
     layer.device = MTLCreateSystemDefaultDevice();
-    layer.pixelFormat = MTLPixelFormatRGBA8Unorm;
     layer.opaque = YES;
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(background)
       name:UIApplicationDidEnterBackgroundNotification object:nil];
