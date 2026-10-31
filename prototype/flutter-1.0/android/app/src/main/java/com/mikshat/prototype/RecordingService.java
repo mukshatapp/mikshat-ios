@@ -13,10 +13,10 @@ public final class RecordingService extends Service {
     super.onCreate();
     NotificationManager manager=getSystemService(NotificationManager.class);
     manager.createNotificationChannel(new NotificationChannel("mukshat-track","الملاحة وتسجيل المسار",NotificationManager.IMPORTANCE_LOW));
+    // Fulfil startForegroundService even if navigation stops before onStartCommand.
+    showForegroundNotification(MapRuntime.get(this));
   }
-  @Override public int onStartCommand(Intent intent,int flags,int startId) {
-    MapRuntime runtime=MapRuntime.get(this);
-    if(!runtime.ready || !(runtime.recording||runtime.navigating)) {stopSelf();return START_NOT_STICKY;}
+  private void showForegroundNotification(MapRuntime runtime) {
     Intent open=new Intent(this,MainActivity.class);
     PendingIntent pending=PendingIntent.getActivity(this,0,open,PendingIntent.FLAG_UPDATE_CURRENT|PendingIntent.FLAG_IMMUTABLE);
     Notification notification=new NotificationCompat.Builder(this,"mukshat-track")
@@ -24,6 +24,15 @@ public final class RecordingService extends Service {
       .setContentText(runtime.recording?"تسجيل المسار مستمر عند قفل الشاشة":"الملاحة تعمل")
       .setOngoing(true).setContentIntent(pending).build();
     ServiceCompat.startForeground(this,1001,notification,ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
+  }
+  @Override public int onStartCommand(Intent intent,int flags,int startId) {
+    MapRuntime runtime=MapRuntime.get(this);
+    if(!runtime.ready || !(runtime.recording||runtime.navigating)) {
+      stopForeground(STOP_FOREGROUND_REMOVE);
+      stopSelf(startId);
+      return START_NOT_STICKY;
+    }
+    showForegroundNotification(runtime);
     runtime.sdk.getLocationHelper().start();
     return START_NOT_STICKY;
   }
