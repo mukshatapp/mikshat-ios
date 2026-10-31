@@ -2,6 +2,8 @@
 """Launch the compiled native iOS host, retain crash reports, and capture the displayed map."""
 import base64, json, os, pathlib, subprocess, sys, time
 app=pathlib.Path(sys.argv[1]).resolve()
+if not (app/'shaders_metal.metallib').is_file():
+    raise SystemExit('The application bundle is missing shaders_metal.metallib')
 proof=pathlib.Path('artifacts/ios-runtime');proof.mkdir(parents=True,exist_ok=True)
 data=json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','--json']))
 candidates=[(r,d) for r,ds in data['devices'].items() if '.iOS-' in r for d in ds if 'iPhone' in d['name']]

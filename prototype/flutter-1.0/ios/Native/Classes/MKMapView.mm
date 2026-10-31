@@ -19,6 +19,7 @@
     self.contentScaleFactor = UIScreen.mainScreen.nativeScale;
     CAMetalLayer * layer = (CAMetalLayer *)self.layer;
     layer.device = MTLCreateSystemDefaultDevice();
+    layer.pixelFormat = MTLPixelFormatRGBA8Unorm;
     layer.opaque = YES;
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(background)
       name:UIApplicationDidEnterBackgroundNotification object:nil];
@@ -35,6 +36,7 @@
                                   self.bounds.size.height * self.contentScaleFactor);
   if (pixels.width < 1 || pixels.height < 1 || CGSizeEqualToSize(pixels, m_lastSize)) return;
   m_lastSize = pixels;
+  ((CAMetalLayer *)self.layer).drawableSize = pixels;
   auto & framework = MukshatFramework();
   if (!m_factory)
   {

@@ -12,7 +12,7 @@ Pod::Spec.new do |s|
   s.requires_arc = true
   s.dependency 'Flutter'
   s.vendored_libraries = 'Artifacts/libMukshatCore.a'
-  s.resources = ['Artifacts/MukshatData.bundle', 'Artifacts/default.metallib']
+  s.resources = ['Artifacts/MukshatData.bundle', 'Artifacts/shaders_metal.metallib']
   s.frameworks = 'UIKit', 'Foundation', 'CoreLocation', 'Metal', 'MetalKit', 'QuartzCore', 'CoreGraphics', 'SystemConfiguration', 'Security', 'CFNetwork', 'Network', 'OpenGLES', 'CoreText', 'ImageIO'
   s.libraries = 'c++', 'z', 'bz2', 'sqlite3', 'icucore'
   s.pod_target_xcconfig = {

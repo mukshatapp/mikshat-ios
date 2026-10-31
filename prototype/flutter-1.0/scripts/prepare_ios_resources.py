@@ -12,3 +12,9 @@ with (target / 'Info.plist').open('wb') as stream:
     plistlib.dump({'CFBundleIdentifier': 'com.mikshat.prototype.data', 'CFBundleName': 'MukshatData',
                   'CFBundlePackageType': 'BNDL', 'CFBundleVersion': '1'}, stream)
 print('iOS resources copied from the same MWM/font/style files as Android')
+
+# Organic Maps loads this exact filename from NSBundle.mainBundle.
+library = root / 'ios/Native/Artifacts/default.metallib'
+if not library.is_file():
+    raise SystemExit('Compile the Metal shaders before preparing iOS resources')
+shutil.copyfile(library, library.with_name('shaders_metal.metallib'))
