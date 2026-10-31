@@ -1,4 +1,4 @@
-name: Mukshat iOS simulator runtime proof
+name: Inspect iOS prototype crash report
 on:
   workflow_dispatch:
   push:
@@ -8,80 +8,29 @@ permissions:
   contents: read
   actions: read
 jobs:
-  simulator:
-    runs-on: macos-15
-    timeout-minutes: 20
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: Download the compiled simulator app
+      - name: Read the existing simulator evidence
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh run download 41244059829 --repo mukshatapp/mikshat-ios --name Mukshat-1.0-iOS-simulator --dir "$RUNNER_TEMP/mukshat-simulator"
-      - name: Launch on an iPhone simulator and capture the actual map
         run: |
+          gh run download 41246613238 --repo mukshatapp/mikshat-ios --name Mukshat-1.0-iOS-runtime-evidence --dir "$RUNNER_TEMP/proof"
           python3 - <<'PY'
-          import base64, json, os, pathlib, subprocess, time
-          root = pathlib.Path(os.environ['RUNNER_TEMP']) / 'mukshat-simulator'
-          proof = pathlib.Path(os.environ['RUNNER_TEMP']) / 'mukshat-proof'
-          proof.mkdir()
-          app = next(root.rglob('Runner.app'))
-          data = json.loads(subprocess.check_output(['xcrun','simctl','list','devices','available','--json']))
-          candidates = [(runtime,device) for runtime,devices in data['devices'].items()
-                        if '.iOS-' in runtime for device in devices if 'iPhone' in device['name']]
-          if not candidates: raise SystemExit('No available iPhone simulator runtime')
-          runtime, device = sorted(candidates,key=lambda item:item[0])[-1]
-          uid = device['udid']
-          print('Simulator:', device['name'], runtime)
-          if device['state'] != 'Booted':
-              subprocess.run(['xcrun','simctl','boot',uid],check=True)
-          subprocess.run(['xcrun','simctl','bootstatus',uid,'-b'],check=True,timeout=240)
-          developer = pathlib.Path(subprocess.check_output(['xcode-select','-p'],text=True).strip())
-          subprocess.run(['open','-a',str(developer/'Applications/Simulator.app'),'--args','-CurrentDeviceUDID',uid],check=True,timeout=30)
-          subprocess.run(['xcrun','simctl','install',uid,str(app)],check=True)
-          log = proof / 'console.log'
-          launch = subprocess.run(['xcrun','simctl','launch','--terminate-running-process',
-                                   '--stdout='+str(log),'--stderr='+str(proof/'stderr.log'),
-                                   uid,'com.mikshat.prototype'],capture_output=True,text=True,timeout=180)
-          print('Launch status:',launch.returncode,launch.stdout,launch.stderr,flush=True)
-          launch.check_returncode()
-          pid = launch.stdout.strip().rsplit(':',1)[-1].strip()
-          if not pid.isdigit(): raise SystemExit('No simulator app PID returned')
-          time.sleep(20)
-          subprocess.run(['xcrun','simctl','io',uid,'screenshot',str(proof/'first-launch.png')],check=True)
-          launch = subprocess.run(['xcrun','simctl','launch','--terminate-running-process',
-                                   '--stdout='+str(log),'--stderr='+str(proof/'stderr.log'),
-                                   uid,'com.mikshat.prototype'],capture_output=True,text=True,timeout=180)
-          print('Second launch:',launch.returncode,launch.stdout,launch.stderr,flush=True)
-          launch.check_returncode()
-          pid = launch.stdout.strip().rsplit(':',1)[-1].strip()
-          time.sleep(20)
-          status = subprocess.run(['ps','-p',pid,'-o','stat=','-o','comm='],capture_output=True,text=True)
-          print('Actual app process:',status.returncode,status.stdout,flush=True)
-          alive = status.returncode == 0 and not status.stdout.strip().startswith('Z')
-          crashes = list((pathlib.Path.home()/'Library/Logs/DiagnosticReports').glob('Runner*'))
-          for report in crashes[-2:]:
-              if report.is_file():
-                  text = report.read_text(errors='replace')
-                  (proof/report.name).write_text(text)
-                  print('Crash report:',report.name,text[:20000])
-
-          screenshot = proof / 'native-map.png'
-          subprocess.run(['xcrun','simctl','io',uid,'screenshot',str(screenshot)],check=True)
-          for source in [log,proof/'stderr.log']:
-              if source.exists(): print(source.name,source.read_text(errors='replace')[-22000:])
-          diagnostics = subprocess.run(['xcrun','simctl','spawn',uid,'log','show','--last','2m',
-              '--style','compact','--predicate','process == "Runner"'],capture_output=True,text=True)
-          (proof/'system.log').write_text(diagnostics.stdout)
-          print(diagnostics.stdout[-18000:])
-          (proof / 'result.txt').write_text('App stayed alive after launch: '+str(alive)+'\n')
-          print('MUKSHAT_IOS_IMAGE_BEGIN')
-          encoded = base64.b64encode(screenshot.read_bytes()).decode()
-          for start in range(0,len(encoded),12000): print(encoded[start:start+12000])
-          print('MUKSHAT_IOS_IMAGE_END')
-          if not alive: raise SystemExit('The simulator app exited before the runtime check')
+          import json, os, pathlib
+          for report in (pathlib.Path(os.environ['RUNNER_TEMP'])/'proof').rglob('Runner*.ips'):
+              raw=report.read_text(errors='replace')
+              data=json.loads(raw.split('\n',1)[1])
+              thread=data['threads'][data['faultingThread']]
+              print('Report:',report.name)
+              print('Exception:',json.dumps(data.get('exception')))
+              print('Faulting thread:',thread.get('name'),thread.get('queue'))
+              for frame in thread.get('frames',[]):
+                  index=frame.get('imageIndex')
+                  image=data.get('usedImages',[])[index] if index is not None else {}
+                  print(json.dumps({'symbol':frame.get('symbol'),'offset':frame.get('symbolLocation'),
+                                    'imageOffset':frame.get('imageOffset'),'image':image.get('name'),
+                                    'path':image.get('path')}))
+              for frame in data.get('lastExceptionBacktrace',[]): print('ObjC exception:',frame)
           PY
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: Mukshat-1.0-iOS-runtime-evidence
-          path: ${{ runner.temp }}/mukshat-proof/
-          retention-days: 14
