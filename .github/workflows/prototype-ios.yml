@@ -3,7 +3,17 @@ on:
   workflow_dispatch:
   push:
     branches: ['prototype/flutter-1.0']
-    paths: ['prototype/flutter-1.0/**', '.github/workflows/prototype-ios.yml']
+    paths:
+      - 'prototype/flutter-1.0/ios/**'
+      - 'prototype/flutter-1.0/lib/**'
+      - 'prototype/flutter-1.0/assets/**'
+      - 'prototype/flutter-1.0/pubspec.*'
+      - 'prototype/flutter-1.0/native-resources/**'
+      - 'prototype/flutter-1.0/scripts/build_ios_core.sh'
+      - 'prototype/flutter-1.0/scripts/prepare_ios_resources.py'
+      - 'prototype/flutter-1.0/scripts/prepare_native.py'
+      - 'prototype/flutter-1.0/scripts/upstream/country-scale.patch'
+      - '.github/workflows/prototype-ios.yml'
 permissions:
   contents: read
 concurrency:

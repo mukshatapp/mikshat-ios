@@ -35,7 +35,7 @@ public final class MapRuntime implements LocationListener, SearchListener, Routi
   }
   final Context context;
   OrganicMaps sdk;
-  boolean ready, initializing, recording, navigating;
+  boolean ready, renderingReady, initializing, recording, navigating;
   String navigationMode = "direct";
   EventChannel.EventSink sink;
   final Handler main = new Handler(Looper.getMainLooper());
@@ -123,16 +123,19 @@ public final class MapRuntime implements LocationListener, SearchListener, Routi
   void search(String query,long id) {
     searchId=id;
     if(query.isEmpty()) { SearchEngine.INSTANCE.cancel(); emit("search","id",id,"items",List.of(),"done",true);return; }
-    if(!SearchEngine.INSTANCE.searchInteractive(query,false,"ar",id,true,location!=null,
-      location==null?0:location.getLatitude(),location==null?0:location.getLongitude()))
+    boolean started=SearchEngine.INSTANCE.search(context,query,false,id,location!=null,
+      location==null?0:location.getLatitude(),location==null?0:location.getLongitude());
+    android.util.Log.d("MukshatSearch","Offline search started="+started+" id="+id);
+    if(!started)
       emit("search","id",id,"items",List.of(),"done",true);
   }
   private List<java.util.Map<String,Object>> cachedResults=List.of();
   @Override public void onResultsUpdate(SearchResult[] results,long timestamp) {
     if(timestamp!=searchId) return;
     List<java.util.Map<String,Object>> rows=new ArrayList<>();
-    for(SearchResult r:results) if(r.type==SearchResult.TYPE_RESULT) rows.add(java.util.Map.of(
+    for(SearchResult r:results) if(r.type!=SearchResult.TYPE_PURE_SUGGEST) rows.add(java.util.Map.of(
       "name",r.getTitle(context),"lat",r.lat,"lon",r.lon));
+    android.util.Log.d("MukshatSearch","Offline rows="+rows.size()+" raw="+results.length+" id="+timestamp);
     cachedResults=rows;emit("search","id",timestamp,"items",rows,"done",false);
   }
   @Override public void onResultsEnd(long timestamp) {
@@ -169,9 +172,17 @@ public final class MapRuntime implements LocationListener, SearchListener, Routi
     if(location==null) return;
     float[] values=new float[3];Location.distanceBetween(location.getLatitude(),location.getLongitude(),targetLat,targetLon,values);
     RoutingInfo info=Framework.nativeGetRouteFollowingInfo();
-    double distance=navigationMode.equals("vehicle") && info!=null?info.distToTarget.mDistance:values[0];
+    double distance=navigationMode.equals("vehicle") && info!=null && info.distToTarget.isValid()?distanceInMetres(info.distToTarget):values[0];
     emit("route","active",navigating,"distance",distance,"bearing",(double)values[1],"message",
       navigationMode.equals("vehicle")?"ملاحة بالسيارة دون اتصال":"توجيه "+(navigationMode.equals("compass")?"بالبوصلة":"مباشر"));
+  }
+  private static double distanceInMetres(app.organicmaps.sdk.util.Distance distance) {
+    return switch(distance.mUnits) {
+      case Meters -> distance.mDistance;
+      case Kilometers -> distance.mDistance*1000.0;
+      case Feet -> distance.mDistance*0.3048;
+      case Miles -> distance.mDistance*1609.344;
+    };
   }
   @Override public void onLocationUpdated(Location fix) {
     location=new Location(fix);

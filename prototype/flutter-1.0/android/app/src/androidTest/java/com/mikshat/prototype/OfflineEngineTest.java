@@ -19,6 +19,7 @@ import java.lang.reflect.Field;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.Test;
+import org.junit.After;
 import org.junit.runner.RunWith;
 
 /** Real native engine with test-only OS GPS fixes on an emulator; no mock search or routing. */
@@ -54,10 +55,16 @@ public class OfflineEngineTest {
     manager.setTestProviderLocation(LocationManager.GPS_PROVIDER,location);
     Thread.sleep(1500);
   }
+  @After public void saveScreenForDiagnostics() throws Exception {
+    Bitmap image=test.getUiAutomation().takeScreenshot();
+    if(image!=null) try(FileOutputStream output=new FileOutputStream(new File(context.getFilesDir(),"prototype-map-proof.png"))) {
+      image.compress(Bitmap.CompressFormat.PNG,100,output);
+    }
+  }
   @Test public void offlineMapSearchRoutesAndLockedRecording() throws Exception {
     Intent open=new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
     test.startActivitySync(open);
-    waitFor(()->runtime.ready && app.organicmaps.sdk.Map.isEngineCreated(),"Native map renderer did not initialize",120000);
+    waitFor(()->runtime.ready && runtime.renderingReady && app.organicmaps.sdk.Map.isEngineCreated(),"Native map renderer did not initialize",120000);
     assertTrue(new File(context.getFilesDir(),"260714/Saudi Arabia_North.mwm").isFile());
     assertTrue(new File(context.getFilesDir(),"260714/Saudi Arabia_South.mwm").isFile());
     shell("svc wifi disable");shell("svc data disable");

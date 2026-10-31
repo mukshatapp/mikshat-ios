@@ -102,6 +102,7 @@ public final class MainActivity extends FlutterFragmentActivity {
     @Override public void dispose(){getLifecycle().removeObserver(controller);controller.onDestroy(MainActivity.this);}
     @Override public void onRenderingInitializationFinished() {
       Framework.nativeSetViewportCenter(24.7136,46.6753,12);
+      runtime.renderingReady=true;
       controller.updateBottomWidgetsOffset(0,(int)(145*getResources().getDisplayMetrics().density));
       if(ContextCompat.checkSelfPermission(MainActivity.this,Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED)
         runtime.sdk.getLocationHelper().start();
