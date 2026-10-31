@@ -1,14 +1,35 @@
 --- a/libs/indexer/data_header.cpp
 +++ b/libs/indexer/data_header.cpp
-@@ -83 +83 @@
+@@ -80,7 +80,7 @@
+   case MapType::WorldCoasts: return {low, high};
+   default:
+     ASSERT_EQUAL(type, MapType::Country, ());
 -    return {worldH + 1, high};
 +    return {worldH, high};
+ 
+     // Uncomment this to test countries drawing in all scales.
+     // return {1, high};
 --- a/libs/indexer/data_source.cpp
 +++ b/libs/indexer/data_source.cpp
-@@ -2,0 +3 @@
+@@ -1,6 +1,7 @@
+ #include "indexer/data_source.hpp"
+ #include "indexer/scale_index.hpp"
+-#include "indexer/unique_index.hpp"
++#include "indexer/unique_index.hpp"
 +#include <type_traits>
-@@ -50,0 +52,4 @@
+ 
+ #include "platform/mwm_version.hpp"
+ 
+@@ -47,7 +48,11 @@
+       // feature ids from it, gets untouched features by ids from |src| and applies |m_fn| by
+       // ProcessElement.
+       feature::DataHeader const & header = mwmValue->GetHeader();
+-      CheckUniqueIndexes checkUnique;
++      CheckUniqueIndexes checkUnique;
 +
-+      // Read richer indexed features for normal rectangular map requests.
++      // Match the reviewed Android country-map rectangular-read policy.
 +      if constexpr (std::is_same_v<CoveringT, covering::CoveringGetter>)
 +        scale += 4;
+ 
+       // In case of WorldCoasts we should pass correct scale in ForEachInIntervalAndScale.
+       auto const lastScale = header.GetLastScale();

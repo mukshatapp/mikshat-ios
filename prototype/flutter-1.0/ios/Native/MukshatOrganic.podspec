@@ -18,6 +18,6 @@ Pod::Spec.new do |s|
     'DEFINES_MODULE' => 'YES',
     'CLANG_CXX_LANGUAGE_STANDARD' => 'c++23',
     'GCC_PREPROCESSOR_DEFINITIONS' => '$(inherited) OMIM_METAL_AVAILABLE=1 RELEASE=1',
-    'HEADER_SEARCH_PATHS' => '$(inherited) "$(PODS_TARGET_SRCROOT)/Engine/libs" "$(PODS_TARGET_SRCROOT)/Engine/3party" "$(PODS_TARGET_SRCROOT)/Engine/3party/boost" "$(PODS_TARGET_SRCROOT)/Engine/3party/glm" "$(PODS_TARGET_SRCROOT)/Engine/3party/glaze/include" "$(PODS_TARGET_SRCROOT)/Engine/3party/pugixml/pugixml/src" "$(PODS_TARGET_SRCROOT)/Engine/3party/jansson/src" "$(PODS_TARGET_SRCROOT)/Engine/3party/utfcpp/source"'
+    'HEADER_SEARCH_PATHS' => '$(inherited) "$(PODS_TARGET_SRCROOT)/Engine/libs" "$(PODS_TARGET_SRCROOT)/Engine/3party" "$(PODS_TARGET_SRCROOT)/Engine/3party/boost_headers" "$(PODS_TARGET_SRCROOT)/Engine/3party/glm" "$(PODS_TARGET_SRCROOT)/Engine/3party/glaze/include" "$(PODS_TARGET_SRCROOT)/Engine/3party/pugixml/pugixml/src" "$(PODS_TARGET_SRCROOT)/Engine/3party/jansson/src" "$(PODS_TARGET_SRCROOT)/Engine/3party/utfcpp/source"'
   }
 end

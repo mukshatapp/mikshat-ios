@@ -8,7 +8,7 @@ permissions:
   contents: read
 concurrency:
   group: mukshat-prototype-android-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   android:
     runs-on: ubuntu-latest
@@ -17,13 +17,13 @@ jobs:
       run:
         working-directory: prototype/flutter-1.0
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 1
           sparse-checkout: |
             prototype/flutter-1.0
             .github/workflows
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'

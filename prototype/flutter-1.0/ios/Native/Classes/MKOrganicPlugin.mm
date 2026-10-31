@@ -70,6 +70,7 @@
       if(error) {result([FlutterError errorWithCode:@"MAP_INSTALL" message:error.localizedDescription details:nil]);return;}
       GetPlatform().SetResourceDir(bundle.UTF8String);
       languages::SetPreferredLanguageOverride("ar");
+      settings::Set(settings::kMapLanguageCode, std::string("ar"));
       auto & framework=MukshatFramework();
       framework.RegisterAllMaps();
       framework.SetMapStyle(MapStyleOutdoorsLight);

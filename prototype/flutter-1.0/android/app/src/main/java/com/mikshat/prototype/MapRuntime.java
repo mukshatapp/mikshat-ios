@@ -69,12 +69,14 @@ public final class MapRuntime implements LocationListener, SearchListener, Routi
         // Set before constructing the SDK so it registers the installed country files on first load.
         File settings = new File(context.getFilesDir(), "settings.ini");
         if (!settings.exists()) try (FileOutputStream out = new FileOutputStream(settings)) {
-          out.write(("StoragePath=" + new File(context.getFilesDir(), "maps").getAbsolutePath() + "/\nLanguageCode=ar\nMapStyle=MapStyleOutdoorsLight\n").getBytes(StandardCharsets.UTF_8));
+          out.write(("StoragePath=" + new File(context.getFilesDir(), "maps").getAbsolutePath() + "/\nMapLanguageCode=ar\nMapStyle=MapStyleOutdoorsLight\n").getBytes(StandardCharsets.UTF_8));
         }
         main.post(() -> {
           try {
+            Locale.setDefault(Locale.forLanguageTag("ar"));
             sdk = new OrganicMaps(context,"prototype","com.mikshat.prototype",1,"1.0.0");
             sdk.init(() -> {});
+            app.organicmaps.sdk.util.Config.setTransliteration(false);
             sdk.getLocationHelper().addListener(this);
             sdk.getSensorHelper().addListener(north -> {
               heading = Math.toDegrees(north);
