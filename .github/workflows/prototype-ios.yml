@@ -1,0 +1,67 @@
+name: Mukshat Flutter 1.0 iOS
+on:
+  workflow_dispatch:
+  push:
+    branches: ['prototype/flutter-1.0']
+    paths: ['prototype/flutter-1.0/**', '.github/workflows/prototype-ios.yml']
+permissions:
+  contents: read
+concurrency:
+  group: mukshat-prototype-ios-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  ios:
+    runs-on: macos-15
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: prototype/flutter-1.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: |
+            prototype/flutter-1.0
+            .github/workflows
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.9'
+          channel: stable
+          cache: true
+      - name: Show build tools
+        run: |
+          flutter --version
+          xcodebuild -version
+          cmake --version
+      - name: Verify Flutter
+        run: |
+          flutter config --no-analytics --no-enable-swift-package-manager
+          flutter pub get
+          flutter analyze
+          flutter test
+      - name: Prepare verified MWM resources
+        run: python3 scripts/prepare_native.py
+      - name: Install Metal toolchain when required
+        run: |
+          if ! xcrun metal -v >/dev/null 2>&1; then
+            xcodebuild -downloadComponent MetalToolchain
+            xcrun -k
+          fi
+      - name: Build Organic Maps native engine for iOS simulator
+        run: bash scripts/build_ios_core.sh iphonesimulator
+      - name: Build Flutter iOS simulator application
+        run: |
+          cd ios
+          pod install
+          cd ..
+          flutter build ios --simulator --debug --no-codesign
+      - name: Upload simulator application and build diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mukshat-1.0-iOS-simulator
+          path: |
+            prototype/flutter-1.0/build/ios/iphonesimulator/Runner.app
+            prototype/flutter-1.0/ios/Podfile.lock
+          if-no-files-found: error
+          retention-days: 14

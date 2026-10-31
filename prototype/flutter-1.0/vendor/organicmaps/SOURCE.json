@@ -1,0 +1,7 @@
+{
+  "tag": "2026.09.29-32-android",
+  "source_url": "https://codeload.github.com/organicmaps/organicmaps/tar.gz/refs/tags/2026.09.29-32-android",
+  "archive_sha256": "799ad94afb6e0f72936cfb004faed914a89f5695c5c2719c79d517d6fa11c608",
+  "selected_entries": 552,
+  "source_policy": "Selected Android SDK source files retained unchanged; host build configuration is separate."
+}

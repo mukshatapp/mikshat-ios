@@ -1,0 +1,26 @@
+name: prototype
+description: "مكشات 1.0: نموذج Flutter بخرائط Organic Maps دون اتصال."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  fonts:
+    - family: Zain
+      fonts:
+        - asset: assets/fonts/Zain-Bold.ttf
+          weight: 700

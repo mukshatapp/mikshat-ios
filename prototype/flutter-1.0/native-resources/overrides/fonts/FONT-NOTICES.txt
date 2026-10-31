@@ -1,0 +1,9 @@
+Zain-Bold.ttf
+Copyright 2024 The Zain Project Authors (https://github.com/googlefonts/zain)
+This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is available with a FAQ at: https://openfontlicense.org
+https://openfontlicense.org
+
+NotoNaskhArabic-Fallback.ttf
+Copyright 2015 The Vazirmatn Project Authors (https://github.com/rastikerdar/vazirmatn)
+This Font Software is licensed under the SIL Open Font License, Version 1.1. This license is available with a FAQ at: https://scripts.sil.org/OFL
+https://scripts.sil.org/OFL

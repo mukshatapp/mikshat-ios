@@ -1,0 +1,77 @@
+[
+  {
+    "path": "copyright.html",
+    "sha256": "56f97992824d22e120da78edcae73d3e11acff597d4ce84b7b232bba80d1635b",
+    "bytes": 162132
+  },
+  {
+    "path": "countries.json",
+    "sha256": "3102b7ec2f77a6e0b9d598d8ad7446347b8c9fdcc9ba6999793ff1bcb80a7284",
+    "bytes": 190882
+  },
+  {
+    "path": "World.mwm",
+    "sha256": "8e699618f4727d6217348d5eb976f92687797dfe4abc40278cfa43b3600199ef",
+    "bytes": 64801701
+  },
+  {
+    "path": "drules_outdoors.bin",
+    "sha256": "5ebc77a5ed43482a0c9c18b70382afbe77033193664c0873a4ac99a0b9523a78",
+    "bytes": 441201
+  },
+  {
+    "path": "Vazirmatn-OFL.txt",
+    "sha256": "17e355067c8284f47743a1ee3b1ef7ff684ff0601eda357f9353b10b3016ab31",
+    "bytes": 4391
+  },
+  {
+    "path": "drules_vehicle.bin",
+    "sha256": "f447098f06adf1277eb180918405f19643e56982f3b7a3b3c23c100be443d605",
+    "bytes": 259161
+  },
+  {
+    "path": "WorldCoasts.mwm",
+    "sha256": "5368b39c6fa34f4fdf3ade6b7ee6ececeb7ded6e5b691e90ab4ef4214ab3221e",
+    "bytes": 8351612
+  },
+  {
+    "path": "drules_default.bin",
+    "sha256": "28ca12dde9acfc46b2bd4df6e741d0b1e690eca80fded57a3fcf6a9dd6dd8a14",
+    "bytes": 438661
+  },
+  {
+    "path": "hadaf-logo.jpg",
+    "sha256": "06312ded5caecca4a6466dacaf6ede0ae574f530def8cf2665b15e50ca16b936",
+    "bytes": 38654
+  },
+  {
+    "path": "categories.txt",
+    "sha256": "39be2d3ad0b348d118472af578c87c6dbeb4dd704e10fc344ffd0af5b32fd0bd",
+    "bytes": 653424
+  },
+  {
+    "path": "fonts/FONT-NOTICES.txt",
+    "sha256": "ba584d59d588b5a5fc0aacf4570a23853934ae3b4e5aa9224e8f998fd94b999d",
+    "bytes": 558
+  },
+  {
+    "path": "fonts/OFL-NotoNaskhArabic.txt",
+    "sha256": "a7a5a25eb188bf1cd96982030d53e23c33485c69b1044a562254226857ee13af",
+    "bytes": 4382
+  },
+  {
+    "path": "fonts/whitelist.txt",
+    "sha256": "68684bcfebba5c66877b1478b41f29b0224e0db6404eee9baaee869e58fef1ea",
+    "bytes": 1174
+  },
+  {
+    "path": "fonts/OFL-Zain.txt",
+    "sha256": "ccbcfbce2bc74fe58aa2d4fa0cf32c8f7facd95decc2a8f72cd49653a0d039da",
+    "bytes": 4474
+  },
+  {
+    "path": "fonts/00_NotoNaskhArabic-Regular.ttf",
+    "sha256": "1cbedfc12d08309ae4284b14b365cbdcd917ea2a7afb096127de4958f5c51abd",
+    "bytes": 223004
+  }
+]
