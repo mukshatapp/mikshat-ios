@@ -78,12 +78,42 @@ jobs:
           key: mukshat-core-iphonesimulator-20260929-${{ runner.arch }}-${{ hashFiles('prototype/flutter-1.0/scripts/upstream/country-scale.patch','prototype/flutter-1.0/scripts/build_ios_core.sh') }}
       - name: Compile Metal shaders and copy native resources
         run: bash scripts/build_ios_core.sh iphonesimulator rendering-only
+      - name: Check native link inputs
+        run: |
+          python3 - <<'PY'
+          import pathlib, subprocess
+          archive = pathlib.Path('ios/Native/Artifacts/libMukshatCore.a')
+          print('Native archive bytes:', archive.stat().st_size)
+          subprocess.run(['xcrun','lipo','-info',str(archive)],check=True)
+          symbols = subprocess.check_output(['xcrun','nm','-gU',str(archive)],text=True)
+          for token in ['GetPlatform','RegisterAllMaps','MetalBaseContext','GpsTracker']:
+              matches = [line for line in symbols.splitlines() if token in line]
+              print(token, 'defined symbols:', len(matches))
+              for line in matches[:2]: print(line)
+          PY
       - name: Build Flutter iOS simulator application
         run: |
           cd ios
           pod install
           cd ..
-          flutter build ios --simulator --debug --no-codesign
+          if flutter build ios --simulator --debug --no-codesign --verbose > ios-simulator-build.log 2>&1; then
+            tail -n 20 ios-simulator-build.log
+          else
+            python3 - <<'PY'
+          import pathlib
+          for config in pathlib.Path('ios/Pods/Target Support Files/Pods-Runner').glob('*.xcconfig'):
+              if 'debug' not in config.name: continue
+              for line in config.read_text().splitlines():
+                  if line.startswith(('OTHER_LDFLAGS','LIBRARY_SEARCH_PATHS','FRAMEWORK_SEARCH_PATHS')):
+                      print(config.name, line)
+          lines = pathlib.Path('ios-simulator-build.log').read_text(errors='replace').splitlines()
+          for line in lines:
+              if ('/clang' in line and (' -o ' in line or ' -lMukshatCore ' in line)) or any(word in line for word in ('warning: ignoring','Undefined symbols','referenced from:','Error (Xcode)','error:')):
+                  print(line[:20000])
+          print('\n'.join(lines[-60:]))
+          PY
+            exit 1
+          fi
       - name: Upload simulator application and build diagnostics
         uses: actions/upload-artifact@v4
         with:
