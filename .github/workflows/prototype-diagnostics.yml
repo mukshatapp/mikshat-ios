@@ -36,17 +36,23 @@ jobs:
           subprocess.run(['xcrun','simctl','bootstatus',uid,'-b'],check=True,timeout=240)
           subprocess.run(['xcrun','simctl','install',uid,str(app)],check=True)
           log = proof / 'console.log'
-          with log.open('w') as output:
-              process = subprocess.Popen(['xcrun','simctl','launch','--console-pty','--terminate-running-process',uid,'com.mikshat.prototype'],stdout=output,stderr=subprocess.STDOUT)
-              time.sleep(35)
-              alive = process.poll() is None
-              screenshot = proof / 'native-map.png'
-              subprocess.run(['xcrun','simctl','io',uid,'screenshot',str(screenshot)],check=True)
-              if alive:
-                  process.terminate()
-                  try: process.wait(timeout=10)
-                  except subprocess.TimeoutExpired: process.kill()
-          print(log.read_text(errors='replace')[-22000:])
+          launch = subprocess.run(['xcrun','simctl','launch','--terminate-running-process',
+                                   '--stdout='+str(log),'--stderr='+str(proof/'stderr.log'),
+                                   uid,'com.mikshat.prototype'],capture_output=True,text=True,timeout=180)
+          print('Launch status:',launch.returncode,launch.stdout,launch.stderr,flush=True)
+          launch.check_returncode()
+          pid = launch.stdout.strip().rsplit(':',1)[-1].strip()
+          if not pid.isdigit(): raise SystemExit('No simulator app PID returned')
+          time.sleep(35)
+          alive = subprocess.run(['xcrun','simctl','spawn',uid,'launchctl','procinfo',pid],capture_output=True).returncode == 0
+          screenshot = proof / 'native-map.png'
+          subprocess.run(['xcrun','simctl','io',uid,'screenshot',str(screenshot)],check=True)
+          for source in [log,proof/'stderr.log']:
+              if source.exists(): print(source.name,source.read_text(errors='replace')[-22000:])
+          diagnostics = subprocess.run(['xcrun','simctl','spawn',uid,'log','show','--last','2m',
+              '--style','compact','--predicate','process == "Runner"'],capture_output=True,text=True)
+          (proof/'system.log').write_text(diagnostics.stdout)
+          print(diagnostics.stdout[-18000:])
           (proof / 'result.txt').write_text('App stayed alive after launch: '+str(alive)+'\n')
           print('MUKSHAT_IOS_IMAGE_BEGIN')
           encoded = base64.b64encode(screenshot.read_bytes()).decode()
