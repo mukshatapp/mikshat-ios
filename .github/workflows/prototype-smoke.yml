@@ -41,7 +41,7 @@ jobs:
           python3 scripts/prepare_native.py
           flutter build apk --debug --target-platform android-x64
           cd android
-          ./gradlew :app:assembleDebugAndroidTest -Ptarget-platform=android-x64 -PprototypeAbis=x86_64
+          ./gradlew :app:assembleDebugAndroidTest -Ptarget-platform=android-x64 -PprototypeAbis=x86_64 -Pflutter.androidSdkRoot="$ANDROID_SDK_ROOT" -Pflutter.installedNdkVersions=28.2.13676358
       - name: Enable KVM on temporary runner
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
