@@ -30,11 +30,12 @@ final class MikshatCoordinateInputView: UIStackView {
         field.semanticContentAttribute = .forceLeftToRight
         field.setContentHuggingPriority(.defaultLow, for: .horizontal)
       }
-      degrees.widthAnchor.constraint(equalTo: minutes.widthAnchor, multiplier: 0.65).isActive = true
       minutes.addTarget(self, action: #selector(formatMinutes(_:)), for: .editingChanged)
       direction.selectedSegmentIndex = 0
       direction.widthAnchor.constraint(equalToConstant: 78).isActive = true
       let row = UIStackView(arrangedSubviews: [direction, degrees, MikshatStyle.label("°", color: MikshatStyle.green), minutes, MikshatStyle.label("′", color: MikshatStyle.green)])
+      // Both fields must share an ancestor before activating a constraint between them.
+      degrees.widthAnchor.constraint(equalTo: minutes.widthAnchor, multiplier: 0.65).isActive = true
       row.axis = .horizontal
       row.spacing = 5
       row.semanticContentAttribute = .forceLeftToRight

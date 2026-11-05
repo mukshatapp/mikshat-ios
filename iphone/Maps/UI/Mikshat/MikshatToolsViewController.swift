@@ -1,7 +1,7 @@
 import UIKit
 
 // Retain the old internal class name for compatibility, but expose only the settings page.
-final class MikshatToolsViewController: UITableViewController {
+final class MikshatToolsViewController: MWMTableViewController {
   private let modeKeys = ["mikshat_heading_sensor", "mikshat_heading_gps", "mikshat_heading_auto"]
   init() { super.init(style: .insetGrouped) }
   @available(*, unavailable)
