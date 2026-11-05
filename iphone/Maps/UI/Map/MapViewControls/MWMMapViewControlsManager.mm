@@ -311,15 +311,13 @@ NSString * const kMapToCategorySelectorSegue = @"MapToCategorySelectorSegue";
 
 - (void)setTrafficButtonHidden:(BOOL)trafficButtonHidden
 {
-  BOOL const isNavigation = self.navigationManager.state == MWMNavigationDashboardStateNavigation;
-  _trafficButtonHidden = isNavigation || trafficButtonHidden;
+  _trafficButtonHidden = YES;
   self.trafficButton.hidden = self.hidden || _trafficButtonHidden;
 }
 
 - (void)setTrackRecordingButtonState:(TrackRecordingButtonState)state
 {
-  BOOL const isNavigation = self.navigationManager.state == MWMNavigationDashboardStateNavigation;
-  if (state == TrackRecordingButtonStateVisible && isNavigation)
+  if (state == TrackRecordingButtonStateVisible)
     state = TrackRecordingButtonStateHidden;
   if ((state == TrackRecordingButtonStateHidden || state == TrackRecordingButtonStateClosed) && !_trackRecordingButton)
     return;

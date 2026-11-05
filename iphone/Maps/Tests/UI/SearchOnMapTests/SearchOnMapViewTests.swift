@@ -56,11 +56,36 @@ final class SearchOnMapHeaderViewTests: XCTestCase {
     assertActionsHidden(true)
   }
 
+  func test_CoordinateInputCreatesBothRowsWithActiveFieldWidthConstraints() {
+    let input = MikshatCoordinateInputView()
+    let rows = input.arrangedSubviews.compactMap { $0 as? UIStackView }
+    XCTAssertEqual(rows.count, 2)
+    for row in rows {
+      let fields = row.arrangedSubviews.compactMap { $0 as? UITextField }
+      XCTAssertEqual(fields.count, 2)
+      XCTAssertTrue(row.constraints.contains { constraint in
+        constraint.isActive && constraint.firstItem === fields[0]
+          && constraint.secondItem === fields[1] && constraint.multiplier == 0.65
+      })
+    }
+  }
+
   private func assertActionsHidden(_ hidden: Bool, file: StaticString = #filePath, line: UInt = #line) {
     let settled = XCTNSPredicateExpectation(predicate: NSPredicate { [actions] _, _ in
       actions?.isHidden == hidden && actions?.alpha == (hidden ? 0 : 1)
     }, object: nil)
     XCTAssertEqual(XCTWaiter.wait(for: [settled], timeout: 2), .completed, file: file, line: line)
+  }
+}
+
+final class MikshatHeadingSettingsTests: XCTestCase {
+  func test_HeadingScreenSupportsAppNavigationAndDisplaysAllModes() {
+    let controller = SettingsBuilder.build(.mikshatTools)
+    XCTAssertTrue(controller is MWMTableViewController)
+    let tableController = controller as! MikshatToolsViewController
+    XCTAssertTrue(tableController.hasNavigationBar)
+    tableController.loadViewIfNeeded()
+    XCTAssertEqual(tableController.tableView(tableController.tableView, numberOfRowsInSection: 0), 3)
   }
 }
 

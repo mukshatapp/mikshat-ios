@@ -8,6 +8,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface PlacePageInfoData : NSObject
 
+@property(nonatomic, readonly) double latitude;
+@property(nonatomic, readonly) double longitude;
+
 @property(nonatomic, readonly, nullable) NSString * openingHoursString;
 @property(nonatomic, readonly, nullable) OpeningHours * openingHours;
 @property(nonatomic, readonly) NSArray<PlacePagePhone *> * phones;

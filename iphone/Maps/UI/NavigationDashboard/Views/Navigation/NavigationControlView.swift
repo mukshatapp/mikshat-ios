@@ -230,9 +230,13 @@ final class NavigationControlView: SolidTouchView {
     }
 
     if let targetUnits = info.targetUnits {
-      distanceLegendLabel.text = targetUnits
+      distanceLegendLabel.attributedText = NSAttributedString(string: targetUnits, attributes: [
+        .baselineOffset: targetUnits.trimmingCharacters(in: .whitespaces) == "كم" ? 3 : 0,
+      ])
       if let distanceWithLegend = distanceWithLegend {
-        distanceWithLegend.append(NSAttributedString(string: targetUnits, attributes: routingLegendAttributes))
+        var distanceUnitAttributes = routingLegendAttributes
+        if targetUnits.trimmingCharacters(in: .whitespaces) == "كم" { distanceUnitAttributes[.baselineOffset] = 3 }
+        distanceWithLegend.append(NSAttributedString(string: targetUnits, attributes: distanceUnitAttributes))
         distanceWithLegendLabel.attributedText = distanceWithLegend
       }
     }

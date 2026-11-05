@@ -29,12 +29,25 @@ CGFloat const kButtonsBottomOffset = 6;
 {
   [super awakeFromNib];
   self.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+  NSArray<UIButton *> * buttons = @[self.zoomIn, self.zoomOut, self.location];
+  NSArray<NSString *> * symbols = @[@"plus", @"minus", @"scope"];
+  UIColor * green = [UIColor colorWithRed:22.0/255 green:78.0/255 blue:63.0/255 alpha:1];
+  for (NSUInteger index = 0; index < buttons.count; ++index)
+  {
+    UIButton * button = buttons[index];
+    [button setImage:[UIImage systemImageNamed:symbols[index]] forState:UIControlStateNormal];
+    button.tintColor = green;
+    button.backgroundColor = UIColor.whiteColor;
+    button.layer.cornerRadius = button.bounds.size.width / 2;
+  }
 }
 
 - (void)layoutSubviews
 {
   CGFloat spacing = self.availableHeight - self.zoomOut.maxY - self.location.height;
   spacing = math::Clamp(spacing, kLocationButtonSpacingMin, kLocationButtonSpacingMax);
+  if (self.superview.width > self.superview.height)
+    spacing = kLocationButtonSpacingMin;
 
   self.location.minY = self.zoomOut.maxY + spacing;
   self.bounds = {{}, {self.zoomOut.width, self.location.maxY}};
@@ -48,21 +61,11 @@ CGFloat const kButtonsBottomOffset = 6;
 
 - (void)layoutXPosition:(BOOL)hidden
 {
-  if (UIApplication.sharedApplication.userInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft)
-  {
-    if (hidden)
-      self.maxX = 0;
-    else
-      self.minX = self.availableArea.origin.x + kViewControlsOffsetToBounds;
-  }
+  auto const availableAreaMaxX = self.availableArea.origin.x + self.availableArea.size.width;
+  if (hidden)
+    self.minX = self.superview.width;
   else
-  {
-    auto const availableAreaMaxX = self.availableArea.origin.x + self.availableArea.size.width;
-    if (hidden)
-      self.minX = self.superview.width;
-    else
-      self.maxX = availableAreaMaxX - kViewControlsOffsetToBounds;
-  }
+    self.maxX = availableAreaMaxX - kViewControlsOffsetToBounds;
 }
 
 - (void)layoutYPosition
@@ -70,7 +73,8 @@ CGFloat const kButtonsBottomOffset = 6;
   CGFloat const centerShift = (self.height - self.zoomIn.midY - self.zoomOut.midY) / 2;
   [UIView animateWithDuration:AppConstants.defaultAnimationDuration
                    animations:^{
-                     self.midY = centerShift + self.superview.height / 2;
+                     CGFloat const landscapeOffset = self.superview.width > self.superview.height ? 12 : 0;
+                     self.midY = centerShift + self.superview.height / 2 + landscapeOffset;
                      if (self.maxY > self.bottomBound)
                        self.maxY = self.bottomBound;
                    }];

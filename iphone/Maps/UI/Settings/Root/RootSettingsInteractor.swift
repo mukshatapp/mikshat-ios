@@ -167,7 +167,9 @@ final class RootSettingsInteractor {
       if !enabled {
         MWMSearchFrameworkHelper.clearSearchHistory()
       }
-    case .profile,
+    case .downloadMaps,
+         .mikshatTools,
+         .profile,
          .units,
          .mobileInternet,
          .powerManagement,
@@ -224,6 +226,10 @@ extension RootSettingsInteractor: SettingsViewControllerInteractor {
   }
 
   private func select(_ setting: RootSettings) {
+    if setting == .downloadMaps {
+      MapViewController.shared()?.openMapsDownloader(.downloaded)
+      return
+    }
     if setting == .routingOptions {
       presenter?.presentRoutingProfiles()
       return

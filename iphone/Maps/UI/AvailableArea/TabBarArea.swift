@@ -4,7 +4,9 @@ final class TabBarArea: AvailableArea {
     // Spacing is used only for devices with zero bottom safe area (such as SE).
     // window can be nil during a CarPlay-first cold launch, before the phone window scene connects.
     let additionalBottomSpacing: CGFloat = (MapsAppDelegate.theApp().window?.safeAreaInsets.bottom ?? 0).isZero ? -10 : .zero
-    areaFrame.origin.y += additionalBottomSpacing
+    let extraHeight = max(0, UIFontMetrics.default.scaledValue(for: 96) - 96)
+    areaFrame.origin.y += additionalBottomSpacing - extraHeight
+    areaFrame.size.height += extraHeight
     return areaFrame
   }
 

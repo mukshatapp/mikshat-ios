@@ -113,9 +113,7 @@ class PlacePageCommonLayout: NSObject, IPlacePageLayout {
       viewControllers.append(productsViewController)
     }
 
-    if placePageData.osmContributionData != nil {
-      viewControllers.append(buttonsViewController)
-    }
+
 
     LocationManager.add(observer: self)
     if let lastLocation = LocationManager.lastLocation() {
@@ -170,7 +168,7 @@ class PlacePageCommonLayout: NSObject, IPlacePageLayout {
 extension PlacePageCommonLayout: MWMLocationObserver {
   func onHeadingUpdate(_ heading: CLHeading) {
     if !placePageData.isMyPosition {
-      updateHeading(heading.trueHeading)
+      updateMikshatHeading()
     }
   }
 
@@ -192,10 +190,37 @@ extension PlacePageCommonLayout: MWMLocationObserver {
       previewViewController.updateDistance(formattedDistance)
 
       lastLocation = location
+      updateMikshatHeading()
     }
   }
 
   func onLocationError(_: MWMLocationStatus) {}
+
+  private func updateMikshatHeading() {
+    guard let location = lastLocation, location.horizontalAccuracy >= 0,
+          abs(location.timestamp.timeIntervalSinceNow) <= 30 else {
+      previewViewController.clearHeading()
+      return
+    }
+    let mode = UserDefaults.standard.integer(forKey: "mikshat_heading_mode")
+    if MikshatNavigationMath.usesGPS(mode: mode, speed: location.speed) {
+      guard location.speed >= 0.5, location.course >= 0, location.course.isFinite else {
+        previewViewController.clearHeading()
+        return
+      }
+      if #available(iOS 13.4, *), location.courseAccuracy > 45 {
+        previewViewController.clearHeading()
+        return
+      }
+      updateHeading(location.course)
+    } else if let heading = LocationManager.lastHeading(), heading.trueHeading >= 0,
+              heading.headingAccuracy >= 0, heading.headingAccuracy <= 45,
+              abs(heading.timestamp.timeIntervalSinceNow) <= 30 {
+      updateHeading(heading.trueHeading)
+    } else {
+      previewViewController.clearHeading()
+    }
+  }
 
   private func updateHeading(_ heading: CLLocationDirection) {
     guard let location = lastLocation, heading >= 0 else {

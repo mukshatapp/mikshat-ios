@@ -64,6 +64,7 @@ class UISearchBarRenderer: UIViewRenderer {
       let clearButtonImage = UIImage(named: "ic_clear")?.withRenderingMode(.alwaysTemplate).withTintColor(tintColor)
       control.setImage(clearButtonImage, for: .clear, state: .normal)
     }
+    searchTextField.tintColor = UIColor(red: 22.0 / 255, green: 78.0 / 255, blue: 63.0 / 255, alpha: 1)
     if let barTintColor = style.barTintColor {
       let traits = control.window?.traitCollection ?? control.traitCollection
       let position = control.delegate?.position?(for: control) ?? control.barPosition

@@ -197,13 +197,13 @@ using namespace routing;
 
 + (BOOL)canAddIntermediatePoint
 {
-  return GetFramework().GetRoutingManager().CouldAddIntermediatePoint();
+  return NO;
 }
 
 + (BOOL)isRoutePointsLimitReached
 {
   // Unlike canAddIntermediatePoint, this also works before routing becomes active.
-  return GetFramework().GetRoutingManager().GetRoutePointsCount() >= RoutePointsLayout::kMaxRoutePointsCount;
+  return GetFramework().GetRoutingManager().GetRoutePointsCount() >= 2;
 }
 
 - (instancetype)initRouter
@@ -323,6 +323,8 @@ using namespace routing;
   }
 
   auto & routingManager = GetFramework().GetRoutingManager();
+  if (point.type == MWMRoutePointTypeIntermediate)
+    return;
   RouteMarkData pt = point.routeMarkData;
   RouteMarkData newPt = newPoint.routeMarkData;
   routingManager.ReplaceRoutePoint(pt.m_pointType, pt.m_intermediateIndex, std::move(newPt));
@@ -350,6 +352,8 @@ using namespace routing;
     return;
   }
 
+  if (point.type == MWMRoutePointTypeIntermediate)
+    return;
   RouteMarkData pt = point.routeMarkData;
   GetFramework().GetRoutingManager().AddRoutePoint(std::move(pt), RoutingOptions::LoadRouteOptimizationFromSettings());
   [[MWMNavigationDashboardManager sharedManager] onRoutePointsUpdated];
@@ -357,18 +361,7 @@ using namespace routing;
 
 + (void)continueRouteToPointAndRebuild:(MWMRoutePoint *)point
 {
-  if (!point)
-  {
-    NSAssert(NO, @"Point can not be nil");
-    return;
-  }
-
-  RouteMarkData pt = point.routeMarkData;
-  if (!GetFramework().GetRoutingManager().ContinueRouteToPoint(std::move(pt)))
-    return;
-
-  [[MWMNavigationDashboardManager sharedManager] onRoutePointsUpdated];
-  [self rebuildWithBestRouter:NO];
+  [self buildToPoint:point bestRouter:NO];
 }
 
 + (void)addPointAndRebuild:(MWMRoutePoint *)point
@@ -392,7 +385,7 @@ using namespace routing;
   if (!finishPoint)
     return;
   [self addPoint:finishPoint];
-  if (![self startPoint] && [MWMLocationManager lastLocation] && [MWMRouter router].canAutoAddLastLocation)
+  if ([MWMLocationManager lastLocation])
     [self addPoint:[[MWMRoutePoint alloc] initWithLastLocationAndType:MWMRoutePointTypeStart intermediateIndex:0]];
   if ([self startPoint] && [self finishPoint])
     [self rebuildWithBestRouter:bestRouter];
@@ -419,6 +412,12 @@ using namespace routing;
 + (void)rebuildWithBestRouter:(BOOL)bestRouter
 {
   auto & rm = GetFramework().GetRoutingManager();
+  auto const previousPoints = rm.GetRoutePoints();
+  for (auto it = previousPoints.rbegin(); it != previousPoints.rend(); ++it)
+  {
+    if (it->m_pointType == RouteMarkType::Intermediate)
+      rm.RemoveRoutePoint(it->m_pointType, it->m_intermediateIndex);
+  }
   auto const & points = rm.GetRoutePoints();
   auto const pointsCount = points.size();
   if (pointsCount < 2)
@@ -427,8 +426,8 @@ using namespace routing;
     [[MWMMapViewControlsManager manager] onRoutePrepare];
     return;
   }
-  if (bestRouter)
-    self.type = routerType(rm.GetBestRouter(points.front().m_position, points.back().m_position));
+  if (self.type != MWMRouterTypeVehicle && self.type != MWMRouterTypeRuler)
+    self.type = MWMRouterTypeVehicle;
 
   [[MWMMapViewControlsManager manager] onRouteRebuild];
   rm.BuildRoute();

@@ -80,7 +80,7 @@ std::pair<int, int> DataHeader::GetScaleRange() const
   case MapType::WorldCoasts: return {low, high};
   default:
     ASSERT_EQUAL(type, MapType::Country, ());
-    return {worldH + 1, high};
+    return {worldH, high};
 
     // Uncomment this to test countries drawing in all scales.
     // return {1, high};

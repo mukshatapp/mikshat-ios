@@ -264,6 +264,8 @@ extension PlacePageInteractor: ActionBarViewControllerDelegate {
     case .routeRemoveStop:
       MWMPlacePageManagerHelper.routeRemoveStop(placePageData)
     case .routeTo:
+      MikshatNavigationCoordinator.stopDirectNavigation(stopRouter: false)
+      if MWMRouter.type() != .vehicle && MWMRouter.type() != .ruler { MWMRouter.setType(.vehicle) }
       MWMPlacePageManagerHelper.route(to: placePageData)
     case .avoidToll:
       MWMPlacePageManagerHelper.avoidToll()

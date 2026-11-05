@@ -26,7 +26,7 @@ final class ActionBarViewController: UIViewController {
 
   private func configureButtons() {
     if placePageData.isRoutePoint {
-      visibleButtons.append(.routeRemoveStop)
+      configDefaultButtons()
     } else if placePageData.roadType != .none {
       let options = RoutingOptions(routerType: MWMRouter.type())
       switch placePageData.roadType {
@@ -58,27 +58,18 @@ final class ActionBarViewController: UIViewController {
       case .onDiskOutOfDate, .onDisk, .undefined:
         break
       case .downloading, .applying, .inQueue, .error, .notDownloaded, .partly:
-        visibleButtons.append(.download)
+        break
       @unknown default:
         fatalError()
       }
     }
 
     var buttons: [ActionBarButtonType] = []
-    let routePointButton: ActionBarButtonType = canReplaceStop ? .routeReplaceStop :
-      (shouldAppendNewPoints ? .routeAddDestination : .routeAddStop)
     switch placePageData.objectType {
     case .POI, .bookmark, .track, .relationTrack:
-      if canRouteToAndFrom {
-        buttons.append(.routeFrom)
-      }
-      if canReplaceStop || shouldAppendNewPoints || canAddStop {
-        buttons.append(routePointButton)
-      }
+
       buttons.append(.bookmark)
-      if canRouteToAndFrom {
-        buttons.append(.routeTo)
-      }
+      buttons.append(.routeTo)
       if placePageData.objectType == .track {
         buttons.append(.track)
       }
@@ -110,6 +101,10 @@ final class ActionBarViewController: UIViewController {
                                    buttonType: buttonType,
                                    isSelected: selected,
                                    isPrimary: buttonType == primaryButton)
+      button.backgroundColor = MikshatStyle.cream
+      button.layer.cornerRadius = 16
+      button.tintColor = MikshatStyle.green
+      stackView.spacing = 10
       stackView.addArrangedSubview(button)
       switch buttonType {
       case .download:

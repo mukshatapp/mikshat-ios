@@ -199,34 +199,27 @@ class PlacePageInfoViewController: UIViewController {
     }
 
     setupCoordinatesView()
-    setupOpenWithAppView()
+
   }
 
   private func setupCoordinatesView() {
-    guard let coordFormats = placePageInfoData.coordFormats as? [String] else { return }
-    // The saved format may be unavailable here (e.g. OS Grid outside Great Britain); its entry is
-    // empty. Show the next available format without overwriting the saved preference, so it is
-    // restored when the user returns to a supported area.
-    let displayId = effectiveFormatId(in: coordFormats)
-    coordinatesView = createInfoItem(coordFormats[displayId],
-                                     icon: UIImage(resource: .icPlacepageCoordinate),
-                                     style: .link,
-                                     accessoryImage: UIImage(resource: .icPlacepageChange),
-                                     tapHandler: { [weak self] in
-                                       guard let self else { return }
-                                       let formatId = self.nextAvailableFormatId(after: self.effectiveFormatId(in: coordFormats), in: coordFormats)
-                                       self.setCoordinatesSelected(formatId: formatId)
-                                     },
-                                     longPressHandler: { [weak self] in
-                                       self?.copyCoordinatesToPasteboard()
-                                     })
-    let menu = UIMenu(children: coordFormats.enumerated().compactMap { index, format in
-      format.isEmpty ? nil : UIAction(title: format, handler: { [weak self] _ in
-        self?.setCoordinatesSelected(formatId: index)
-        self?.copyCoordinatesToPasteboard()
-      })
-    })
-    coordinatesView?.setAccessoryMenu(menu)
+    let formats = MikshatNavigationMath.coordinatePairs(latitude: placePageInfoData.latitude, longitude: placePageInfoData.longitude)
+    for (index, text) in formats.enumerated() {
+      let title = MikshatStyle.label(["DD", "DDM", "DMS"][index], size: 13, color: MikshatStyle.green)
+      let value = MikshatStyle.label(text, size: 17, color: MikshatStyle.green)
+      value.semanticContentAttribute = .forceLeftToRight
+      value.textAlignment = .left
+      let copy = MikshatStyle.button(L("mikshat_copy"), symbol: "doc.on.doc") { [weak self] in self?.delegate?.didCopy(text) }
+      copy.widthAnchor.constraint(greaterThanOrEqualToConstant: 52).isActive = true
+      let row = UIStackView(arrangedSubviews: [title, value, copy])
+      row.axis = .horizontal
+      row.spacing = 10
+      row.alignment = .center
+      row.isLayoutMarginsRelativeArrangement = true
+      row.layoutMargins = UIEdgeInsets(top: 14, left: 16, bottom: 14, right: 16)
+      row.heightAnchor.constraint(greaterThanOrEqualToConstant: 64).isActive = true
+      addToStack(row)
+    }
   }
 
   /// The format index actually shown: the saved one if available here, otherwise the next available.
