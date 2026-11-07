@@ -85,6 +85,8 @@ NS_SWIFT_NAME(BookmarksManager)
 - (BOOL)hasExtraInfo:(MWMMarkGroupID)groupId;
 - (BOOL)isHtmlDescription:(MWMMarkGroupID)groupId;
 
+- (MWMMarkID)saveLocation:(CLLocationCoordinate2D)coordinate name:(NSString *)name NS_SWIFT_NAME(saveLocation(_:name:));
+
 - (MWMMarkGroupID)createCategoryWithName:(NSString *)name;
 - (void)setCategory:(MWMMarkGroupID)groupId name:(NSString *)name;
 - (void)setCategory:(MWMMarkGroupID)groupId description:(NSString *)name;

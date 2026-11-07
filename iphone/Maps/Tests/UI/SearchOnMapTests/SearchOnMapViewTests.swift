@@ -1,5 +1,7 @@
 @testable import Organic_Maps__Debug_
 import XCTest
+import UIKit
+import CoreLocation
 
 final class SearchOnMapHeaderViewTests: XCTestCase {
   private var header: SearchOnMapHeaderView!
@@ -339,6 +341,52 @@ private final class SearchClosureObserver: NSObject, SearchOnMapManagerObserver 
   func searchManager(didChangeState state: SearchOnMapState) {
     if state == .closed {
       wasSearchingWhenClosed = manager.isSearching
+    }
+  }
+}
+
+
+final class MikshatCoordinateEntryTests: XCTestCase {
+  func test_CompleteArabicEntryEnablesMapWithoutSubmittingUntilTap() throws {
+    let input = MikshatCoordinateInputView()
+    let rows = input.arrangedSubviews.compactMap { $0 as? UIStackView }
+    let fields = rows.flatMap { $0.arrangedSubviews.compactMap { $0 as? UITextField } }
+    XCTAssertEqual(fields.count, 4)
+    let button = try XCTUnwrap(input.arrangedSubviews.compactMap { $0 as? UIButton }.first)
+    var submissions = 0
+    input.onSubmit = { value in
+      submissions += 1
+      XCTAssertEqual(value.latitude, 24 + 9.321 / 60, accuracy: 0.000001)
+      XCTAssertEqual(value.longitude, 47 + 16.709 / 60, accuracy: 0.000001)
+    }
+    XCTAssertFalse(button.isEnabled)
+    for (field, text) in zip(fields, ["٢٤", "٠٩٣٢١", "٠٤٧", "١٦٧٠٩"]) {
+      XCTAssertFalse(input.textField(field, shouldChangeCharactersIn: NSRange(location: 0, length: 0), replacementString: text))
+    }
+    XCTAssertEqual(fields.map { $0.text ?? "" }, ["24", "09.321", "047", "16.709"])
+    XCTAssertTrue(button.isEnabled)
+    XCTAssertEqual(submissions, 0)
+    button.sendActions(for: .touchUpInside)
+    XCTAssertEqual(submissions, 1)
+    _ = input.textField(fields[1], shouldChangeCharactersIn: NSRange(location: 0, length: 6), replacementString: "60000")
+    XCTAssertFalse(button.isEnabled)
+  }
+
+  func test_DeletingDecimalSeparatorDeletesDigitAndAllowsContinuedEditing() throws {
+    let input = MikshatCoordinateInputView()
+    let rows = input.arrangedSubviews.compactMap { $0 as? UIStackView }
+    let minutes = try XCTUnwrap(rows.first?.arrangedSubviews.compactMap { $0 as? UITextField }.last)
+    _ = input.textField(minutes, shouldChangeCharactersIn: NSRange(location: 0, length: 0), replacementString: "09")
+    XCTAssertEqual(minutes.text, "09.")
+    _ = input.textField(minutes, shouldChangeCharactersIn: NSRange(location: 2, length: 1), replacementString: "")
+    XCTAssertEqual(minutes.text, "0")
+  }
+
+  func test_BothCompassScreensLoadWithCurrentLocationSection() {
+    for controller in [MikshatCompassViewController(target: nil, name: L("mikshat_heading"), general: true),
+                       MikshatCompassViewController(target: CLLocationCoordinate2D(latitude: 24, longitude: 47), name: "Destination")] {
+      controller.loadViewIfNeeded()
+      XCTAssertNotNil(controller.view.firstDescendant { ($0 as? UILabel)?.text == L("mikshat_current_location") })
     }
   }
 }

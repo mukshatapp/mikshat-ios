@@ -7,6 +7,10 @@ enum MikshatNavigationMath {
     (degrees.truncatingRemainder(dividingBy: 360) + 360).truncatingRemainder(dividingBy: 360)
   }
 
+  static func relativeBearing(bearing: Double, heading: Double) -> Double {
+    normalize(bearing - heading)
+  }
+
   static func bearing(latitude: Double, longitude: Double,
                       targetLatitude: Double = 21.422487, targetLongitude: Double = 39.826206) -> Double {
     let a = latitude * .pi / 180
@@ -105,5 +109,25 @@ extension MikshatNavigationMath {
     [String(format: "%.6f, %.6f", latitude, longitude),
      ddm(latitude, latitude: true) + "\n" + ddm(longitude, latitude: false),
      dms(latitude, latitude: true) + "\n" + dms(longitude, latitude: false)]
+  }
+}
+
+
+extension MikshatNavigationMath {
+  static func parseDecimalPair(_ text: String) -> (latitude: Double, longitude: Double)? {
+    // Preserve whitespace between decimal latitude and longitude while normalizing Arabic digits.
+    let normalized = text.map { character -> String in
+      if character.isWhitespace { return " " }
+      if character == "," || character == "،" { return "," }
+      return ascii(String(character))
+    }.joined().trimmingCharacters(in: CharacterSet(charactersIn: "() "))
+    let pattern = "^([+-]?[0-9]{1,2}(?:\\.[0-9]+)?)[,، ]+([+-]?[0-9]{1,3}(?:\\.[0-9]+)?)$"
+    guard let regex = try? NSRegularExpression(pattern: pattern),
+          let match = regex.firstMatch(in: normalized, range: NSRange(normalized.startIndex..., in: normalized)),
+          let latRange = Range(match.range(at: 1), in: normalized),
+          let lonRange = Range(match.range(at: 2), in: normalized),
+          let latitude = Double(normalized[latRange]), let longitude = Double(normalized[lonRange]),
+          abs(latitude) <= 90, abs(longitude) <= 180 else { return nil }
+    return (latitude, longitude)
   }
 }

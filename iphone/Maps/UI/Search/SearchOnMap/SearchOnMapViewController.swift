@@ -151,7 +151,10 @@ final class SearchOnMapViewController: UIViewController {
     headerView.delegate = self
     headerView.coordinateDidSubmit = { [weak self] coordinate in
       self?.view.endEditing(true)
-      let pair = String(format: "%.8f,%.8f", coordinate.latitude, coordinate.longitude)
+      let pair = String(format: "%.8f,%.8f", locale: Locale(identifier: "en_US_POSIX"), coordinate.latitude, coordinate.longitude)
+      let query = SearchQuery(pair, source: .typedText)
+      Search.save(query)
+      MikshatSearchLocations.remember(coordinate, query: pair)
       guard let url = URL(string: "om://map?ll=\(pair)") else { return }
       self?.close()
       _ = DeepLinkHandler.shared.applicationDidOpenUrl(url)

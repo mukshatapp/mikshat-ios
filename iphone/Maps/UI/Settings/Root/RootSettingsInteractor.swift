@@ -166,6 +166,7 @@ final class RootSettingsInteractor {
       settings.setSearchHistoryEnabled(enabled)
       if !enabled {
         MWMSearchFrameworkHelper.clearSearchHistory()
+        MikshatSearchLocations.clear()
       }
     case .downloadMaps,
          .mikshatTools,

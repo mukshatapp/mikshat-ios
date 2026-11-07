@@ -332,6 +332,17 @@ static void DeleteTemporaryBookmarksFile(std::string const & filePath)
   return strings::IsHTML(description);
 }
 
+- (MWMMarkID)saveLocation:(CLLocationCoordinate2D)coordinate name:(NSString *)name
+{
+  auto & framework = GetFramework();
+  kml::BookmarkData data;
+  data.m_name[kml::kDefaultLang] = name.UTF8String;
+  data.m_point = mercator::FromLatLon(coordinate.latitude, coordinate.longitude);
+  data.m_color = framework.LastEditedBMColor();
+  auto session = self.bm.GetEditSession();
+  return session.CreateBookmark(std::move(data), framework.LastEditedBMCategory())->GetId();
+}
+
 - (MWMMarkGroupID)createCategoryWithName:(NSString *)name
 {
   auto groupId = self.bm.CreateBookmarkCategory(name.UTF8String);

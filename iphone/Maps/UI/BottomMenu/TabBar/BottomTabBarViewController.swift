@@ -44,9 +44,9 @@ class BottomTabBarViewController: UIViewController {
     let settings = MikshatStyle.button(L("settings"), symbol: "gearshape") {
       MapViewController.shared()?.navigationController?.pushViewController(SettingsBuilder.buildRoot(), animated: true)
     }
-    let location = MikshatStyle.button(L("mikshat_my_location"), symbol: "mappin.circle") {
-      LocationManager.start()
-      LocationManager.setMyPositionMode(.follow)
+    let location = MikshatStyle.button(L("mikshat_save_share"), symbol: "mappin.circle") {
+      guard let map = MapViewController.shared() else { return }
+      MikshatLocationActions.presentMenu(from: map)
     }
     let search = MikshatStyle.button(L("search"), symbol: "magnifyingglass") { [weak self] in self?.presenter.onSearchButtonPressed() }
     search.configuration?.baseForegroundColor = .white
@@ -77,9 +77,10 @@ class BottomTabBarViewController: UIViewController {
         }
       }
     }
-    recording.configuration?.baseForegroundColor = .systemRed
+    recording.configuration?.baseForegroundColor = TrackRecordingManager.shared.recordingState == .active ? .systemRed : .black
     TrackRecordingManager.shared.addObserver(self) { [weak recording] state, _, _ in
-      recording?.configuration?.image = UIImage(systemName: state == .active ? "stop.circle.fill" : "record.circle")
+      recording?.configuration?.image = MikshatSymbols.image(named: "record.circle")
+      recording?.configuration?.baseForegroundColor = state == .active ? .systemRed : .black
       recording?.accessibilityValue = L(state == .active ? "on" : "off")
     }
     let bookmarks = MikshatStyle.button(L("bookmarks"), symbol: "bookmark") { [weak self] in self?.presenter.onBookmarksButtonPressed() }

@@ -4,6 +4,8 @@ final class SearchHistoryCell: MWMTableViewCell {
     case clear
   }
 
+  private let directionIndicator = MikshatDirectionIndicator()
+
   private static let placeholderImage = UIImage.filled(with: .clear, size: CGSize(width: 28, height: 28))
 
   override init(style _: UITableViewCell.CellStyle, reuseIdentifier: String?) {
@@ -17,9 +19,16 @@ final class SearchHistoryCell: MWMTableViewCell {
   }
 
   func configure(for content: Content) {
+    directionIndicator.target = nil
+    accessoryView = nil
     switch content {
     case .query(let query):
       textLabel?.text = query
+      if let coordinate = MikshatSearchLocations.coordinate(for: query) {
+        directionIndicator.frame = CGRect(x: 0, y: 0, width: 28, height: 28)
+        directionIndicator.target = coordinate
+        accessoryView = directionIndicator
+      }
       textLabel?.setFontStyleAndApply(.regular17, color: .blackSecondary)
       imageView?.image = UIImage(resource: .icSearch)
       imageView?.setStyleAndApply(.black)

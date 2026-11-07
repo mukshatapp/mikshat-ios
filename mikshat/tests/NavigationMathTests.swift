@@ -7,6 +7,14 @@ struct NavigationMathTests {
       precondition(condition, message)
     }
     let math = MikshatNavigationMath.self
+    check(math.relativeBearing(bearing: 10, heading: 350) == 20, "Direction crosses north clockwise")
+    check(math.relativeBearing(bearing: 350, heading: 10) == 340, "Direction crosses north counterclockwise")
+    check(math.relativeBearing(bearing: 90, heading: 90) == 0, "Destination straight ahead")
+    let parsed = math.parseDecimalPair("(٢٤.٣٠٠٣ ٤٧.١٢٥٩١٧)")
+    check(parsed?.latitude == 24.3003 && parsed?.longitude == 47.125917, "Arabic coordinate history")
+    check(math.parseDecimalPair("24.3,47.1")?.longitude == 47.1, "Comma separated coordinate history")
+    check(math.parseDecimalPair("coffee 24 47") == nil, "Generic query has no invented location")
+    check(math.parseDecimalPair("91,47") == nil, "History coordinate bounds")
     let riyadh = math.bearing(latitude: 24.7136, longitude: 46.6753)
     check(abs(riyadh - 243.8) < 0.2, "Riyadh Qibla bearing")
     check(abs(math.bearing(latitude: 0, longitude: 0, targetLatitude: 10, targetLongitude: 0)) < 0.0001,

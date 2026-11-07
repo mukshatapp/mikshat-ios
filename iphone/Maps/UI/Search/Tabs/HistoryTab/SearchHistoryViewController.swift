@@ -80,6 +80,7 @@ final class SearchHistoryViewController: MWMViewController {
 
   private func clearSearchHistory() {
     frameworkHelper.clearSearchHistory()
+    MikshatSearchLocations.clear()
     reload()
   }
 
