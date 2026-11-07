@@ -12,6 +12,7 @@
 #include "map/bookmarks_search_params.hpp"
 
 #include "coding/internal/file_data.hpp"
+#include "coding/string_utf8_multilang.hpp"
 
 #include "base/stl_helpers.hpp"
 #include "base/string_utils.hpp"
@@ -336,7 +337,7 @@ static void DeleteTemporaryBookmarksFile(std::string const & filePath)
 {
   auto & framework = GetFramework();
   kml::BookmarkData data;
-  data.m_name[kml::kDefaultLang] = name.UTF8String;
+  data.m_name[StringUtf8Multilang::kDefaultCode] = name.UTF8String;
   data.m_point = mercator::FromLatLon(coordinate.latitude, coordinate.longitude);
   data.m_color = framework.LastEditedBMColor();
   auto session = self.bm.GetEditSession();

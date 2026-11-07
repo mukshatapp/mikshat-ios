@@ -121,10 +121,17 @@ workflows:
       - name: Archive and export signed IPA
         script: |
           set -euo pipefail
+          # Prefer raw compiler diagnostics over the abbreviated xcpretty output.
+          BUILD_IPA_HELP="$(xcode-project build-ipa --help)"
+          if [[ "$BUILD_IPA_HELP" == *"--disable-xcpretty"* ]]; then
+            set -- --disable-xcpretty
+          else
+            set --
+          fi
           xcode-project build-ipa \
             --workspace "$XCODE_WORKSPACE" \
             --scheme "$XCODE_SCHEME" \
-            --config Release
+            --config Release "$@" 2>&1 | tee /tmp/mikshat-archive.log
       - name: Validate versions in signed IPA
         script: |
           set -euo pipefail
@@ -153,6 +160,7 @@ workflows:
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
+      - /tmp/mikshat-archive.log
       - build/ios/xcarchive/*.xcarchive/dSYMs/*.dSYM
     publishing:
       app_store_connect:
