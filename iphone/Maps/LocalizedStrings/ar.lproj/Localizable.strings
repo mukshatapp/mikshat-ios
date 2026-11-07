@@ -52,13 +52,13 @@
 "add_new_set" = "إضافة قائمة جديدة";
 
 /* Add Bookmark list dialog - hint when the list name is empty */
-"bookmark_set_name" = "اسم قائمة الإشارات المرجعية";
+"bookmark_set_name" = "اسم قائمة المفضلة";
 
 /* Should be used in the bookmarks-only context, see bookmarks_and_tracks if tracks are also implied. */
-"bookmarks" = "الإشارات المرجعية";
+"bookmarks" = "المفضلة";
 
 /* "Bookmarks and Tracks" dialog title. Also used in iPhone home screen quick actions. */
-"bookmarks_and_tracks" = "الإشارات المرجعية والمسارات";
+"bookmarks_and_tracks" = "المفضلة والمسارات";
 
 /* Editor title above street and house number, duplicates [type.building.address] in types_strings.txt */
 "address" = "العنوان";
@@ -82,7 +82,7 @@
 "country_status_download_without_size" = "تنزيل الخريطة";
 
 /* "Bookmark Lists" dialog title */
-"bookmark_sets" = "قائمة الإشارات المرجعية";
+"bookmark_sets" = "قائمة المفضلة";
 
 
 /********** Search categories **********/
@@ -160,13 +160,13 @@
 "share_bookmarks_email_body" = "مرحباً! ْ\n\n تم إرفاق إشاراتي المرجعية من تطبيق Organic Maps. الرجاء فتحهم إذا لديك تطبيق Organic Maps مثبتاً. أو، إذا لم يكن مثبتاً، قم بتنزيل التطبيق لنظام iOS أو أندرويد من خلال الضغط على هذا الرابط: https://omaps.app/get?kmz \n\nاستمتع بالسفر مع Organic Maps!";
 
 /* message title of loading file */
-"load_kmz_title" = "يتم تحميل الإشارات المرجعية";
+"load_kmz_title" = "يتم تحميل المفضلة";
 
 /* Kmz file successful loading */
-"load_kmz_successful" = "تم تحميل الإشارات المرجعية بنجاح! يمكنك العثور عليها على الخريطة أو على شاشة إدارة الإشارات المرجعية.";
+"load_kmz_successful" = "تم تحميل المفضلة بنجاح! يمكنك العثور عليها على الخريطة أو على شاشة إدارة المفضلة.";
 
 /* Kml file loading failed */
-"load_kmz_failed" = "فشلت عملية تحميل الإشارات المرجعية. قد يكون الملف تالف أو غير صالح.";
+"load_kmz_failed" = "فشلت عملية تحميل المفضلة. قد يكون الملف تالف أو غير صالح.";
 
 /* resource for context menu */
 "edit" = "تعديل";
@@ -433,7 +433,7 @@
 "downloader_status_failed" = "فشل";
 
 /* bookmark button text */
-"bookmark" = "إشارة مرجعية";
+"bookmark" = "موقع مفضل";
 
 
 /********** Routing dialogs strings **********/
@@ -638,7 +638,7 @@
 "mobile_data" = "بيانات الجوال";
 
 /* NOTE to translators: please synchronize your translation with the English one. */
-"mobile_data_description" = "إننا نحتاج بيانات الجوال لعرض معلومات تفصيلية عن الأماكن والإشارات المرجعية.";
+"mobile_data_description" = "إننا نحتاج بيانات الجوال لعرض معلومات تفصيلية عن الأماكن والمفضلة.";
 "mobile_data_option_never" = "عدم الاستخدام مطلقًا";
 "mobile_data_option_ask" = "السؤال دوماً";
 "traffic_update_maps_text" = "لعرض البيانات المرورية، يجب تحديث الخرائط.";
@@ -664,7 +664,7 @@
 "bookmarks_create_new_group" = "إنشاء قائمة جديدة";
 
 /* Bookmark categories screen, button that opens folder selection dialog to import KML/KMZ/GPX/KMB files */
-"bookmarks_import" = "استيراد الإشارات المرجعية والمسارات";
+"bookmarks_import" = "استيراد المفضلة والمسارات";
 "bookmarks_error_message_share_general" = "تعذرت المشاركة بسبب خطأ في التطبيق";
 "bookmarks_error_title_share_empty" = "خطأ في المشاركة";
 "bookmarks_error_message_share_empty" = "لا يمكن مشاركة قائمة فارغة";
@@ -692,7 +692,7 @@
 "layers_title" = "أنماط الخريطة وطبقاتها";
 
 /* Button to change the color of all bookmarks in the current list */
-"change_all_bookmarks_color" = "تغيير لون جميع الإشارات المرجعية";
+"change_all_bookmarks_color" = "تغيير لون جميع المفضلة";
 
 /* Button to change the color of all tracks in the current list */
 "change_all_tracks_color" = "تغيير لون جميع المسارات";
@@ -724,8 +724,8 @@
 "power_managment_setting_manual_max" = "توفير الطاقة الأقصى";
 
 /* Settings/Bookmark Text Placement */
-"bookmarks_text_placement_title" = "أسماء الإشارات المرجعية على الخريطة";
-"bookmarks_text_placement_description" = "إذا كان هناك عدد كبير جدًا من الإشارات المرجعية، فقد يؤدي عرض أسمائها على الخريطة إلى إبطاء التطبيق.";
+"bookmarks_text_placement_title" = "أسماء المفضلة على الخريطة";
+"bookmarks_text_placement_description" = "إذا كان هناك عدد كبير جدًا من المفضلة، فقد يؤدي عرض أسمائها على الخريطة إلى إبطاء التطبيق.";
 "show_to_the_right" = "عرض إلى اليمين";
 "show_at_the_bottom" = "اعرض في الأسفل";
 "enable_logging_warning_message" = "هذا الخيار يقوم ببدأ تسجيل سجلات التطبيق لإغراض التشخيصة. يمكن أن يكون مفيدًا لفريق الدعم الخاص بنا لحل المشاكل التي تواجهكم داخل التطبيق. قم بتفعيل هذا الخيار بشكل مؤقت فقط في حالة طلب الدعم من Organic Maps.";
@@ -900,8 +900,8 @@
 "dialog_routing_system_error_carplay" = "حدث خطأ. يرجى إعادة تشغيل التطبيق";
 "dialog_routing_rebuild_from_current_location_carplay" = "سيتم إعادة رسم الطريق من موقعك الحالي";
 "dialog_routing_rebuild_for_vehicle_carplay" = "سيتم تعديل الطريق ليكون خاص بالسيارة";
-"not_all_shown_bookmarks_carplay" = "لا يتم عرض جميع الإشارات المرجعية";
-"switch_to_phone_bookmarks_carplay" = "قم بالتبديل إلى الهاتف لرؤية جميع الإشارات المرجعية";
+"not_all_shown_bookmarks_carplay" = "لا يتم عرض جميع المفضلة";
+"switch_to_phone_bookmarks_carplay" = "قم بالتبديل إلى الهاتف لرؤية جميع المفضلة";
 "speedcams_alert_title_carplay_1" = "كاميرات السرعة";
 "speedcams_alert_title_carplay_2" = "تحذير بشأن السرعة";
 "download_map_carplay" = "يُرجى تحميل الخرائط في تطبيق Organic Maps على جهازك";
@@ -1016,7 +1016,7 @@
 "button_layer_outdoor" = "الأنشطة الخارجية";
 
 /* Bookmark categories screen, button that opens share dialog to export all bookmarks and tracks */
-"bookmarks_export" = "تصدير كافة الإشارات المرجعية والمسارات";
+"bookmarks_export" = "تصدير كافة المفضلة والمسارات";
 "drive_through" = "خدمة من السيارة";
 
 /* Accessibility text for the zoom-in button on the map and visible title for the CarPlay dashboard button. Keep it short. */
@@ -1090,7 +1090,7 @@
 "enable_icloud_synchronization_title" = "تمكين مزامنة iCloud";
 
 /* Message for the "Enable iCloud Syncronization" alert. */
-"enable_icloud_synchronization_message" = "تعد مزامنة iCloud ميزة تجريبية قيد التطوير. تأكد من عمل نسخة احتياطية لجميع الإشارات المرجعية والمسارات الخاصة بك.";
+"enable_icloud_synchronization_message" = "تعد مزامنة iCloud ميزة تجريبية قيد التطوير. تأكد من عمل نسخة احتياطية لجميع المفضلة والمسارات الخاصة بك.";
 
 /* Title for the "iCloud Is Disabled" alert. */
 "icloud_disabled_title" = "تم تعطيل iCloud";
@@ -1191,7 +1191,7 @@
 "editor_add_select_category_recent_subtitle" = "مستخدمة مؤخراً";
 
 /* Toast message shown when bookmark colors are changed in category settings */
-"toast_bookmarks_color_changed" = "تم تغيير لون الإشارات المرجعية";
+"toast_bookmarks_color_changed" = "تم تغيير لون المفضلة";
 
 /* Toast message shown when track colors are changed in category settings */
 "toast_tracks_color_changed" = "تم تغيير لون المسارات";
@@ -1357,3 +1357,21 @@
 
 /* Mikshat Android-equivalent navigation interface */
 "mikshat_direct_notice" = "توجيه مباشر • المسافة بخط مستقيم • وقت الوصول تقديري";
+
+/* Mikshat location and compass interface */
+"mikshat_save_share" = "حفظ ومشاركة";
+
+/* Mikshat location and compass interface */
+"mikshat_save_location" = "حفظ الموقع";
+
+/* Mikshat location and compass interface */
+"mikshat_share_location" = "مشاركة الموقع";
+
+/* Mikshat location and compass interface */
+"mikshat_current_location" = "الموقع الحالي";
+
+/* Mikshat location and compass interface */
+"mikshat_location_saved" = "تم حفظ الموقع في المفضلة";
+
+/* Mikshat location and compass interface */
+"mikshat_fixed_arrow" = "السهم ثابت للأعلى";

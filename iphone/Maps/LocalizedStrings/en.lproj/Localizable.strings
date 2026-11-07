@@ -1357,3 +1357,21 @@
 
 /* Mikshat Android-equivalent navigation interface */
 "mikshat_direct_notice" = "Direct guidance • straight-line distance • arrival time is an estimate";
+
+/* Mikshat location and compass interface */
+"mikshat_save_share" = "Save and share";
+
+/* Mikshat location and compass interface */
+"mikshat_save_location" = "Save location";
+
+/* Mikshat location and compass interface */
+"mikshat_share_location" = "Share location";
+
+/* Mikshat location and compass interface */
+"mikshat_current_location" = "Current location";
+
+/* Mikshat location and compass interface */
+"mikshat_location_saved" = "Location saved to favorites";
+
+/* Mikshat location and compass interface */
+"mikshat_fixed_arrow" = "Arrow fixed upwards";
