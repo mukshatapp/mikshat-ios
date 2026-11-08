@@ -1375,3 +1375,21 @@
 
 /* Mikshat location and compass interface */
 "mikshat_fixed_arrow" = "Arrow fixed upwards";
+
+/* Mikshat navigation and location sharing */
+"mikshat_finish_trip_first" = "Finish the current trip before changing its destination.";
+
+/* Mikshat navigation and location sharing */
+"mikshat_stop_navigation" = "Stop";
+
+/* Mikshat navigation and location sharing */
+"mikshat_show_stop" = "Show stop button";
+
+/* Mikshat navigation and location sharing */
+"mikshat_app_name" = "Mikshat";
+
+/* Mikshat navigation and location sharing */
+"mikshat_map_point" = "Map point";
+
+/* Mikshat navigation and location sharing */
+"mikshat_share_message" = "📍 %@ via Mikshat\nFor navigation and outdoor maps\n\nCoordinates:\n%@\n\nOpen in Mikshat:\n%@";

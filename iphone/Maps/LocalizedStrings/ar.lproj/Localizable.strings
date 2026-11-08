@@ -1375,3 +1375,21 @@
 
 /* Mikshat location and compass interface */
 "mikshat_fixed_arrow" = "السهم ثابت للأعلى";
+
+/* Mikshat navigation and location sharing */
+"mikshat_finish_trip_first" = "أنهِ الرحلة الحالية قبل تغيير الوجهة.";
+
+/* Mikshat navigation and location sharing */
+"mikshat_stop_navigation" = "توقف";
+
+/* Mikshat navigation and location sharing */
+"mikshat_show_stop" = "إظهار زر التوقف";
+
+/* Mikshat navigation and location sharing */
+"mikshat_app_name" = "مكشات";
+
+/* Mikshat navigation and location sharing */
+"mikshat_map_point" = "نقطة الخريطة";
+
+/* Mikshat navigation and location sharing */
+"mikshat_share_message" = "📍 %@ عبر مكشات\nللملاحة والخرائط البرية\n\nالإحداثيات:\n%@\n\nافتح الموقع في تطبيق مكشات:\n%@";
