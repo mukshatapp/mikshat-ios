@@ -103,8 +103,9 @@
   }
 
   private func convertUniversalLink(_ universalLink: URL) -> URL? {
+    if let link = MikshatNavigationMath.mikshatMapLink(universalLink) { return link }
     // Convert http(s)://omaps.app/ENCODEDCOORDS/NAME to om://ENCODEDCOORDS/NAME.
-    URL(string: universalLink.absoluteString
+    return URL(string: universalLink.absoluteString
       .replacingOccurrences(of: "http://omaps.app", with: "om:/")
       .replacingOccurrences(of: "https://omaps.app", with: "om:/"))
   }

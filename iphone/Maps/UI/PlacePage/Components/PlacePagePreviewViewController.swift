@@ -1,6 +1,19 @@
 final class PlacePageDirectionView: UIView {
   @IBOutlet var imageView: UIImageView!
   @IBOutlet var label: UILabel!
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    let font = UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: 18.2))
+    if label.font.pointSize != font.pointSize { label.font = font }
+  }
+  override func awakeFromNib() {
+    super.awakeFromNib()
+    label.font = UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: 18.2))
+    label.adjustsFontForContentSizeCategory = true
+    for constraint in imageView.constraints where constraint.firstAttribute == .width || constraint.firstAttribute == .height {
+      if constraint.secondItem == nil { constraint.constant *= 1.3 }
+    }
+  }
 }
 
 final class PlacePagePreviewViewController: UIViewController {
@@ -24,7 +37,13 @@ final class PlacePagePreviewViewController: UIViewController {
   @IBOutlet var addressDirectionView: PlacePageDirectionView!
 
   var placePageDirectionView: PlacePageDirectionView?
-  lazy var fullScreenDirectionView: DirectionView = Bundle.main.load(viewClass: DirectionView.self)!
+  private var loadedDirectionView: DirectionView?
+  var fullScreenDirectionView: DirectionView {
+    if let loadedDirectionView { return loadedDirectionView }
+    let view: DirectionView = Bundle.main.load(viewClass: DirectionView.self)!
+    loadedDirectionView = view
+    return view
+  }
 
   var placePagePreviewData: PlacePagePreviewData! {
     didSet {
@@ -36,6 +55,7 @@ final class PlacePagePreviewViewController: UIViewController {
 
   weak var delegate: PlacePageHeaderViewControllerDelegate?
 
+  var mikshatCoordinate: CLLocationCoordinate2D?
   private var distance: String?
   private var speedAndAltitude: String?
   private var heading: CGFloat?
@@ -44,6 +64,10 @@ final class PlacePagePreviewViewController: UIViewController {
     super.viewDidLoad()
 
     updateViews()
+    if let coordinate = mikshatCoordinate {
+      let text = MikshatNavigationMath.coordinatePairs(latitude: coordinate.latitude, longitude: coordinate.longitude)[1]
+      stackView.addArrangedSubview(MikshatCoordinateRow(text: text) { [weak self] in self?.delegate?.previewDidCopy(text) })
+    }
 
     subtitleLabel.adjustsFontForContentSizeCategory = true
     scheduleLabel.adjustsFontForContentSizeCategory = true
@@ -102,17 +126,17 @@ final class PlacePagePreviewViewController: UIViewController {
     self.distance = distance
     placePageDirectionView?.isHidden = false
     placePageDirectionView?.label.text = distance
-    fullScreenDirectionView.updateDistance(distance)
+    loadedDirectionView?.updateDistance(distance)
   }
 
   func clearHeading() {
     heading = nil
     placePageDirectionView?.imageView.isHidden = true
-    fullScreenDirectionView.setHeadingAvailable(false)
+    loadedDirectionView?.setHeadingAvailable(false)
   }
 
   func updateHeading(_ angle: CGFloat) {
-    fullScreenDirectionView.setHeadingAvailable(true)
+    loadedDirectionView?.setHeadingAvailable(true)
     placePageDirectionView?.imageView.isHidden = false
     let duration = heading == nil ? .zero : AppConstants.defaultAnimationDuration // skip the initial setup animation
     UIView.animate(withDuration: duration,
@@ -121,7 +145,7 @@ final class PlacePagePreviewViewController: UIViewController {
                    animations: { [unowned self] in
                      placePageDirectionView?.imageView.transform = CGAffineTransform(rotationAngle: CGFloat.pi / 2 - angle)
                    })
-    fullScreenDirectionView.updateHeading(angle)
+    loadedDirectionView?.updateHeading(angle)
     heading = angle
   }
 
@@ -142,6 +166,7 @@ final class PlacePagePreviewViewController: UIViewController {
 
     fullScreenDirectionView.updateTitle(placePagePreviewData.title,
                                         subtitle: placePagePreviewData.subtitle ?? placePagePreviewData.coordinates)
+    fullScreenDirectionView.setHeadingAvailable(true)
     fullScreenDirectionView.updateHeading(heading)
     fullScreenDirectionView.updateDistance(distance)
     fullScreenDirectionView.show()

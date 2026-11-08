@@ -100,6 +100,14 @@ final class NavigationDashboardViewController: UIViewController {
     super.viewDidLoad()
     setupView()
     layout()
+    NotificationCenter.default.addObserver(self, selector: #selector(mikshatVisibilityChanged), name: MikshatNavigationCoordinator.visibilityChanged, object: nil)
+  }
+
+  @objc private func mikshatVisibilityChanged() {
+    let active = MikshatNavigationCoordinator.isDirectActive
+    availableAreaView.isHidden = active
+    bottomActionsMenu.isHidden = active
+    if active { navigationControlView.isVisible = false; updatePresentationStep(.hidden) }
   }
 
   override func viewDidLayoutSubviews() {
@@ -541,6 +549,12 @@ extension NavigationDashboardViewController: UIScrollViewDelegate {
 
 extension NavigationDashboardViewController {
   func render(_ viewModel: NavigationDashboard.ViewModel) {
+    if MikshatNavigationCoordinator.isDirectActive {
+      mikshatVisibilityChanged()
+      return
+    }
+    availableAreaView.isHidden = false
+    bottomActionsMenu.isHidden = false
     switch viewModel.dashboardState {
     case .closed:
       close()

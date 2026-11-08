@@ -29,6 +29,7 @@ class PlacePageCommonLayout: NSObject, IPlacePageLayout {
   private lazy var previewViewController: PlacePagePreviewViewController = {
     let vc = storyboard.instantiateViewController(ofType: PlacePagePreviewViewController.self)
     vc.placePagePreviewData = placePageData.previewData
+    vc.mikshatCoordinate = placePageData.locationCoordinate
     vc.delegate = interactor
     return vc
   }()

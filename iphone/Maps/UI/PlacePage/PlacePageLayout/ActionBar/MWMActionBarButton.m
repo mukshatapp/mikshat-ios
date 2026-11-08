@@ -46,9 +46,33 @@ typedef NS_ENUM(NSInteger, MWMBookmarksButtonState) {
 
 @implementation MWMActionBarButton
 
+- (void)layoutSubviews
+{
+  [super layoutSubviews];
+  if (self.type == MWMActionBarButtonTypeBookmark || self.type == MWMActionBarButtonTypeRouteTo)
+  {
+    UIFont * font = [UIFontMetrics.defaultMetrics scaledFontForFont:[UIFont systemFontOfSize:14.4]];
+    if (self.label.font.pointSize != font.pointSize)
+      self.label.font = font;
+  }
+}
+
+- (void)applyTheme
+{
+  [super applyTheme];
+  if (self.type == MWMActionBarButtonTypeBookmark || self.type == MWMActionBarButtonTypeRouteTo)
+    self.label.font = [UIFontMetrics.defaultMetrics scaledFontForFont:[UIFont systemFontOfSize:14.4]];
+}
+
 - (void)configButton:(BOOL)isSelected primary:(BOOL)isPrimary
 {
   self.label.text = titleForButton(self.type, isSelected);
+  if (self.type == MWMActionBarButtonTypeBookmark || self.type == MWMActionBarButtonTypeRouteTo)
+  {
+    self.label.font = [UIFontMetrics.defaultMetrics scaledFontForFont:[UIFont systemFontOfSize:14.4]];
+    self.label.adjustsFontForContentSizeCategory = YES;
+    self.button.imageView.transform = CGAffineTransformMakeScale(1.2, 1.2);
+  }
   self.button.coloring = (isPrimary || self.type == MWMActionBarButtonTypeBookmark) ? MWMButtonColoringBlue : MWMButtonColoringBlack;
   [self.button.imageView setContentMode:UIViewContentModeScaleAspectFit];
 

@@ -19,6 +19,7 @@ final class ActionBarViewController: UIViewController {
 
   override func viewDidLoad() {
     super.viewDidLoad()
+    stackView.heightAnchor.constraint(greaterThanOrEqualToConstant: 58).isActive = true
     configureButtons()
   }
 

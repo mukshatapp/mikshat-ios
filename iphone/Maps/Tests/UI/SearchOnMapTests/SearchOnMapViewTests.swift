@@ -390,3 +390,28 @@ final class MikshatCoordinateEntryTests: XCTestCase {
     }
   }
 }
+
+
+final class MikshatLocationCardTests: XCTestCase {
+  func test_CoordinateRowsHaveTwoUnwrappedLinesAndTextCopyButton() {
+    for (index, value) in MikshatNavigationMath.coordinatePairs(latitude: 23.934539, longitude: 47.249).enumerated() {
+      var didCopy = false
+      let row = MikshatCoordinateRow(text: value, format: ["DD", "DDM", "DMS"][index]) { didCopy = true }
+      let labels = row.arrangedSubviews.compactMap { $0 as? UIStackView }.flatMap { $0.arrangedSubviews.compactMap { $0 as? UILabel } }
+      XCTAssertEqual(labels.count, 2)
+      XCTAssertTrue(labels.allSatisfy { $0.numberOfLines == 1 })
+      let copy = row.arrangedSubviews.compactMap { $0 as? UIButton }.first
+      XCTAssertEqual(copy?.configuration?.title, L("mikshat_copy"))
+      copy?.sendActions(for: .touchUpInside)
+      XCTAssertTrue(didCopy)
+    }
+  }
+
+  func test_ShareMessageContainsBothCoordinatesAndOnlyMikshatLink() {
+    let text = MikshatShareContent.message(latitude: 23.934312, longitude: 47.249434, name: "نقطة الخريطة")
+    XCTAssertTrue(text.contains("N 23° 56.059′"))
+    XCTAssertTrue(text.contains("E 047° 14.966′"))
+    XCTAssertTrue(text.contains("https://mukshatapp.github.io/map/"))
+    XCTAssertFalse(text.contains("omaps.app"))
+  }
+}

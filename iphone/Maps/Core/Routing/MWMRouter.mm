@@ -28,6 +28,13 @@
 
 using namespace routing;
 
+namespace
+{
+bool s_mikshatDirectActive = false;
+char const kMikshatBaseline[] = "mikshat-direct-baseline";
+}
+
+
 @interface MWMRouter () <MWMLocationObserver, MWMFrameworkRouteBuilderObserver>
 
 @property(nonatomic) uint32_t routeManagerTransactionId;
@@ -41,6 +48,29 @@ using namespace routing;
 @end
 
 @implementation MWMRouter
+
++ (BOOL)isMikshatDirectActive { return s_mikshatDirectActive; }
+
++ (void)beginMikshatDirectFrom:(CLLocationCoordinate2D)origin to:(CLLocationCoordinate2D)destination
+{
+  if (s_mikshatDirectActive)
+    return;
+  std::vector<m2::PointD> points = {mercator::FromLatLon(origin.latitude, origin.longitude),
+                                  mercator::FromLatLon(destination.latitude, destination.longitude)};
+  df::DrapeApiLineData line(points, dp::Color(25, 130, 245, 255));
+  line.Width(4.0f);
+  GetFramework().GetDrapeApi().AddLine(kMikshatBaseline, line);
+  s_mikshatDirectActive = true;
+}
+
++ (void)endMikshatDirect
+{
+  if (!s_mikshatDirectActive)
+    return;
+  s_mikshatDirectActive = false;
+  GetFramework().GetDrapeApi().RemoveLine(kMikshatBaseline);
+}
+
 
 + (MWMRouter *)router
 {
@@ -235,6 +265,8 @@ using namespace routing;
 
 + (void)setType:(MWMRouterType)type
 {
+  if (s_mikshatDirectActive)
+    return;
   if (type == self.type)
     return;
 
@@ -285,6 +317,8 @@ using namespace routing;
 
 + (void)removePointAndRebuild:(MWMRoutePoint *)point
 {
+  if (s_mikshatDirectActive)
+    return;
   if (!point)
     return;
   if ([self pointsCount] == 1)
@@ -300,6 +334,8 @@ using namespace routing;
 
 + (void)replacePointAndRebuild:(MWMRoutePoint *)point withPoint:(MWMRoutePoint *)newPoint
 {
+  if (s_mikshatDirectActive)
+    return;
   if (!point)
   {
     NSAssert(NO, @"Source point can not be nil");
@@ -334,6 +370,8 @@ using namespace routing;
 
 + (void)reverseRoute
 {
+  if (s_mikshatDirectActive)
+    return;
   if (!GetFramework().GetRoutingManager().ReverseRoutePoints())
     return;
   [self rebuildWithBestRouter:NO];
@@ -341,11 +379,15 @@ using namespace routing;
 
 + (void)removePoints
 {
+  if (s_mikshatDirectActive)
+    return;
   GetFramework().GetRoutingManager().RemoveRoutePoints();
 }
 
 + (void)addPoint:(MWMRoutePoint *)point
 {
+  if (s_mikshatDirectActive && (!point || point.type != MWMRoutePointTypeStart || !point.isMyPosition))
+    return;
   if (!point)
   {
     NSAssert(NO, @"Point can not be nil");
@@ -366,6 +408,8 @@ using namespace routing;
 
 + (void)addPointAndRebuild:(MWMRoutePoint *)point
 {
+  if (s_mikshatDirectActive && (!point || point.type != MWMRoutePointTypeStart || !point.isMyPosition))
+    return;
   if (!point)
     return;
   [self addPoint:point];
@@ -374,6 +418,8 @@ using namespace routing;
 
 + (void)buildFromPoint:(MWMRoutePoint *)startPoint bestRouter:(BOOL)bestRouter
 {
+  if (s_mikshatDirectActive)
+    return;
   if (!startPoint)
     return;
   [self addPoint:startPoint];
@@ -382,6 +428,8 @@ using namespace routing;
 
 + (void)buildToPoint:(MWMRoutePoint *)finishPoint bestRouter:(BOOL)bestRouter
 {
+  if (s_mikshatDirectActive)
+    return;
   if (!finishPoint)
     return;
   [self addPoint:finishPoint];
@@ -395,7 +443,7 @@ using namespace routing;
                    startPoint:(MWMRoutePoint *)startPoint
                   finishPoint:(MWMRoutePoint *)finishPoint
 {
-  if (!startPoint || !finishPoint)
+  if (s_mikshatDirectActive || !startPoint || !finishPoint)
     return;
 
   [MWMRouter setType:type];
@@ -493,6 +541,7 @@ using namespace routing;
 
 + (void)doStop:(BOOL)removeRoutePoints
 {
+  [self endMikshatDirect];
   [[MWMRoutingManager routingManager] stopRoutingAndRemoveRoutePoints:removeRoutePoints];
   if (removeRoutePoints)
     [[MWMRoutingManager routingManager] deleteSavedRoutePoints];

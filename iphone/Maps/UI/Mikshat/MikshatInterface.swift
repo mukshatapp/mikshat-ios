@@ -65,6 +65,12 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
   private var lastLandscape: Bool?
   private var timer: Timer?
 
+  @objc(minimumMapControlsYInView:)
+  static func minimumMapControlsY(in view: UIView) -> CGFloat {
+    guard let controls = view.subviews.first(where: { $0 is MikshatHomeControls }), !controls.isHidden else { return 0 }
+    return controls.frame.maxY + 12
+  }
+
   @objc(installInView:)
   static func install(in view: UIView) {
     let controls = MikshatHomeControls()
@@ -114,7 +120,7 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
     controls.qiblaHeightConstraint = qibla.heightAnchor.constraint(equalToConstant: 64)
     controls.compassHeightConstraint = compass.heightAnchor.constraint(equalToConstant: 64)
     NSLayoutConstraint.activate([
-      controls.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -14),
+      controls.rightAnchor.constraint(equalTo: view.safeAreaLayoutGuide.rightAnchor, constant: -14),
       controls.topConstraint!, controls.widthConstraint!, controls.qiblaHeightConstraint!, controls.compassHeightConstraint!,
       kaaba.centerXAnchor.constraint(equalTo: qibla.centerXAnchor), kaaba.centerYAnchor.constraint(equalTo: qibla.centerYAnchor),
       kaaba.widthAnchor.constraint(equalToConstant: 48), kaaba.heightAnchor.constraint(equalTo: kaaba.widthAnchor),
@@ -559,13 +565,8 @@ enum MikshatLocationActions {
 
   static func shareCurrent(from controller: UIViewController) {
     guard let fix = MikshatHeading.currentLocation else { showLocationError(from: controller); return }
-    let value = String(format: "%.8f,%.8f", locale: Locale(identifier: "en_US_POSIX"), fix.coordinate.latitude, fix.coordinate.longitude)
-    guard let url = URL(string: "https://omaps.app/?ll=\(value)") else { return }
-    let text = MikshatNavigationMath.coordinatePairs(latitude: fix.coordinate.latitude, longitude: fix.coordinate.longitude)[1]
-    let share = UIActivityViewController(activityItems: [text, url], applicationActivities: nil)
-    share.popoverPresentationController?.sourceView = controller.view
-    share.popoverPresentationController?.sourceRect = CGRect(x: controller.view.bounds.midX, y: controller.view.bounds.midY, width: 1, height: 1)
-    controller.present(share, animated: true)
+    let share = ActivityViewController.share(forMyPosition: fix.coordinate)
+    share.present(inParentViewController: controller, anchorView: controller.view)
   }
 
   private static func showLocationError(from controller: UIViewController) {
@@ -706,4 +707,68 @@ enum MikshatSearchLocations {
     return CLLocationCoordinate2DIsValid(result) ? result : nil
   }
   static func clear() { UserDefaults.standard.removeObject(forKey: key) }
+}
+
+
+final class MikshatCoordinateRow: UIStackView {
+  init(text: String, format: String? = nil, copy: @escaping () -> Void) {
+    super.init(frame: .zero)
+    axis = .horizontal
+    alignment = .center
+    spacing = 10
+    semanticContentAttribute = .forceLeftToRight
+    isLayoutMarginsRelativeArrangement = true
+    layoutMargins = UIEdgeInsets(top: 10, left: 16, bottom: 10, right: 16)
+    let button = UIButton(type: .system)
+    var configuration = UIButton.Configuration.filled()
+    configuration.title = L("mikshat_copy")
+    configuration.baseBackgroundColor = MikshatStyle.green
+    configuration.baseForegroundColor = .white
+    configuration.cornerStyle = .medium
+    button.configuration = configuration
+    button.widthAnchor.constraint(equalToConstant: 66).isActive = true
+    button.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+    button.addAction(UIAction { _ in copy() }, for: .touchUpInside)
+    addArrangedSubview(button)
+    let values = UIStackView()
+    values.axis = .vertical
+    values.spacing = 3
+    let components = text.components(separatedBy: "\n")
+    for line in components {
+      let label = MikshatStyle.label(line, size: 18, color: MikshatStyle.green)
+      label.numberOfLines = 1
+      label.textAlignment = .left
+      label.semanticContentAttribute = .forceLeftToRight
+      label.adjustsFontSizeToFitWidth = true
+      label.minimumScaleFactor = 0.55
+      values.addArrangedSubview(label)
+    }
+    addArrangedSubview(values)
+    if let format {
+      let title = MikshatStyle.label(format, size: 13, color: MikshatStyle.green)
+      title.widthAnchor.constraint(equalToConstant: 38).isActive = true
+      addArrangedSubview(title)
+    }
+    heightAnchor.constraint(equalToConstant: UIFontMetrics.default.scaledValue(for: 88)).withPriority(.required - 1).isActive = true
+    setContentHuggingPriority(.required, for: .vertical)
+    setContentCompressionResistancePriority(.required, for: .vertical)
+  }
+  @available(*, unavailable)
+  required init(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+}
+
+
+@objc(MikshatShareContent)
+final class MikshatShareContent: NSObject {
+  @objc(linkWithLatitude:longitude:name:)
+  static func link(latitude: Double, longitude: Double, name: String) -> URL? {
+    MikshatNavigationMath.shareLink(latitude: latitude, longitude: longitude, name: name)
+  }
+  @objc(messageWithLatitude:longitude:name:)
+  static func message(latitude: Double, longitude: Double, name: String) -> String {
+    guard let url = link(latitude: latitude, longitude: longitude, name: name) else { return "" }
+    let title = name.isEmpty ? L("mikshat_map_point") : name
+    let coordinates = MikshatNavigationMath.coordinatePairs(latitude: latitude, longitude: longitude)[1]
+    return String(format: L("mikshat_share_message"), title, coordinates, url.absoluteString)
+  }
 }

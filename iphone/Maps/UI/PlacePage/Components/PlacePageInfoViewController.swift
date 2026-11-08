@@ -205,21 +205,15 @@ class PlacePageInfoViewController: UIViewController {
   private func setupCoordinatesView() {
     let formats = MikshatNavigationMath.coordinatePairs(latitude: placePageInfoData.latitude, longitude: placePageInfoData.longitude)
     for (index, text) in formats.enumerated() {
-      let title = MikshatStyle.label(["DD", "DDM", "DMS"][index], size: 13, color: MikshatStyle.green)
-      let value = MikshatStyle.label(text, size: 17, color: MikshatStyle.green)
-      value.semanticContentAttribute = .forceLeftToRight
-      value.textAlignment = .left
-      let copy = MikshatStyle.button(L("mikshat_copy"), symbol: "doc.on.doc") { [weak self] in self?.delegate?.didCopy(text) }
-      copy.widthAnchor.constraint(greaterThanOrEqualToConstant: 52).isActive = true
-      let row = UIStackView(arrangedSubviews: [title, value, copy])
-      row.axis = .horizontal
-      row.spacing = 10
-      row.alignment = .center
-      row.isLayoutMarginsRelativeArrangement = true
-      row.layoutMargins = UIEdgeInsets(top: 14, left: 16, bottom: 14, right: 16)
-      row.heightAnchor.constraint(greaterThanOrEqualToConstant: 64).isActive = true
+      let row = MikshatCoordinateRow(text: text, format: ["DD", "DDM", "DMS"][index]) { [weak self] in
+        self?.delegate?.didCopy(text)
+      }
       addToStack(row)
     }
+    // Absorb any surplus height here instead of stretching the first coordinate row.
+    let spacer = UIView()
+    spacer.setContentHuggingPriority(.defaultLow, for: .vertical)
+    stackView.addArrangedSubview(spacer)
   }
 
   /// The format index actually shown: the saved one if available here, otherwise the next available.

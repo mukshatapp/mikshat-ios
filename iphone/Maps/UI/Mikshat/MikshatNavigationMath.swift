@@ -106,7 +106,7 @@ extension MikshatNavigationMath {
     return "\(direction) \(pad(total / 360_000, latitude ? 2 : 3))° \(pad(total / 6000 % 60, 2))′ \(pad(total / 100 % 60, 2)).\(pad(total % 100, 2))″"
   }
   static func coordinatePairs(latitude: Double, longitude: Double) -> [String] {
-    [String(format: "%.6f, %.6f", latitude, longitude),
+    [String(format: "%.6f\n%.6f", locale: Locale(identifier: "en_US_POSIX"), latitude, longitude),
      ddm(latitude, latitude: true) + "\n" + ddm(longitude, latitude: false),
      dms(latitude, latitude: true) + "\n" + dms(longitude, latitude: false)]
   }
@@ -129,5 +129,38 @@ extension MikshatNavigationMath {
           let latitude = Double(normalized[latRange]), let longitude = Double(normalized[lonRange]),
           abs(latitude) <= 90, abs(longitude) <= 180 else { return nil }
     return (latitude, longitude)
+  }
+}
+
+
+extension MikshatNavigationMath {
+  static func distanceParts(_ formatted: String) -> (value: String, unit: String) {
+    guard let range = formatted.range(of: "[\\p{N}]+(?:[.,٫٬][\\p{N}]+)*", options: .regularExpression) else { return (formatted, "") }
+    return (String(formatted[range]), formatted.replacingCharacters(in: range, with: "").trimmingCharacters(in: .whitespacesAndNewlines))
+  }
+}
+
+
+extension MikshatNavigationMath {
+  static func shareLink(latitude: Double, longitude: Double, name: String) -> URL? {
+    guard latitude.isFinite, longitude.isFinite, abs(latitude) <= 90, abs(longitude) <= 180 else { return nil }
+    var components = URLComponents(string: "https://mukshatapp.github.io/map/")!
+    let pair = String(format: "%.6f,%.6f", locale: Locale(identifier: "en_US_POSIX"), latitude, longitude)
+    components.queryItems = [URLQueryItem(name: "ll", value: pair)]
+    if !name.isEmpty { components.queryItems?.append(URLQueryItem(name: "n", value: name)) }
+    return components.url
+  }
+
+  static func mikshatMapLink(_ url: URL) -> URL? {
+    guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+          ["https", "http"].contains(components.scheme?.lowercased() ?? ""),
+          components.host?.lowercased() == "mukshatapp.github.io",
+          ["/map", "/map/"].contains(components.path),
+          components.queryItems?.filter({ $0.name == "ll" }).count == 1,
+          let pair = components.queryItems?.first(where: { $0.name == "ll" })?.value,
+          parseDecimalPair(pair) != nil else { return nil }
+    var target = URLComponents(string: "om://map")!
+    target.queryItems = components.queryItems
+    return target.url
   }
 }

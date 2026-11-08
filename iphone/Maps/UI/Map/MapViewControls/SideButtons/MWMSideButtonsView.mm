@@ -75,6 +75,9 @@ CGFloat const kButtonsBottomOffset = 6;
                    animations:^{
                      CGFloat const landscapeOffset = self.superview.width > self.superview.height ? 12 : 0;
                      self.midY = centerShift + self.superview.height / 2 + landscapeOffset;
+                     CGFloat const toolsBottom = [MikshatHomeControls minimumMapControlsYInView:self.superview];
+                     if (self.minY < toolsBottom && toolsBottom + self.height <= self.bottomBound)
+                       self.minY = toolsBottom;
                      if (self.maxY > self.bottomBound)
                        self.maxY = self.bottomBound;
                    }];

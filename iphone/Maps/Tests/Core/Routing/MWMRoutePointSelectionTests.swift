@@ -1,5 +1,6 @@
 @testable import Organic_Maps__Debug_
 import XCTest
+import CoreLocation
 
 final class MWMRoutePointSelectionTests: XCTestCase {
   private var manager: MWMNavigationDashboardManager!
@@ -268,5 +269,30 @@ final class MWMRoutePointSelectionTests: XCTestCase {
     }, object: nil)
     wait(for: [ready], timeout: 5)
     XCTAssertTrue(MWMRouter.isRoutingActive())
+  }
+}
+
+final class MikshatDirectDestinationLockTests: XCTestCase {
+  func test_DirectTripRejectsDestinationReplacementAndUnlocksAtEnd() {
+    let previousPoints = MWMRouter.points()
+    defer {
+      MWMRouter.endMikshatDirect()
+      MWMRouter.removePoints()
+      previousPoints.forEach { MWMRouter.addPoint($0) }
+    }
+    MWMRouter.removePoints()
+    let destination = MWMRoutePoint(cgPoint: CGPoint(x: 47, y: 24), title: "Original", subtitle: nil, type: .finish, intermediateIndex: 0)
+    let replacement = MWMRoutePoint(cgPoint: CGPoint(x: 48, y: 25), title: "Replacement", subtitle: nil, type: .finish, intermediateIndex: 0)
+    MWMRouter.addPoint(destination)
+    MWMRouter.beginMikshatDirect(from: CLLocationCoordinate2D(latitude: 24, longitude: 46), to: CLLocationCoordinate2D(latitude: destination.latitude, longitude: destination.longitude))
+    XCTAssertTrue(MWMRouter.isMikshatDirectActive())
+    MWMRouter.addPoint(replacement)
+    MWMRouter.removePoints()
+    XCTAssertEqual(MWMRouter.finishPoint()?.longitude, destination.longitude)
+    XCTAssertEqual(MWMRouter.finishPoint()?.latitude, destination.latitude)
+    MWMRouter.endMikshatDirect()
+    XCTAssertFalse(MWMRouter.isMikshatDirectActive())
+    MWMRouter.addPoint(replacement)
+    XCTAssertEqual(MWMRouter.finishPoint()?.longitude, replacement.longitude)
   }
 }

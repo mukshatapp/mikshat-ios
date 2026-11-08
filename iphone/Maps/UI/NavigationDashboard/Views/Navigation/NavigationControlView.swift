@@ -1,8 +1,8 @@
 final class NavigationControlView: SolidTouchView {
   private enum Constants {
     static let buttonContentInset: CGFloat = 15
-    static var metricFont: UIFont { .bold22.dynamic(maxSize: 26) }
-    static var metricLegendFont: UIFont { .bold12.dynamic(maxSize: 16) }
+    static var metricFont: UIFont { UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: 38, weight: .bold)) }
+    static var metricLegendFont: UIFont { UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: 18, weight: .medium)) }
   }
 
   @IBOutlet private var distanceLabel: UILabel!
@@ -92,6 +92,7 @@ final class NavigationControlView: SolidTouchView {
     [distanceLegendLabel, speedLegendLabel]
   }
 
+  private var mikshatActions: MikshatNavigationActionsView?
   private var lastViewportHeight: CGFloat = 0
 
   override func awakeFromNib() {
@@ -108,9 +109,17 @@ final class NavigationControlView: SolidTouchView {
     configureButton(settingsButton)
     configureButton(ttsButton)
     configureButton(trackRecordingButton)
+    trackRecordingButton.isHidden = true
+    addGestureRecognizer(UIPanGestureRecognizer(target: self, action: #selector(mikshatPan(_:))))
     configureStopButton(stopButton)
 
     MWMTextToSpeech.add(self)
+  }
+
+  @objc private func mikshatPan(_ gesture: UIPanGestureRecognizer) {
+    guard gesture.state == .ended else { return }
+    let y = gesture.translation(in: self).y
+    if abs(y) > 12 { isExtended = y < 0; refreshDiminishTimer() }
   }
 
   private func configureMetricLabel(_ label: UILabel, font: UIFont) {
@@ -168,14 +177,20 @@ final class NavigationControlView: SolidTouchView {
     notExtendedConstraint = progressView.bottomAnchor.constraint(equalTo: lg.bottomAnchor)
     notExtendedConstraint.isActive = true
 
+    let actions = MikshatNavigationActionsView()
+    actions.install(in: ownerView, above: self)
+    mikshatActions = actions
     updateVisibleViewportArea()
   }
 
   private func removeView() {
     // Cancel diminish timer on remove, otherwise performSelector keeps the view alive ~5s after close, blocking deinit.
     cancelDiminishTimer()
+    mikshatActions?.removeFromSuperview()
+    mikshatActions = nil
     updateVisibleViewportArea(onClose: true)
-    dimBackground.setVisible(false, completion: {
+    dimBackground.setVisible(false, completion: { [weak self] in
+      guard let self, !self.isVisible else { return }
       self.removeFromSuperview()
     })
   }
@@ -325,20 +340,22 @@ final class NavigationControlView: SolidTouchView {
     }
     imageView.animationImages = morphImages
     imageView.animationRepeatCount = 1
+    imageView.animationDuration = 0.2
     imageView.image = morphImages.last
     imageView.startAnimating()
     setExtendButtonImage()
   }
 
   private func setExtendButtonImage() {
-    DispatchQueue.main.async {
-      guard let imageView = self.extendButton.imageView else { return }
-      if imageView.isAnimating {
-        self.setExtendButtonImage()
-      } else {
-        self.extendButton.setImage(UIImage(resource: self.isExtended ? .icMenuDown : .icMenu), for: .normal)
-      }
+    guard let imageView = extendButton.imageView else { return }
+    let update: () -> Void = { [weak self] in
+      guard let self else { return }
+      self.extendButton.setImage(UIImage(resource: self.isExtended ? .icMenuDown : .icMenu), for: .normal)
     }
+    if imageView.isAnimating {
+      // One completion update, rather than repeatedly rescheduling work on the main queue.
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.22, execute: update)
+    } else { update() }
   }
 
   private func refreshDiminishTimer() {

@@ -1,4 +1,5 @@
 #import "MWMShareActivityItem.h"
+#import "SwiftBridge.h"
 
 #include "base/assert.hpp"
 
@@ -54,7 +55,10 @@
 {
   self = [super init];
   if (self)
+  {
     [self fillFrom:GetFramework().GetShareDataForMyPosition(ms::LatLon(location.latitude, location.longitude))];
+    [self applyMikshatCoordinate:location name:L(@"mikshat_current_location")];
+  }
   return self;
 }
 
@@ -64,9 +68,25 @@
   if (self)
   {
     auto & f = GetFramework();
-    [self fillFrom:f.GetShareData(f.GetCurrentPlacePageInfo())];
+    auto const & info = f.GetCurrentPlacePageInfo();
+    [self fillFrom:f.GetShareData(info)];
+    auto const coordinate = info.GetLatLon();
+    [self applyMikshatCoordinate:CLLocationCoordinate2DMake(coordinate.m_lat, coordinate.m_lon)
+                          name:@(info.GetTitle().c_str())];
   }
   return self;
+}
+
+- (void)applyMikshatCoordinate:(CLLocationCoordinate2D)coordinate name:(NSString *)name
+{
+  NSString * title = name.length > 0 ? name : L(@"mikshat_map_point");
+  NSURL * url = [MikshatShareContent linkWithLatitude:coordinate.latitude longitude:coordinate.longitude name:title];
+  if (!url)
+    return;
+  _shareUrl = url;
+  _shareText = [MikshatShareContent messageWithLatitude:coordinate.latitude longitude:coordinate.longitude name:title];
+  _shareHtml = @"";
+  _subjectBasis = [NSString stringWithFormat:@"%@ • %@", title, L(@"mikshat_app_name")];
 }
 
 - (void)fillFrom:(share::Result const &)result
@@ -96,17 +116,15 @@
 // Email subject: place name/address, "I am here" for the current position, or a generic fallback.
 - (NSString *)subject
 {
-  if (self.isMyPosition)
-    return L(@"share_my_position");
-  if (self.subjectBasis.length > 0)
-    return [NSString stringWithFormat:L(@"share_place_subject"), self.subjectBasis];
-  return L(@"share_place_subject_default");
+  return self.subjectBasis.length > 0 ? self.subjectBasis : L(@"mikshat_app_name");
 }
 
 // A rich attributed body so Mail sends formatted HTML; nil when the HTML can't be parsed.
 // This is created lazily after Mail is selected so other share extensions only receive plain text.
 - (NSAttributedString *)attributedBody
 {
+  if (self.shareHtml.length == 0)
+    return nil;
   NSData * data = [self.shareHtml dataUsingEncoding:NSUTF8StringEncoding];
   if (!data)
     return nil;
@@ -145,8 +163,13 @@
 {
   LPLinkMetadata * metadata = [[LPLinkMetadata alloc] init];
   metadata.originalURL = self.shareUrl;
+  metadata.URL = self.shareUrl;
   metadata.title = [self subject];
-  metadata.iconProvider = [[NSItemProvider alloc] initWithObject:[UIImage imageNamed:@"imgLogo"]];
+  NSDictionary * icons = NSBundle.mainBundle.infoDictionary[@"CFBundleIcons"];
+  NSString * iconName = [icons[@"CFBundlePrimaryIcon"][@"CFBundleIconFiles"] lastObject];
+  UIImage * icon = (iconName ? [UIImage imageNamed:iconName] : nil) ?: [UIImage imageNamed:@"imgLogo"];
+  if (icon)
+    metadata.iconProvider = [[NSItemProvider alloc] initWithObject:icon];
   return metadata;
 }
 

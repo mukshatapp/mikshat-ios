@@ -46745,3 +46745,39 @@ comment = Mikshat location and compass interface
 tags = apple-maps
 en = Arrow fixed upwards
 ar = السهم ثابت للأعلى
+
+[mikshat_finish_trip_first]
+comment = Mikshat navigation and location sharing
+tags = apple-maps
+en = Finish the current trip before changing its destination.
+ar = أنهِ الرحلة الحالية قبل تغيير الوجهة.
+
+[mikshat_stop_navigation]
+comment = Mikshat navigation and location sharing
+tags = apple-maps
+en = Stop
+ar = توقف
+
+[mikshat_show_stop]
+comment = Mikshat navigation and location sharing
+tags = apple-maps
+en = Show stop button
+ar = إظهار زر التوقف
+
+[mikshat_app_name]
+comment = Mikshat navigation and location sharing
+tags = apple-maps
+en = Mikshat
+ar = مكشات
+
+[mikshat_map_point]
+comment = Mikshat navigation and location sharing
+tags = apple-maps
+en = Map point
+ar = نقطة الخريطة
+
+[mikshat_share_message]
+comment = Mikshat navigation and location sharing
+tags = apple-maps
+en = 📍 %@ via Mikshat\nFor navigation and outdoor maps\n\nCoordinates:\n%@\n\nOpen in Mikshat:\n%@
+ar = 📍 %@ عبر مكشات\nللملاحة والخرائط البرية\n\nالإحداثيات:\n%@\n\nافتح الموقع في تطبيق مكشات:\n%@
