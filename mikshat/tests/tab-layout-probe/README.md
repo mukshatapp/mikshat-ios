@@ -15,9 +15,14 @@ metrics after each transition. It requires finite geometry and restored page
 alignment. It also exercises ten unchanged layout passes per fixture.
 
 The 4.6.9 source at commit `74b5bf3` is expected to fail the page-alignment
-assertions. The candidate uses an explicit, recorded transformation moving
-collection `layoutIfNeeded()` **inside** the positive-size/not-dragging/valid-item
-guard immediately before `scrollToItem`. The production working copy is not
+assertions. An initial `guarded` candidate moved collection `layoutIfNeeded()` inside the
+positive-size/not-dragging/valid-item guard, but the native iOS 26.5 probe still
+reported the same failure: a 480-point viewport retained a 640-point total content
+width from two old 320-point items. Preparing layout alone did not invalidate
+cached delegate sizes.
+
+The `metrics` candidate explicitly invalidates flow-layout delegate metrics and
+attributes, then prepares layout inside that guard before `scrollToItem`. The production working copy is not
 modified. Generated original/compiled files, SHA-256 manifests and native output
 are uploaded as artifacts. A baseline unexpected pass or candidate failure fails
 the workflow.

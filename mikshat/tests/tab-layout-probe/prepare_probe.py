@@ -163,8 +163,20 @@ def prepare(root, output, label, variant):
     source = (root / TAB).read_text()
     original = source
     transform = None
-    if variant == 'guarded':
+    if variant in ('guarded', 'metrics'):
         source, transform = guarded_variant(source)
+    if variant == 'metrics':
+        original_invalidation = '      tabsContentLayout.invalidateLayout()\n'
+        metrics_invalidation = '''      let invalidation = UICollectionViewFlowLayoutInvalidationContext()
+      invalidation.invalidateFlowLayoutDelegateMetrics = true
+      invalidation.invalidateFlowLayoutAttributes = true
+      tabsContentLayout.invalidateLayout(with: invalidation)
+'''
+        if metrics_invalidation not in source:
+            if source.count(original_invalidation) != 1:
+                raise ValueError('Expected exactly one content-layout invalidation')
+            source = source.replace(original_invalidation, metrics_invalidation, 1)
+        transform['delegateMetricsInvalidation'] = metrics_invalidation.splitlines()
     controller = (root / CONTROLLER).read_text()
     (output / 'TabView.original.swift').write_text(original)
     (output / 'TabView.compiled.swift').write_text(source)
@@ -183,7 +195,7 @@ if __name__ == '__main__':
     parser.add_argument('--source-root', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--label', required=True)
-    parser.add_argument('--variant', choices=['as-is', 'guarded'], default='as-is')
+    parser.add_argument('--variant', choices=['as-is', 'guarded', 'metrics'], default='as-is')
     args = parser.parse_args()
     if not re.fullmatch('[A-Za-z0-9-]+', args.label):
         parser.error('label must contain only letters, digits or hyphens')

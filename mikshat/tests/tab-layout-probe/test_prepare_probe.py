@@ -30,6 +30,17 @@ class PreparationTests(unittest.TestCase):
             self.assertIn('class TabView:', (output / 'Probe.swift').read_text())
             self.assertIn('class TabViewController:', (output / 'Probe.swift').read_text())
 
+    def test_metrics_variant_invalidates_cached_delegate_sizes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            report = probe.prepare(ROOT, output, 'metrics', 'metrics')
+            source = (output / 'TabView.compiled.swift').read_text()
+            self.assertIn('invalidation.invalidateFlowLayoutDelegateMetrics = true', source)
+            self.assertIn('invalidation.invalidateFlowLayoutAttributes = true', source)
+            self.assertIn('tabsContentLayout.invalidateLayout(with: invalidation)', source)
+            self.assertIn('let selectedIndex, hasContentItem(at: selectedIndex) {\n        tabsContentCollectionView.layoutIfNeeded()\n', source)
+            self.assertEqual(report['variant'], 'metrics')
+
 
 if __name__ == '__main__':
     unittest.main()

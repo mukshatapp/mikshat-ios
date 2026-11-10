@@ -42,9 +42,9 @@ jobs:
       - name: Reproduce 4.6.9 stale collection geometry
         run: |
           bash mikshat/tests/tab-layout-probe/run_probe.sh /tmp/mikshat-tab-baseline tab-results/baseline "$(cat /tmp/mikshat-tab-udid)" baseline as-is failed
-      - name: Verify guarded layout preparation using actual candidate source
+      - name: Verify delegate-metrics invalidation using actual candidate source
         run: |
-          bash mikshat/tests/tab-layout-probe/run_probe.sh "$GITHUB_WORKSPACE" tab-results/guarded "$(cat /tmp/mikshat-tab-udid)" guarded guarded passed
+          bash mikshat/tests/tab-layout-probe/run_probe.sh "$GITHUB_WORKSPACE" tab-results/metrics "$(cat /tmp/mikshat-tab-udid)" metrics metrics passed
       - uses: actions/upload-artifact@v4
         if: always()
         with:
