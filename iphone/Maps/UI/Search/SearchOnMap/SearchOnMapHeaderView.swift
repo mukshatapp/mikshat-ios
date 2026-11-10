@@ -274,7 +274,9 @@ final class SearchOnMapHeaderView: UIView {
       guard let self else { return }
       self.focusRequestPending = false
       guard self.wantsKeyboard, self.window != nil, !self.searchBar.isFirstResponder else { return }
+      LOG(.info, "MikshatSearch phase=keyboard-focus-begin")
       self.searchBar.becomeFirstResponder()
+      LOG(.info, "MikshatSearch phase=keyboard-focus-returned")
     }
   }
 

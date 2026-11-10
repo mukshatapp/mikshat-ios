@@ -451,7 +451,7 @@ final class MikshatMapControlLayoutTests: XCTestCase {
     let map = try XCTUnwrap(MapViewController.shared())
     map.loadViewIfNeeded()
     let home = try XCTUnwrap(map.view.subviews.compactMap { $0 as? MikshatHomeControls }.first)
-    let buttons = MWMSideButtons.buttons().view!
+    let buttons = MWMSideButtons().view!
     XCTAssertFalse(buttons.superview === home.superview, "Regression covers the actual separate containers")
     defer { MWMSideButtons.updateAvailableArea(map.view.bounds) }
     let heights: [CGFloat] = [map.view.bounds.height, 80, 240, map.view.bounds.height]
@@ -727,8 +727,46 @@ final class SearchThemeWindowLifecycleTests: XCTestCase {
     }
   }
 
+  func test_GlobalSearchManagerOpensWithDashboardObserversInPrepareAndNavigation() throws {
+    let map = try XCTUnwrap(MapViewController.shared())
+    map.loadViewIfNeeded()
+    let manager = map.searchManager
+    let dashboard = MWMNavigationDashboardManager.shared()
+    if let existing = manager.viewController {
+      manager.close()
+      let detached = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in existing.parent == nil }, object: nil)
+      XCTAssertEqual(XCTWaiter.wait(for: [detached], timeout: 3), .completed)
+    }
+    defer {
+      manager.close()
+      dashboard.onRouteStop()
+    }
+    // This is dashboard/observer integration, not a simulated GPS trip. A local
+    // SearchOnMapManager would skip these real dashboard notifications entirely.
+    for navigation in [false, true] {
+      dashboard.onRoutePrepare()
+      if navigation { dashboard.onRouteStart() }
+      for routing in [false, true] {
+        for _ in 0..<3 {
+          manager.startSearching(isRouting: routing)
+          let controller = try XCTUnwrap(manager.viewController)
+          let focused = expectation(description: "Global search notification and keyboard focus complete")
+          DispatchQueue.main.async { focused.fulfill() }
+          wait(for: [focused], timeout: 2)
+          XCTAssertTrue(controller.parent === map)
+          let bar = try XCTUnwrap(findSearchBar(in: controller.view))
+          XCTAssertTrue(bar.searchTextField.isFirstResponder)
+          XCTAssertEqual(dashboard.state, navigation ? .navigation : .prepare)
+          manager.close()
+          let detached = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in controller.parent == nil }, object: nil)
+          XCTAssertEqual(XCTWaiter.wait(for: [detached], timeout: 3), .completed)
+        }
+      }
+    }
+  }
+
   private func findSearchBar(in view: UIView) -> UISearchBar? {
     if let bar = view as? UISearchBar { return bar }
-    return view.subviews.lazy.compactMap { findSearchBar(in: $0) }.first
+    return view.subviews.lazy.compactMap { self.findSearchBar(in: $0) }.first
   }
 }

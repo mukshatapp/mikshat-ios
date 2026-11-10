@@ -46,10 +46,13 @@ final class SearchOnMapManager: NSObject {
       viewController = nil
     }
     self.mode = mode
+    LOG(.info, "MikshatSearch phase=deactivate-selection")
     FrameworkHelper.deactivateMapSelection()
+    LOG(.info, "MikshatSearch phase=construct-screen")
     let viewController = SearchOnMapViewControllerBuilder.build(mode: mode,
                                                                 didChangeState: notifyObservers)
     self.viewController = viewController
+    LOG(.info, "MikshatSearch phase=open-returned")
   }
 
   func hide() {
@@ -97,15 +100,19 @@ private enum SearchOnMapViewControllerBuilder {
                                               canSelectCurrentLocation: $0.canSelectCurrentLocation)
     }
     let viewController = SearchOnMapViewController()
+    LOG(.info, "MikshatSearch phase=screen-constructed")
     let presenter = SearchOnMapPresenter(shouldHideForRouting: mode == .routing,
                                          routePointActions: routePointActions,
                                          didChangeState: didChangeState)
     let interactor = SearchOnMapInteractor(presenter: presenter,
                                            routePointSelector: routePointSelector,
                                            mapViewController: MapViewController.shared())
+    LOG(.info, "MikshatSearch phase=observers-registered")
     presenter.view = viewController
     viewController.interactor = interactor
+    LOG(.info, "MikshatSearch phase=show-screen")
     viewController.show()
+    LOG(.info, "MikshatSearch phase=show-returned")
     return viewController
   }
 }
