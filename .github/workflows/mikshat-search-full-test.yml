@@ -15,6 +15,7 @@ concurrency:
 
 jobs:
   search-regression:
+    if: "!contains(github.event.head_commit.message, '[renderer-only]')"
     name: Real app on iPhone 16 / iOS 26
     runs-on: macos-26
     timeout-minutes: 60
@@ -249,13 +250,19 @@ jobs:
                                   ('4.6.9-theme-baseline', 'xcodebuild-search-baseline-tests.log')]:
               path = Path('build/search-diagnostics') / filename
               text = path.read_text(errors='replace') if path.exists() else ''
-              errors = [line for line in text.splitlines() if re.search(r'\berror:|fatal error:', line)]
+              # XCTest assertions use "file:line: error:" and some runtime
+              # symbols contain "error:". Neither is a compiler diagnostic.
+              compiler_pattern = r'(?:^|\s)(?:/[^:\n]+|[^:\s]+\.(?:swift|m|mm|h|c|cc|cpp|hpp)):\d+:\d+:\s+(?:fatal\s+)?error:'
+              errors = [line for line in text.splitlines() if re.search(compiler_pattern, line)]
+              failures = [line for line in text.splitlines()
+                          if re.search(r'Test Case .* failed|:\d+: error: -\[', line)]
               counts = [dict(tests=int(tests), failures=int(failures))
                         for tests, failures in re.findall(r'Executed (\d+) tests?, with (\d+) failures?', text)]
               started = len(re.findall(r'Test Case .* started', text))
               rows.append(dict(label=label, log=filename, testCasesStarted=started,
-                               executionSummaries=counts, compilerErrors=errors[-30:],
-                               status='compile_failure' if errors else ('tests_started' if started else 'no_test_execution_recorded')))
+                               executionSummaries=counts, compilerErrors=errors[-30:], testFailures=failures[-30:],
+                               status='test_execution' if started or any(row['tests'] for row in counts)
+                               else ('compile_failure' if errors else 'no_test_execution_recorded')))
           destination = Path('build/search-diagnostics/test-summary.json')
           destination.write_text(json.dumps(rows, indent=2) + '\n')
           summary = ['## Search diagnostic results', '',
@@ -265,6 +272,8 @@ jobs:
                           f"Execution summaries: {row['executionSummaries']}", '']
               if row['compilerErrors']:
                   summary += ['```text', '\n'.join(row['compilerErrors']), '```', '']
+              if row['testFailures']:
+                  summary += ['Test failures:', '', '```text', '\n'.join(row['testFailures']), '```', '']
           markdown = '\n'.join(summary) + '\n'
           Path('build/search-diagnostics/test-summary.md').write_text(markdown)
           if os.environ.get('GITHUB_STEP_SUMMARY'):

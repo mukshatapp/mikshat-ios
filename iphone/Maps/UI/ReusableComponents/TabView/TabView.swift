@@ -330,6 +330,9 @@ class TabView: UIView {
       // Record geometry before scrolling, which may synchronously trigger layout.
       lastContentSize = contentSize
       tabsContentLayout.invalidateLayout()
+      // Prepare the new item sizes before scrollToItem clamps its offset using
+      // contentSize; otherwise a rotation can still use the old page geometry.
+      tabsContentCollectionView.layoutIfNeeded()
       if contentSize.width > 0, contentSize.height > 0,
          !tabsContentCollectionView.isDragging, !tabsContentCollectionView.isDecelerating,
          let selectedIndex, hasContentItem(at: selectedIndex) {
