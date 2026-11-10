@@ -14,6 +14,12 @@ The app records native bounds, content size, offsets, page position and item
 metrics after each transition. It requires finite geometry and restored page
 alignment. It also exercises ten unchanged layout passes per fixture.
 
+Both transitions also run as separate hosted fixtures: the actual tab controller
+is attached as a child of the visible window's root controller, and its view is
+resized without forcing a hardware orientation change. Reports include window
+attachment and safe-area insets. Alignment always uses the collection's actual
+viewport width, rather than an assumed full-screen width.
+
 The 4.6.9 source at commit `74b5bf3` is expected to fail the page-alignment
 assertions. An initial `guarded` candidate moved collection `layoutIfNeeded()` inside the
 positive-size/not-dragging/valid-item guard, but the native iOS 26.5 probe still

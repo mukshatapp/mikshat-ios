@@ -67,12 +67,27 @@ final class TabProbeDelegate: UIResponder, UIApplicationDelegate {
     if !value { failures.append(message) }
   }
 
-  private func runCase(_ name: String, sizes: [CGSize]) {
+  private func runCase(_ name: String, sizes: [CGSize], hosted: Bool = false) {
     let controller = TabViewController()
     controller.loadViewIfNeeded()
     controller.viewControllers = [UIViewController(), UIViewController()]
     let tabs = controller.tabView
     tabs.selectedIndex = 1
+    // Keep the original unhosted XCTest fixtures and separately exercise the same
+    // production view while it is attached to a real, visible UIKit window.
+    if hosted, let host = window?.rootViewController {
+      host.addChild(controller)
+      host.view.addSubview(tabs)
+      controller.didMove(toParent: host)
+      check(tabs.window != nil, "\(name): view is not attached to the visible window")
+    }
+    defer {
+      if hosted {
+        controller.willMove(toParent: nil)
+        tabs.removeFromSuperview()
+        controller.removeFromParent()
+      }
+    }
     guard let content = tabs.subviews.compactMap({ $0 as? UICollectionView }).first else {
       failures.append("Missing content collection")
       return
@@ -93,6 +108,9 @@ final class TabProbeDelegate: UIResponder, UIApplicationDelegate {
         "selectedIndex": tabs.selectedIndex ?? -1,
         "pagePosition": ratio ?? -1,
         "itemSize": [metrics.width, metrics.height],
+        "windowAttached": tabs.window != nil,
+        "safeAreaInsets": [tabs.safeAreaInsets.top, tabs.safeAreaInsets.left,
+                           tabs.safeAreaInsets.bottom, tabs.safeAreaInsets.right],
       ]
       geometry.append(detail)
       print("MIKSHAT_TAB_PROBE \(detail)")
@@ -116,11 +134,13 @@ final class TabProbeDelegate: UIResponder, UIApplicationDelegate {
     fflush(stdout)
     runCase("existing-resize", sizes: [CGSize(width: 320, height: 480), CGSize(width: 480, height: 320)])
     runCase("nonempty-collapse", sizes: [CGSize(width: 320, height: 480), .zero, CGSize(width: 480, height: 320)])
+    runCase("hosted-resize", sizes: [CGSize(width: 320, height: 480), CGSize(width: 480, height: 320)], hosted: true)
+    runCase("hosted-collapse", sizes: [CGSize(width: 320, height: 480), .zero, CGSize(width: 480, height: 320)], hosted: true)
     let result = failures.isEmpty ? "passed" : "failed"
     let report: [String: Any] = [
       "result": result, "label": "__LABEL__", "iOS": UIDevice.current.systemVersion,
       "model": UIDevice.current.model, "failures": failures, "geometry": geometry,
-      "scope": "Actual TabView and TabViewController; UIKit real; only visual helpers/base app controller stubbed; geometry fixtures unhosted like production XCTest"
+      "scope": "Actual TabView and TabViewController; UIKit real; only visual helpers/base app controller stubbed; unhosted XCTest fixtures and visible-window child-controller fixtures"
     ]
     let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     if let data = try? JSONSerialization.data(withJSONObject: report, options: [.sortedKeys]) {
