@@ -97,7 +97,9 @@ class TabView: UIView {
   private var slidingViewLeft: NSLayoutConstraint!
   private var slidingViewWidth: NSLayoutConstraint!
   private var slidingViewHeight: NSLayoutConstraint!
-  private lazy var pageCount = self.dataSource?.numberOfPages(in: self) ?? 0
+  private var pageCount: Int { max(0, dataSource?.numberOfPages(in: self) ?? 0) }
+  private var lastHeaderSize: CGSize = .zero
+  private var lastContentSize: CGSize = .zero
   var selectedIndex: Int? {
     didSet {
       updateSelectedHeader()
@@ -296,19 +298,45 @@ class TabView: UIView {
     }
   }
 
+  func reloadData() {
+    let count = pageCount
+    let newIndex = count > 0 ? min(max(0, selectedIndex ?? 0), count - 1) : nil
+    if selectedIndex != newIndex { selectedIndex = newIndex }
+    lastContentSize = .zero
+    tabsCollectionView.reloadData()
+    tabsContentCollectionView.reloadData()
+    setNeedsLayout()
+  }
+
+  private func hasContentItem(at index: Int) -> Bool {
+    index >= 0 && index < pageCount && tabsContentCollectionView.numberOfSections > 0
+      && index < tabsContentCollectionView.numberOfItems(inSection: 0)
+  }
+
   override func layoutSubviews() {
-    tabsLayout.invalidateLayout()
-    tabsContentLayout.invalidateLayout()
     super.layoutSubviews()
-    assert(pageCount > 0)
-    slidingViewWidth.constant = pageCount > 0 ? contentFrame.width / CGFloat(pageCount) : 0
-    slidingViewLeft.constant = pageCount > 0 ? contentFrame.width / CGFloat(pageCount) * CGFloat(selectedIndex ?? 0) : 0
-    tabsCollectionView.layoutIfNeeded()
-    tabsContentCollectionView.layoutIfNeeded()
-    if let selectedIndex = selectedIndex {
-      tabsContentCollectionView.scrollToItem(at: IndexPath(item: selectedIndex, section: 0),
-                                             at: .left,
-                                             animated: false)
+    let width = pageCount > 0 ? max(0, contentFrame.width) / CGFloat(pageCount) : 0
+    let left = width * CGFloat(selectedIndex ?? 0)
+    if slidingViewWidth.constant != width { slidingViewWidth.constant = width }
+    if slidingViewLeft.constant != left { slidingViewLeft.constant = left }
+
+    let headerSize = tabsCollectionView.bounds.size
+    if headerSize != lastHeaderSize {
+      lastHeaderSize = headerSize
+      tabsLayout.invalidateLayout()
+    }
+    let contentSize = tabsContentCollectionView.bounds.size
+    if contentSize != lastContentSize {
+      // Record geometry before scrolling, which may synchronously trigger layout.
+      lastContentSize = contentSize
+      tabsContentLayout.invalidateLayout()
+      if contentSize.width > 0, contentSize.height > 0,
+         !tabsContentCollectionView.isDragging, !tabsContentCollectionView.isDecelerating,
+         let selectedIndex, hasContentItem(at: selectedIndex) {
+        tabsContentCollectionView.scrollToItem(at: IndexPath(item: selectedIndex, section: 0),
+                                               at: .left,
+                                               animated: false)
+      }
     }
     updateHeaderSelectionProgress()
   }
@@ -373,7 +401,10 @@ extension TabView: UICollectionViewDelegateFlowLayout {
       return
     }
 
-    selectedIndex = Int(round(scrollView.contentOffset.x / scrollView.bounds.width))
+    guard scrollView.bounds.width > 0 else { return }
+    let position = (scrollView.contentOffset.x / scrollView.bounds.width).rounded()
+    guard position.isFinite, position >= 0, position < CGFloat(pageCount) else { return }
+    selectedIndex = Int(position)
     if let selectedIndex = selectedIndex, selectedIndex != lastSelectedIndex {
       delegate?.tabView(self, didSelectTabAt: selectedIndex)
     }
@@ -381,6 +412,7 @@ extension TabView: UICollectionViewDelegateFlowLayout {
 
   func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
     if collectionView == tabsCollectionView {
+      guard hasContentItem(at: indexPath.item) else { return }
       let isSelected = selectedIndex == indexPath.item
       if !isSelected {
         selectedIndex = indexPath.item
@@ -400,12 +432,12 @@ extension TabView: UICollectionViewDelegateFlowLayout {
                       layout _: UICollectionViewLayout,
                       sizeForItemAt _: IndexPath) -> CGSize {
     let bounds = collectionView.bounds.inset(by: collectionView.adjustedContentInset)
-
+    let size = CGSize(width: max(0, bounds.width), height: max(0, bounds.height))
     if collectionView == tabsContentCollectionView {
-      return bounds.size
+      return size
     } else {
-      return CGSize(width: bounds.width / CGFloat(pageCount),
-                    height: bounds.height)
+      guard pageCount > 0 else { return .zero }
+      return CGSize(width: size.width / CGFloat(pageCount), height: size.height)
     }
   }
 }

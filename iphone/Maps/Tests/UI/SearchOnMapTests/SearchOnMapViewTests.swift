@@ -472,3 +472,92 @@ final class MikshatMapControlLayoutTests: XCTestCase {
     }
   }
 }
+
+final class MikshatSearchDirectionIndicatorTests: XCTestCase {
+  func test_AttachingHistoryArrowsDoesNotStartGPS() {
+    let wasStarted = LocationManager.isStarted()
+    let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+    defer {
+      window.subviews.forEach { $0.removeFromSuperview() }
+      if wasStarted { LocationManager.start() } else { LocationManager.stop() }
+    }
+    LocationManager.stop()
+    for _ in 0..<12 {
+      let arrow = MikshatDirectionIndicator()
+      arrow.target = CLLocationCoordinate2D(latitude: 24.7136, longitude: 46.6753)
+      window.addSubview(arrow)
+    }
+    XCTAssertFalse(LocationManager.isStarted(), "History decoration must not start or replay GPS into navigation")
+  }
+
+  func test_SharedRefreshDoesNotRetainDetachedHistoryArrows() {
+    weak var releasedArrow: MikshatDirectionIndicator?
+    autoreleasepool {
+      let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+      let arrow = MikshatDirectionIndicator()
+      releasedArrow = arrow
+      window.addSubview(arrow)
+      arrow.removeFromSuperview()
+    }
+    XCTAssertNil(releasedArrow)
+  }
+}
+
+final class SearchTabLayoutRegressionTests: XCTestCase {
+  private func collections(in view: UIView) -> [UICollectionView] {
+    view.subviews.flatMap { child -> [UICollectionView] in
+      if let collection = child as? UICollectionView { return [collection] }
+      return collections(in: child)
+    }
+  }
+
+  func test_ZeroInitialCountIsNotCachedBeforeChildControllersAreAssigned() throws {
+    let controller = TabViewController()
+    controller.loadViewIfNeeded()
+    let tabs = controller.tabView
+    let views = collections(in: tabs)
+    XCTAssertEqual(views.count, 2)
+    // Force the initial count query before SearchTabViewController adds its children.
+    for view in views { XCTAssertEqual(tabs.collectionView(view, numberOfItemsInSection: 0), 0) }
+    controller.viewControllers = [UIViewController(), UIViewController()]
+    for view in views {
+      XCTAssertEqual(tabs.collectionView(view, numberOfItemsInSection: 0), 2)
+      XCTAssertEqual(view.numberOfItems(inSection: 0), 2)
+    }
+  }
+
+  func test_EmptyOrZeroSizedTabsDoNotScrollToAnInvalidItemOrConvertNaNToInt() throws {
+    let controller = TabViewController()
+    controller.loadViewIfNeeded()
+    let tabs = controller.tabView
+    tabs.frame = .zero
+    tabs.selectedIndex = 0
+    tabs.setNeedsLayout()
+    tabs.layoutIfNeeded()
+    for collection in collections(in: tabs) {
+      collection.frame = .zero
+      let size = tabs.collectionView(collection, layout: UICollectionViewFlowLayout(), sizeForItemAt: IndexPath(item: 0, section: 0))
+      XCTAssertTrue(size.width.isFinite && size.height.isFinite)
+      XCTAssertGreaterThanOrEqual(size.width, 0)
+      XCTAssertGreaterThanOrEqual(size.height, 0)
+      tabs.scrollViewDidEndDecelerating(collection)
+    }
+  }
+
+  func test_SelectedPageSurvivesResizingWithoutRepeatedLayoutScrolling() throws {
+    let controller = TabViewController()
+    controller.loadViewIfNeeded()
+    controller.viewControllers = [UIViewController(), UIViewController()]
+    let tabs = controller.tabView
+    tabs.selectedIndex = 1
+    let content = try XCTUnwrap(tabs.subviews.compactMap { $0 as? UICollectionView }.first)
+    for size in [CGSize(width: 320, height: 480), CGSize(width: 480, height: 320)] {
+      tabs.frame = CGRect(origin: .zero, size: size)
+      tabs.setNeedsLayout()
+      tabs.layoutIfNeeded()
+      tabs.layoutIfNeeded()
+      XCTAssertEqual(tabs.selectedIndex, 1)
+      XCTAssertEqual(content.contentOffset.x / content.bounds.width, 1, accuracy: 0.01)
+    }
+  }
+}

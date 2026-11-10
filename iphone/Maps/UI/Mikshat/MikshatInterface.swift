@@ -681,9 +681,10 @@ private final class MikshatSaveShareViewController: UIViewController {
   }
 }
 
-final class MikshatDirectionIndicator: UIImageView, MWMLocationObserver {
+final class MikshatDirectionIndicator: UIImageView {
   var target: CLLocationCoordinate2D? { didSet { updateDirection() } }
-  private var timer: Timer?
+  private static let attachedIndicators = NSHashTable<MikshatDirectionIndicator>.weakObjects()
+  private static var refreshTimer: Timer?
 
   init() {
     super.init(image: UIImage(systemName: "location.north.fill"))
@@ -699,16 +700,34 @@ final class MikshatDirectionIndicator: UIImageView, MWMLocationObserver {
 
   override func didMoveToWindow() {
     super.didMoveToWindow()
-    timer?.invalidate()
     if window != nil {
-      LocationManager.add(observer: self)
-      LocationManager.start()
-      timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in self?.updateDirection() }
-    } else { LocationManager.remove(observer: self) }
+      Self.attachedIndicators.add(self)
+      Self.startRefreshingIfNeeded()
+    } else {
+      Self.attachedIndicators.remove(self)
+      Self.stopRefreshingIfEmpty()
+    }
     updateDirection()
   }
-  func onLocationUpdate(_ location: CLLocation) { updateDirection() }
-  func onHeadingUpdate(_ heading: CLHeading) { updateDirection() }
+
+  private static func startRefreshingIfNeeded() {
+    guard refreshTimer == nil else { return }
+    // The map already owns GPS/heading updates. Registering every history row
+    // as a native observer replays GPS into the routing engine for every row.
+    let timer = Timer(timeInterval: 0.5, repeats: true) { _ in
+      let indicators = attachedIndicators.allObjects
+      indicators.forEach { $0.updateDirection() }
+      stopRefreshingIfEmpty()
+    }
+    refreshTimer = timer
+    RunLoop.main.add(timer, forMode: .common)
+  }
+
+  private static func stopRefreshingIfEmpty() {
+    guard attachedIndicators.allObjects.isEmpty else { return }
+    refreshTimer?.invalidate()
+    refreshTimer = nil
+  }
 
   private func updateDirection() {
     guard window != nil, let target, CLLocationCoordinate2DIsValid(target),
