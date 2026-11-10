@@ -20,6 +20,14 @@ hand-written equivalent hooks. A baseline run can pass, crash, or time out. A
 passing baseline must be reported as a failure to reproduce that UIKit failure,
 not counted as evidence that the device report is resolved.
 
+Set `MIKSHAT_PROBE_OPTIMIZATION=release` to compile Swift with `-O
+-whole-module-optimization` and Objective-C with `-O2`; the default explicitly
+uses `-Onone`/`-O0`. Each result and generated source manifest records the chosen
+optimization and compiler flags. The diagnostic workflow exercises baseline and
+fixed sources under both settings because an unoptimized UIKit pass does not
+cover TestFlight optimizer behavior. Explicit `dynamic` modifiers are preserved
+when extracting the production hook methods.
+
 Each build records `generated/source-manifest.json`, compiler logs, `launch.log`
 and `probe-outcome.json`. The app must write a successful completion report after
 20 attach/focus/detach cycles for the launcher to pass. Exit without a report or a

@@ -24,6 +24,7 @@ jobs:
       - name: Prepare baseline source and simulator
         run: |
           set -euo pipefail
+          git fetch --no-tags --depth=1 origin 74b5bf3f38411fca1006ca129e7a388b67e100f4
           mkdir -p /tmp/mikshat-search-baseline
           for path in iphone/Maps/Extensions/Views/UIView+SetStyle.swift iphone/Maps/Core/Theme/Renderers/UITextFieldRenderer.swift iphone/Maps/Core/Theme/Renderers/UISearchBarRenderer.swift iphone/Maps/Core/Theme/Swizzle/SwizzleStyle.m iphone/Maps/Core/Theme/Swizzle/SwizzleStyle.h; do
             mkdir -p "/tmp/mikshat-search-baseline/$(dirname "$path")"
@@ -51,6 +52,17 @@ jobs:
       - name: Exercise fixed UIKit hooks
         run: |
           bash mikshat/tests/search-theme-probe/run_probe.sh "$GITHUB_WORKSPACE" probe-results/fixed "$(cat /tmp/mikshat-probe-udid)" fixed
+      - name: Exercise optimized 4.6.9 baseline UIKit hooks
+        continue-on-error: true
+        env:
+          MIKSHAT_PROBE_OPTIMIZATION: release
+        run: |
+          bash mikshat/tests/search-theme-probe/run_probe.sh /tmp/mikshat-search-baseline probe-results/baselinerelease "$(cat /tmp/mikshat-probe-udid)" baselinerelease
+      - name: Exercise optimized fixed UIKit hooks
+        env:
+          MIKSHAT_PROBE_OPTIMIZATION: release
+        run: |
+          bash mikshat/tests/search-theme-probe/run_probe.sh "$GITHUB_WORKSPACE" probe-results/fixedrelease "$(cat /tmp/mikshat-probe-udid)" fixedrelease
       - name: Collect simulator diagnostics
         if: always()
         run: |

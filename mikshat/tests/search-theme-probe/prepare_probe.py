@@ -17,7 +17,7 @@ FILES = {
 
 
 def extract_hook(source):
-    pattern = re.compile(r'(?m)^  (?:(?:@objc|override)\s+)*func (sw_\w+)\(\)\s*\{')
+    pattern = re.compile(r'(?m)^  (?:(?:@objc|override|dynamic)\s+)*func (sw_\w+)\(\)\s*\{')
     matches = list(pattern.finditer(source))
     if len(matches) != 1:
         raise ValueError(f'Expected one window hook, found {len(matches)}')

@@ -11,7 +11,7 @@ extension UISearchBar {
     }
   }
 
-  @objc func sw_searchBarDidMoveToWindow() {
+  @objc dynamic func sw_searchBarDidMoveToWindow() {
     // A nil app window (a CarPlay-first launch, or a disconnected phone scene) must not match a
     // view that is leaving the hierarchy: nil === nil is true.
     guard let appWindow = MapsAppDelegate.theApp().window, appWindow === window else {

@@ -27,6 +27,14 @@ class ProbePreparationTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             probe.extract_hook('  func sw_a() {}\n  func sw_b() {}')
 
+    def test_preserves_explicit_dynamic_dispatch(self):
+        method = '''  @objc dynamic func sw_textFieldDidMoveToWindow() {
+    sw_textFieldDidMoveToWindow()
+  }'''
+        name, extracted = probe.extract_hook('extension UITextField {\n' + method + '\n}\n')
+        self.assertEqual(name, 'sw_textFieldDidMoveToWindow')
+        self.assertEqual(extracted, method)
+
     def test_generated_app_contains_the_actual_source_methods(self):
         root = HERE.parents[2]
         with tempfile.TemporaryDirectory() as directory:
