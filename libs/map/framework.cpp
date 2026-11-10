@@ -2341,6 +2341,8 @@ void Framework::OnTapEvent(place_page::BuildInfo const & buildInfo)
   if (m_routingManager.IsRoutingActive() && m_routingManager.GetCurrentRouterType() == routing::RouterType::Ruler &&
       !placePageInfo.IsRoutePoint())
   {
+    if (m_singleRulerDestination && m_rulerDestinationLocked)
+      return;
     DeactivateMapSelection();
 
     // This re-check guards against any synchronous callback that tears down routing mid-handler.
@@ -2361,7 +2363,17 @@ void Framework::OnTapEvent(place_page::BuildInfo const & buildInfo)
     else
       data.m_position = buildInfo.m_mercator;
 
-    if (m_routingManager.ContinueRouteToPoint(std::move(data)))
+    if (m_singleRulerDestination)
+    {
+      auto const previous = m_routingManager.GetRoutePoints();
+      for (auto it = previous.rbegin(); it != previous.rend(); ++it)
+        if (it->m_pointType != RouteMarkType::Start)
+          m_routingManager.RemoveRoutePoint(it->m_pointType, it->m_intermediateIndex);
+      data.m_intermediateIndex = 0;
+      m_routingManager.AddRoutePoint(std::move(data), false /* optimize */);
+      m_routingManager.BuildRoute();
+    }
+    else if (m_routingManager.ContinueRouteToPoint(std::move(data)))
     {
       // Refresh route
       m_routingManager.RemoveRoute(false /* deactivateFollowing */);
@@ -2798,7 +2810,7 @@ void Framework::CreateBackgroundTilesProvider(std::string const & url, uint32_t 
 {
   RasterTileProvider::Params rp;
   rp.m_urlTemplate = url;
-  rp.m_maxZoom = 19;  // standard web-mercator detail; deeper OM tiles reuse the ancestor sub-rect.
+  rp.m_maxZoom = url.find("https://mt0.google.com/vt/") == 0 ? 20 : 19;
   rp.m_maxCacheBytes = static_cast<uint64_t>(cacheSizeMB) * 1024 * 1024;
   // Global coverage (whole world) — min zoom and the lat/lon box keep their defaults.
 

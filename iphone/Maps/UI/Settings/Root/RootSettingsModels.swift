@@ -56,7 +56,7 @@ extension RootSettings {
   var title: String {
     switch self {
     case .downloadMaps: return L("download_maps")
-    case .mikshatTools: return L("mikshat_heading_source")
+    case .mikshatTools: return L("mikshat_compass_settings")
     case .profile: return L("profile")
     case .units: return L("measurement_units")
     case .zoomButtons: return L("pref_zoom_title")

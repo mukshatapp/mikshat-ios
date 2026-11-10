@@ -72,6 +72,18 @@ final class SearchOnMapHeaderViewTests: XCTestCase {
     }
   }
 
+  func test_KeyboardRequestCancelledBeforeAttachmentDoesNotBecomeFirstResponder() {
+    header.setIsSearching(true)
+    header.setIsSearching(true)
+    header.setIsSearching(false)
+    let finished = expectation(description: "Pending focus request processed")
+    DispatchQueue.main.async {
+      XCTAssertFalse(self.searchBar.isFirstResponder)
+      finished.fulfill()
+    }
+    wait(for: [finished], timeout: 2)
+  }
+
   private func assertActionsHidden(_ hidden: Bool, file: StaticString = #filePath, line: UInt = #line) {
     let settled = XCTNSPredicateExpectation(predicate: NSPredicate { [actions] _, _ in
       actions?.isHidden == hidden && actions?.alpha == (hidden ? 0 : 1)
@@ -81,6 +93,24 @@ final class SearchOnMapHeaderViewTests: XCTestCase {
 }
 
 final class MikshatHeadingSettingsTests: XCTestCase {
+  func test_TransparencyDefaultsAndClamping() {
+    let defaults = UserDefaults.standard
+    let keys = ["mikshat_compass_transparency_enabled", "mikshat_compass_transparency"]
+    let saved = keys.map { defaults.object(forKey: $0) }
+    defer {
+      for (key, value) in zip(keys, saved) {
+        if let value { defaults.set(value, forKey: key) } else { defaults.removeObject(forKey: key) }
+      }
+    }
+    keys.forEach { defaults.removeObject(forKey: $0) }
+    XCTAssertFalse(MikshatCompassAppearance.enabled)
+    XCTAssertEqual(MikshatCompassAppearance.percentage, 40)
+    defaults.set(120, forKey: keys[1])
+    XCTAssertEqual(MikshatCompassAppearance.percentage, 100)
+    defaults.set(-20, forKey: keys[1])
+    XCTAssertEqual(MikshatCompassAppearance.percentage, 0)
+  }
+
   func test_HeadingScreenSupportsAppNavigationAndDisplaysAllModes() {
     let controller = SettingsBuilder.build(.mikshatTools)
     XCTAssertTrue(controller is MWMTableViewController)

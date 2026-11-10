@@ -12,6 +12,7 @@
   /// Keeps the last link received during a cold launch. It is handled by handlePendingDeepLink()
   /// once the map is ready, because the place page and viewport animations need an initialized map.
   func prepareForColdLaunch(url: URL) {
+    guard let url = MikshatNavigationMath.normalizedIncomingLink(url) else { return }
     hasPendingColdLaunchDeepLink = true
     self.url = url
   }
@@ -28,6 +29,7 @@
       return handleFileImport(url: url, openInPlace: openInPlace)
     }
 
+    guard let url = MikshatNavigationMath.normalizedIncomingLink(url) else { return false }
     self.url = url
 
     // A link arriving before the map is ready supersedes the previous pending link.

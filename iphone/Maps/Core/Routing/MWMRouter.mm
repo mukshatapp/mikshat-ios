@@ -58,9 +58,11 @@ char const kMikshatBaseline[] = "mikshat-direct-baseline";
   std::vector<m2::PointD> points = {mercator::FromLatLon(origin.latitude, origin.longitude),
                                   mercator::FromLatLon(destination.latitude, destination.longitude)};
   df::DrapeApiLineData line(points, dp::Color(25, 130, 245, 255));
-  line.Width(4.0f);
+  line.Width(12.0f);
   GetFramework().GetDrapeApi().AddLine(kMikshatBaseline, line);
   s_mikshatDirectActive = true;
+  GetFramework().SetRulerDestinationPolicy(true, true);
+  GetFramework().GetRoutingManager().SetPreserveRulerCamera(true);
 }
 
 + (void)endMikshatDirect
@@ -68,6 +70,8 @@ char const kMikshatBaseline[] = "mikshat-direct-baseline";
   if (!s_mikshatDirectActive)
     return;
   s_mikshatDirectActive = false;
+  GetFramework().SetRulerDestinationPolicy(true, false);
+  GetFramework().GetRoutingManager().SetPreserveRulerCamera(false);
   GetFramework().GetDrapeApi().RemoveLine(kMikshatBaseline);
 }
 

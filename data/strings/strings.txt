@@ -46781,3 +46781,51 @@ comment = Mikshat navigation and location sharing
 tags = apple-maps
 en = 📍 %@ via Mikshat\nFor navigation and outdoor maps\n\nCoordinates:\n%@\n\nOpen in Mikshat:\n%@
 ar = 📍 %@ عبر مكشات\nللملاحة والخرائط البرية\n\nالإحداثيات:\n%@\n\nافتح الموقع في تطبيق مكشات:\n%@
+
+[mikshat_compass_settings]
+comment = Mikshat map controls and compass settings
+tags = apple-maps
+en = Compass settings
+ar = إعدادات البوصلة
+
+[mikshat_compass_transparency_title]
+comment = Mikshat map controls and compass settings
+tags = apple-maps
+en = Compass transparency
+ar = شفافية البوصلة
+
+[mikshat_compass_transparency_enable]
+comment = Mikshat map controls and compass settings
+tags = apple-maps
+en = Enable background transparency
+ar = تفعيل شفافية الخلفية
+
+[mikshat_compass_transparency_amount]
+comment = Mikshat map controls and compass settings
+tags = apple-maps
+en = Background transparency
+ar = درجة شفافية الخلفية
+
+[mikshat_compass_transparency_hint]
+comment = Mikshat map controls and compass settings
+tags = apple-maps
+en = Show the map behind the general and navigation compasses. 0% opaque, 100% transparent.
+ar = إظهار الخريطة خلف البوصلة العامة وبوصلة التوجيه. 0% معتمة، 100% شفافة.
+
+[mikshat_satellite_enable]
+comment = Mikshat map controls and compass settings
+tags = apple-maps
+en = Enable satellite imagery
+ar = تشغيل صور الأقمار الصناعية
+
+[mikshat_satellite_disable]
+comment = Mikshat map controls and compass settings
+tags = apple-maps
+en = Disable satellite imagery
+ar = إيقاف صور الأقمار الصناعية
+
+[mikshat_toggle_time]
+comment = Mikshat map controls and compass settings
+tags = apple-maps
+en = Switch remaining time and arrival time
+ar = تبديل الوقت المتبقي ووقت الوصول

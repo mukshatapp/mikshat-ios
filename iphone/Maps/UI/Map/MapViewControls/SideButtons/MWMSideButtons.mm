@@ -8,6 +8,7 @@
 #import "SwiftBridge.h"
 
 #include <CoreApi/Framework.h>
+#include "platform/settings.hpp"
 
 namespace
 {
@@ -29,6 +30,7 @@ NSString * const kUDDidShowLongTapToShowSideButtonsToast = @"kUDDidShowLongTapTo
 @property(weak, nonatomic) IBOutlet MWMButton * locationButton;
 
 @property(nonatomic) BOOL zoomSwipeEnabled;
+@property(nonatomic) BOOL awaitingUserLocationMode;
 @property(nonatomic, readonly) BOOL isZoomEnabled;
 
 @property(nonatomic) MWMMyPositionMode locationMode;
@@ -79,6 +81,11 @@ NSString * const kUDDidShowLongTapToShowSideButtonsToast = @"kUDDidShowLongTapTo
 {
   [self refreshLocationButtonState:mode];
   self.locationMode = mode;
+  if (self.awaitingUserLocationMode && mode >= MWMMyPositionModeNotFollow)
+  {
+    self.awaitingUserLocationMode = NO;
+    settings::Set("MikshatPreferredCameraMode", static_cast<location::EMyPositionMode>(mode));
+  }
 }
 
 #pragma mark - Location button
@@ -135,6 +142,7 @@ NSString * const kUDDidShowLongTapToShowSideButtonsToast = @"kUDDidShowLongTapTo
 - (IBAction)locationTouchUpInside
 {
   [MWMLocationManager enableLocationAlert];
+  self.awaitingUserLocationMode = YES;
   GetFramework().SwitchMyPositionNextMode();
 }
 

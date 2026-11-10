@@ -204,7 +204,7 @@ class PlacePageInfoViewController: UIViewController {
 
   private func setupCoordinatesView() {
     let formats = MikshatNavigationMath.coordinatePairs(latitude: placePageInfoData.latitude, longitude: placePageInfoData.longitude)
-    for (index, text) in formats.enumerated() {
+    for (index, text) in formats.prefix(2).enumerated() {
       let row = MikshatCoordinateRow(text: text, format: ["DD", "DDM", "DMS"][index]) { [weak self] in
         self?.delegate?.didCopy(text)
       }

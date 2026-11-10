@@ -17,6 +17,7 @@ final class SearchOnMapManager: NSObject {
   weak var viewController: SearchOnMapViewController?
   var isSearching: Bool { viewController != nil }
   private var mode: SearchOnMapMode = .normal
+  private var isStarting = false
 
   override init() {
     super.init()
@@ -25,6 +26,9 @@ final class SearchOnMapManager: NSObject {
   // MARK: - Public methods
 
   func startSearching(isRouting: Bool) {
+    guard !isStarting else { return }
+    isStarting = true
+    defer { isStarting = false }
     let mode: SearchOnMapMode
     if !isRouting {
       mode = .normal

@@ -48,6 +48,8 @@ final class SearchOnMapHeaderView: UIView {
   private var separator: UIView?
   private var searchBarLeadingDefaultConstraint: NSLayoutConstraint!
   private var searchBarLeadingWithRouteActionsConstraint: NSLayoutConstraint!
+  private var wantsKeyboard = false
+  private var focusRequestPending = false
   private var hasRouteActions = false
   private var areRouteActionsVisible = false
 
@@ -254,11 +256,25 @@ final class SearchOnMapHeaderView: UIView {
     updateRouteActionButtonsVisibility()
   }
 
+  override func didMoveToWindow() {
+    super.didMoveToWindow()
+    if window != nil && wantsKeyboard { setIsSearching(true) }
+  }
+
   func setIsSearching(_ isSearching: Bool) {
-    if isSearching {
-      searchBar.becomeFirstResponder()
-    } else if searchBar.isFirstResponder {
-      searchBar.resignFirstResponder()
+    wantsKeyboard = isSearching
+    if !isSearching {
+      if searchBar.isFirstResponder { searchBar.resignFirstResponder() }
+      return
+    }
+    guard !searchBar.isFirstResponder, !focusRequestPending else { return }
+    focusRequestPending = true
+    // Focus after attachment/layout, not recursively inside a render triggered by editing callbacks.
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      self.focusRequestPending = false
+      guard self.wantsKeyboard, self.window != nil, !self.searchBar.isFirstResponder else { return }
+      self.searchBar.becomeFirstResponder()
     }
   }
 

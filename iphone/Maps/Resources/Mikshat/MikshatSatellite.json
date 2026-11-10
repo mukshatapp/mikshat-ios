@@ -1,0 +1,8 @@
+{
+  "title": "قمر صناعي قوقل",
+  "url": "https://mt0.google.com/vt/lyrs=s@176103410&x={x}&y={y}&z={z}&s=Galileo&scale=2&hl=ar",
+  "minZoom": 0,
+  "maxZoom": 20,
+  "embeddedTileCount": 0,
+  "sourceSHA256": "a54065be6e9bbd025dcf2fb821d985c23f5837113a97a85dec5ec9d542ae4e58"
+}

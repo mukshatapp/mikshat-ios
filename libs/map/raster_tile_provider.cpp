@@ -306,6 +306,8 @@ void RasterTileProvider::StartDownload(df::TileKey const & tileKey, dp::Backgrou
   else
   {
     platform::HttpClient request(url);
+    if (url.starts_with("https://mt0.google.com/vt/"))
+      request.SetRawHeader("Referer", "https://www.google.com/maps/");
     request.SetTimeout(kRequestTimeoutSec);
     request.SetFollowRedirects(true);
     auto handle = request.RunHttpRequestAsync(std::move(handler));

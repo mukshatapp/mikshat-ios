@@ -44,43 +44,34 @@ CGFloat const kButtonsBottomOffset = 6;
 
 - (void)layoutSubviews
 {
-  CGFloat spacing = self.availableHeight - self.zoomOut.maxY - self.location.height;
-  spacing = math::Clamp(spacing, kLocationButtonSpacingMin, kLocationButtonSpacingMax);
-  if (self.superview.width > self.superview.height)
-    spacing = kLocationButtonSpacingMin;
-
-  self.location.minY = self.zoomOut.maxY + spacing;
-  self.bounds = {{}, {self.zoomOut.width, self.location.maxY}};
-  if (self.zoomHidden)
-    self.height = self.location.height;
-  self.location.maxY = self.height;
-
-  [self animate];
   [super layoutSubviews];
+  CGFloat const size = self.superview.bounds.size.width > self.superview.bounds.size.height ? 38 : 52;
+  CGFloat const gap = 8;
+  self.zoomIn.frame = CGRectMake(0, 0, size, size);
+  self.zoomOut.frame = CGRectMake(0, size + gap, size, size);
+  self.location.frame = CGRectMake(0, self.zoomHidden ? 0 : 2 * (size + gap), size, size);
+  self.bounds = CGRectMake(0, 0, size, self.zoomHidden ? size : 3 * size + 2 * gap);
+  for (UIButton * button in @[self.zoomIn, self.zoomOut, self.location])
+    button.layer.cornerRadius = size / 2;
+  [self layoutXPosition:self.hidden];
+  [self layoutYPosition];
 }
 
 - (void)layoutXPosition:(BOOL)hidden
 {
-  auto const availableAreaMaxX = self.availableArea.origin.x + self.availableArea.size.width;
   if (hidden)
-    self.minX = self.superview.width;
+    self.minX = self.superview.bounds.size.width;
   else
-    self.maxX = availableAreaMaxX - kViewControlsOffsetToBounds;
+  {
+    CGFloat const columnWidth = self.superview.bounds.size.width > self.superview.bounds.size.height ? 52 : 68;
+    self.maxX = self.superview.bounds.size.width - self.superview.safeAreaInsets.right - 14 - (columnWidth - self.width) / 2;
+  }
 }
 
 - (void)layoutYPosition
 {
-  CGFloat const centerShift = (self.height - self.zoomIn.midY - self.zoomOut.midY) / 2;
-  [UIView animateWithDuration:AppConstants.defaultAnimationDuration
-                   animations:^{
-                     CGFloat const landscapeOffset = self.superview.width > self.superview.height ? 12 : 0;
-                     self.midY = centerShift + self.superview.height / 2 + landscapeOffset;
-                     CGFloat const toolsBottom = [MikshatHomeControls minimumMapControlsYInView:self.superview];
-                     if (self.minY < toolsBottom && toolsBottom + self.height <= self.bottomBound)
-                       self.minY = toolsBottom;
-                     if (self.maxY > self.bottomBound)
-                       self.maxY = self.bottomBound;
-                   }];
+  // Independent of the place-card available area: raised sheets cover these controls.
+  self.minY = [MikshatHomeControls minimumMapControlsYInView:self.superview];
 }
 
 - (void)fadeZoomButtonsShow:(BOOL)show
@@ -103,16 +94,6 @@ CGFloat const kButtonsBottomOffset = 6;
 - (void)animate
 {
   [self layoutYPosition];
-
-  BOOL const isZoomHidden = self.zoomIn.alpha == 0.0;
-  BOOL const willZoomHide = (self.location.maxY > self.availableHeight);
-  if (willZoomHide != isZoomHidden)
-    [self fadeZoomButtonsShow:!willZoomHide];
-
-  BOOL const isLocationHidden = self.location.alpha == 0.0;
-  BOOL const willLocationHide = (self.location.height > self.availableHeight);
-  if (willLocationHide != isLocationHidden)
-    [self fadeLocationButtonShow:!willLocationHide];
 }
 
 #pragma mark - Properties

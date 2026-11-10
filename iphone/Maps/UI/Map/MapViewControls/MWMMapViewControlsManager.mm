@@ -201,6 +201,8 @@ NSString * const kMapToCategorySelectorSegue = @"MapToCategorySelectorSegue";
 
 - (void)onRouteRebuild
 {
+  if ([MWMRouter isMikshatDirectActive])
+    return;
   [self.ownerController.bookmarksCoordinator close];
   [self.navigationManager onRoutePlanning];
   self.promoButton.hidden = YES;
@@ -208,6 +210,8 @@ NSString * const kMapToCategorySelectorSegue = @"MapToCategorySelectorSegue";
 
 - (void)onRouteReady:(BOOL)hasWarnings
 {
+  if ([MWMRouter isMikshatDirectActive])
+    return;
   [self.navigationManager onRouteReady:hasWarnings];
   self.promoButton.hidden = YES;
 }

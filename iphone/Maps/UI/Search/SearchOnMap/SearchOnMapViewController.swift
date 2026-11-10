@@ -22,6 +22,9 @@ final class SearchOnMapViewController: UIViewController {
     static let dimViewThreshold: CGFloat = 50
   }
 
+  private var isUpdatingFrame = false
+  private var isClosing = false
+  private var lastRenderedModel: ViewModel?
   var interactor: SearchOnMapInteractor?
 
   @objc let availableAreaView = SearchOnMapAreaView()
@@ -268,8 +271,11 @@ final class SearchOnMapViewController: UIViewController {
   // MARK: - Handle Presentation Steps
 
   private func updateFrameOfPresentedViewInContainerView() {
+    guard !isUpdatingFrame, !isClosing else { return }
+    isUpdatingFrame = true
+    defer { isUpdatingFrame = false }
     presentationStepsController.updateFrame()
-    view.layoutIfNeeded()
+    view.setNeedsLayout()
   }
 
   @objc
@@ -362,16 +368,9 @@ final class SearchOnMapViewController: UIViewController {
                                  historyAndCategoryTabViewController.view,
                                  searchNoResultsView,
                                  searchingActivityView].filter { $0 != view }
-    UIView.animate(withDuration: AppConstants.fastAnimationDuration,
-                   delay: 0,
-                   options: .curveEaseInOut,
-                   animations: {
-                     viewsToHide.forEach { $0.alpha = 0 }
-                     view.alpha = 1
-                   }) { _ in
-      viewsToHide.forEach { $0.isHidden = true }
-      view.isHidden = false
-    }
+    viewsToHide.forEach { $0.isHidden = true; $0.alpha = 0 }
+    view.isHidden = false
+    view.alpha = 1
   }
 
   private func setIsSearching(_ isSearching: Bool) {
@@ -389,6 +388,8 @@ final class SearchOnMapViewController: UIViewController {
 
 extension SearchOnMapViewController: SearchOnMapView {
   func render(_ viewModel: ViewModel) {
+    guard !isClosing, lastRenderedModel != viewModel else { return }
+    lastRenderedModel = viewModel
     headerView.setRoutePointActions(viewModel.routePointActions)
     setContent(viewModel.contentState)
     setIsSearching(viewModel.isTyping)
@@ -401,6 +402,8 @@ extension SearchOnMapViewController: SearchOnMapView {
   }
 
   func close() {
+    guard !isClosing else { return }
+    isClosing = true
     mapPointPickerViewController?.close()
     mapPointPickerViewController = nil
     headerView.setIsSearching(false)

@@ -119,6 +119,7 @@ public:
   routing::RoutingSession const & RoutingSession() const { return m_routingSession; }
   routing::RoutingSession & RoutingSession() { return m_routingSession; }
   void SetRouter(routing::RouterType type);
+  void SetPreserveRulerCamera(bool preserve) { m_preserveRulerCamera = preserve; }
   routing::RouterType GetRouter() const { return m_currentRouterType; }
   bool IsRoutingActive() const { return m_routingSession.IsActive(); }
   bool IsRouteBuilt() const { return m_routingSession.IsBuilt(); }
@@ -370,6 +371,7 @@ private:
   RouteRecommendCallback m_routeRecommendCallback;
   Callbacks m_callbacks;
   df::DrapeEngineSafePtr m_drapeEngine;
+  bool m_preserveRulerCamera = false;
   routing::RouterType m_currentRouterType = routing::RouterType::Count;
   bool m_loadAltitudes = false;
   routing::RoutingSession m_routingSession;

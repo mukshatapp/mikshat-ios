@@ -164,3 +164,18 @@ extension MikshatNavigationMath {
     return target.url
   }
 }
+
+
+extension MikshatNavigationMath {
+  static func normalizedIncomingLink(_ url: URL) -> URL? {
+    if url.scheme?.lowercased() == "mikshat-maps" {
+      guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false), components.host?.lowercased() == "map",
+            components.queryItems?.filter({ $0.name == "ll" }).count == 1,
+            let pair = components.queryItems?.first(where: { $0.name == "ll" })?.value,
+            parseDecimalPair(pair) != nil else { return nil }
+      components.scheme = "om"
+      return components.url
+    }
+    return url
+  }
+}

@@ -58,6 +58,14 @@ struct NavigationMathTests {
     check(math.mikshatMapLink(namedLink)?.scheme == "om", "Shared web link converts to iOS map link")
     check(math.mikshatMapLink(URL(string: "https://example.com/map/?ll=24,47")!) == nil, "Unrelated host rejected")
     check(math.mikshatMapLink(URL(string: "https://mukshatapp.github.io/map/?ll=24,47&ll=1,2")!) == nil, "Ambiguous coordinate query rejected")
+    let dedicated = URL(string: "mikshat-maps://map?ll=23.934312,47.249434&n=%D9%85%D9%83%D8%B4%D8%A7%D8%AA")!
+    let normalized = math.normalizedIncomingLink(dedicated)!
+    check(normalized.scheme == "om", "Dedicated app scheme normalizes internally")
+    check(URLComponents(url: normalized, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "n" })?.value == "مكشات", "Arabic destination survives incoming link")
+    for invalid in ["mikshat-maps://map?ll=91,47", "mikshat-maps://map?ll=24,47&ll=1,2", "mikshat-maps://other?ll=24,47"] {
+      check(math.normalizedIncomingLink(URL(string: invalid)!) == nil, "Invalid dedicated link rejected")
+    }
+    check(math.normalizedIncomingLink(URL(string: "om://map?ll=24,47")!)?.scheme == "om", "Legacy incoming links remain supported")
     check(math.distanceParts("220 متر").value == "220", "Arabic distance numeric value")
     check(math.distanceParts("2.3 km").unit == "km", "Metric distance unit")
     check(math.distanceParts("٢٫٣ كم").value == "٢٫٣", "Arabic decimal distance")

@@ -73,6 +73,7 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
 
   @objc(installInView:)
   static func install(in view: UIView) {
+    MikshatSatelliteController.shared.install(in: view)
     let controls = MikshatHomeControls()
     controls.axis = .vertical
     controls.spacing = 10
@@ -109,7 +110,7 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
     compass.addAction(UIAction { _ in
       guard let map = MapViewController.shared() else { return }
       let controller = MikshatCompassViewController(target: nil, name: L("mikshat_heading"), general: true)
-      controller.modalPresentationStyle = .fullScreen
+      controller.modalPresentationStyle = .overFullScreen
       map.present(controller, animated: true)
     }, for: .touchUpInside)
     controls.addArrangedSubview(compass)
@@ -131,11 +132,12 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
     super.layoutSubviews()
     guard let parent = superview else { return }
     let landscape = parent.bounds.width > parent.bounds.height
+    MikshatSatelliteController.shared.updateLayout(in: parent)
     guard landscape != lastLandscape else { return }
     lastLandscape = landscape
-    axis = landscape ? .horizontal : .vertical
-    distribution = landscape ? .fillEqually : .fill
-    widthConstraint?.constant = landscape ? 220 : 68
+    axis = .vertical
+    distribution = .fill
+    widthConstraint?.constant = landscape ? 52 : 68
     topConstraint?.constant = landscape ? 4 : 64
     qiblaHeightConstraint?.constant = landscape ? 44 : 64
     compassHeightConstraint?.constant = landscape ? 44 : 64
@@ -263,6 +265,9 @@ final class MikshatCompassViewController: UIViewController, MWMLocationObserver 
     let qibla = isQibla
     view.backgroundColor = qibla ? UIColor(red: 0.02, green: 0.16, blue: 0.13, alpha: 1) : .white
     view.overrideUserInterfaceStyle = .light
+    view.isOpaque = false
+    NotificationCenter.default.addObserver(self, selector: #selector(updateTransparency), name: MikshatCompassAppearance.changed, object: nil)
+    updateTransparency()
     if !qibla {
       [status, speedValue, distanceValue, durationValue, arrivalValue].forEach { $0.textColor = MikshatStyle.green }
     }
@@ -285,7 +290,7 @@ final class MikshatCompassViewController: UIViewController, MWMLocationObserver 
     header.spacing = 10
     header.semanticContentAttribute = .forceLeftToRight
     if !qibla {
-      header.backgroundColor = UIColor.white.withAlphaComponent(0.03)
+      header.backgroundColor = UIColor.white.withAlphaComponent(0.92)
       header.layer.cornerRadius = 18
       header.layer.borderWidth = 1
       header.layer.borderColor = MikshatStyle.green.cgColor
@@ -338,7 +343,7 @@ final class MikshatCompassViewController: UIViewController, MWMLocationObserver 
         let box = UIStackView(arrangedSubviews: [MikshatStyle.label(L(key), size: 16, color: MikshatStyle.green), value])
         box.axis = .vertical
         box.spacing = 8
-        box.backgroundColor = UIColor.white.withAlphaComponent(0.03)
+        box.backgroundColor = UIColor.white.withAlphaComponent(0.92)
         box.layer.cornerRadius = 18
         box.layer.borderWidth = 1
         box.layer.borderColor = MikshatStyle.green.cgColor
@@ -358,6 +363,7 @@ final class MikshatCompassViewController: UIViewController, MWMLocationObserver 
       else { stack.addArrangedSubview(speedValue) }
       coordinates.semanticContentAttribute = .forceLeftToRight
       let locationCard = UIStackView(arrangedSubviews: [MikshatStyle.label(L("mikshat_current_location"), size: 18, color: MikshatStyle.green), coordinates])
+      locationCard.backgroundColor = UIColor.white.withAlphaComponent(0.92)
       locationCard.axis = .vertical
       locationCard.spacing = 12
       locationCard.layer.cornerRadius = 18
@@ -399,8 +405,14 @@ final class MikshatCompassViewController: UIViewController, MWMLocationObserver 
       stack.centerXAnchor.constraint(equalTo: scroll.frameLayoutGuide.centerXAnchor), stack.widthAnchor.constraint(equalTo: scroll.frameLayoutGuide.widthAnchor, constant: -28),
     ])
   }
+  @objc private func updateTransparency() {
+    guard isViewLoaded, !isQibla else { return }
+    let alpha = MikshatCompassAppearance.enabled ? 1 - CGFloat(MikshatCompassAppearance.percentage) / 100 : 1
+    view.backgroundColor = UIColor.white.withAlphaComponent(alpha)
+  }
   override func viewWillAppear(_ animated: Bool) {
     super.viewWillAppear(animated)
+    updateTransparency()
     LocationManager.add(observer: self)
     LocationManager.start()
     MapsAppDelegate.theApp().disableStandby()

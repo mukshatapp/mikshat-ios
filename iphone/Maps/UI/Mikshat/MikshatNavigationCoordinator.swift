@@ -17,7 +17,7 @@ enum MikshatNavigationCoordinator {
     let destination = CLLocationCoordinate2D(latitude: point.latitude, longitude: point.longitude)
     if compassSelected {
       let controller = MikshatCompassViewController(target: destination, name: point.title)
-      controller.modalPresentationStyle = .fullScreen
+      controller.modalPresentationStyle = .overFullScreen
       map.present(controller, animated: true)
       return true
     }
@@ -35,7 +35,6 @@ enum MikshatNavigationCoordinator {
     actions = tools
     MWMRouter.beginMikshatDirect(from: fix.coordinate, to: destination)
     NotificationCenter.default.post(name: visibilityChanged, object: nil)
-    LocationManager.setMyPositionMode(.follow)
     MapsAppDelegate.theApp().disableStandby()
     hud.start()
     return true
@@ -57,6 +56,9 @@ enum MikshatNavigationCoordinator {
 
 final class MikshatNavigationActionsView: UIStackView {
   private let recording = UIButton(type: .system)
+  private var leftConstraint: NSLayoutConstraint?
+  private var compactLayout: Bool?
+  private var buttonSizes: [NSLayoutConstraint] = []
 
   init() {
     super.init(frame: .zero)
@@ -69,7 +71,9 @@ final class MikshatNavigationActionsView: UIStackView {
       button.backgroundColor = .white
       button.layer.cornerRadius = 26
       button.accessibilityLabel = L(key)
-      button.heightAnchor.constraint(equalToConstant: 52).isActive = true
+      let size = button.heightAnchor.constraint(equalToConstant: 52)
+      buttonSizes.append(size)
+      size.isActive = true
       button.widthAnchor.constraint(equalToConstant: 52).isActive = true
       button.addAction(UIAction { _ in action() }, for: .touchUpInside)
       return button
@@ -86,7 +90,9 @@ final class MikshatNavigationActionsView: UIStackView {
     recording.layer.cornerRadius = 26
     recording.accessibilityLabel = L("mikshat_record_track")
     recording.widthAnchor.constraint(equalToConstant: 52).isActive = true
-    recording.heightAnchor.constraint(equalToConstant: 52).isActive = true
+    let size = recording.heightAnchor.constraint(equalToConstant: 52)
+    buttonSizes.append(size)
+    size.isActive = true
     recording.addAction(UIAction { _ in
       let recorder = TrackRecordingManager.shared
       if recorder.recordingState == .active { recorder.stopAndSave() }
@@ -110,14 +116,30 @@ final class MikshatNavigationActionsView: UIStackView {
     recording.accessibilityValue = L(state == .active ? "on" : "off")
   }
 
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    guard let container = superview else { return }
+    let compact = container.bounds.width > container.bounds.height
+    if compactLayout != compact {
+      compactLayout = compact
+      spacing = compact ? 6 : 9
+      buttonSizes.forEach { $0.constant = compact ? 44 : 52 }
+    }
+    let original = CGRect(x: container.safeAreaInsets.left + 12, y: frame.minY, width: frame.width, height: frame.height)
+    let globe = MikshatSatelliteController.shared.buttonFrame(in: container)
+    let offset = globe.map { original.intersects($0.insetBy(dx: -6, dy: -6)) ? $0.maxX - container.safeAreaInsets.left + 10 : 12 } ?? 12
+    if leftConstraint?.constant != offset { leftConstraint?.constant = offset }
+  }
+
   func install(in container: UIView, above card: UIView) {
     translatesAutoresizingMaskIntoConstraints = false
     // Keep map tools below the search and place-card containers.
     if let map = MapViewController.shared(), container === map.view {
       container.insertSubview(self, belowSubview: map.placePageContainer)
     } else { container.addSubview(self) }
+    leftConstraint = leftAnchor.constraint(equalTo: container.safeAreaLayoutGuide.leftAnchor, constant: 12)
     NSLayoutConstraint.activate([
-      leftAnchor.constraint(equalTo: container.safeAreaLayoutGuide.leftAnchor, constant: 12),
+      leftConstraint!,
       bottomAnchor.constraint(equalTo: card.topAnchor, constant: -12),
     ])
   }
