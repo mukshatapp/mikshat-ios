@@ -1417,3 +1417,6 @@
 
 /* Mikshat map controls and compass settings */
 "mikshat_toggle_time" = "تبديل الوقت المتبقي ووقت الوصول";
+
+/* Navigation can use the known map-arrow position while GPS is stale; do not imply live speed or location. */
+"mikshat_cached_location" = "آخر موقع معروف على الخريطة — بانتظار تحديث الموقع";

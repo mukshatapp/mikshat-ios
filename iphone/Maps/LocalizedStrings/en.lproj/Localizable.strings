@@ -1417,3 +1417,6 @@
 
 /* Mikshat map controls and compass settings */
 "mikshat_toggle_time" = "Switch remaining time and arrival time";
+
+/* Navigation can use the known map-arrow position while GPS is stale; do not imply live speed or location. */
+"mikshat_cached_location" = "Last known map position — waiting for a location update";
