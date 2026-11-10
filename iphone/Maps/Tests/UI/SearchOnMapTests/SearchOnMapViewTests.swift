@@ -561,3 +561,85 @@ final class SearchTabLayoutRegressionTests: XCTestCase {
     }
   }
 }
+
+final class MikshatCompassLocationIndependenceTests: XCTestCase {
+  func test_LocationFreshnessDoesNotRequireSpeedOrCourse() {
+    let stopped = CLLocation(coordinate: CLLocationCoordinate2D(latitude: 24.7, longitude: 46.7),
+                             altitude: 0, horizontalAccuracy: 5000, verticalAccuracy: -1,
+                             course: -1, speed: -1, timestamp: Date())
+    XCTAssertTrue(MikshatHeading.isFresh(stopped), "Approximate position remains a position even without speed/course")
+    let old = CLLocation(coordinate: stopped.coordinate, altitude: 0, horizontalAccuracy: 20, verticalAccuracy: -1,
+                         timestamp: Date(timeIntervalSinceNow: -600))
+    XCTAssertFalse(MikshatHeading.isFresh(old), "Known coordinates must be labelled stale rather than live")
+  }
+
+  func test_HeadingOnlyServiceDoesNotStartGPS() {
+    let wasStarted = LocationManager.isStarted()
+    LocationManager.stop()
+    MikshatHeadingSensor.shared.begin()
+    defer {
+      MikshatHeadingSensor.shared.end()
+      if wasStarted { LocationManager.start() } else { LocationManager.stop() }
+    }
+    XCTAssertFalse(LocationManager.isStarted())
+  }
+
+  private func descendants<T: UIView>(of type: T.Type, in view: UIView) -> [T] {
+    view.subviews.flatMap { child in
+      (child as? T).map { [$0] } ?? []
+    } + view.subviews.flatMap { descendants(of: type, in: $0) }
+  }
+
+  func test_GeneralSensorCompassWorksWithoutAnyLocation() throws {
+    let controller = MikshatCompassViewController(target: nil, name: "Compass", general: true)
+    controller.loadViewIfNeeded()
+    controller.updateReadings(position: nil, reading: (degrees: 123, gps: false))
+    let dial = try XCTUnwrap(descendants(of: MikshatCompassDial.self, in: controller.view).first)
+    XCTAssertEqual(dial.heading, 123)
+    XCTAssertEqual(dial.bearing, 123)
+    XCTAssertEqual(dial.alpha, 1)
+    XCTAssertEqual(dial.accessibilityValue, "123°")
+    let labels = descendants(of: UILabel.self, in: controller.view)
+    XCTAssertFalse(labels.contains { $0.text?.contains(L("mikshat_location_unavailable")) == true })
+    XCTAssertTrue(labels.contains { $0.text == "—" })
+  }
+
+  func test_DestinationCompassUsesStalePositionButDoesNotPresentLiveSpeedOrArrival() throws {
+    let destination = CLLocationCoordinate2D(latitude: 24.8, longitude: 46.8)
+    let controller = MikshatCompassViewController(target: destination, name: "Destination")
+    controller.loadViewIfNeeded()
+    let cached = CLLocation(coordinate: CLLocationCoordinate2D(latitude: 24.7, longitude: 46.7),
+                           altitude: 0, horizontalAccuracy: 20, verticalAccuracy: -1,
+                           course: 90, speed: 10, timestamp: Date(timeIntervalSinceNow: -600))
+    controller.updateReadings(position: cached, reading: (degrees: 120, gps: false))
+    let dial = try XCTUnwrap(descendants(of: MikshatCompassDial.self, in: controller.view).first)
+    XCTAssertNotNil(dial.bearing)
+    XCTAssertEqual(dial.alpha, 1)
+    let labels = descendants(of: UILabel.self, in: controller.view)
+    XCTAssertTrue(labels.contains { $0.text?.contains(L("mikshat_cached_location")) == true })
+    XCTAssertFalse(labels.contains { $0.text == "36\n" + L("mikshat_kmh") })
+    let distance = DistanceFormatter.distanceString(fromMeters: cached.distance(from: CLLocation(latitude: destination.latitude, longitude: destination.longitude)))
+    XCTAssertTrue(labels.contains { $0.text == distance })
+  }
+
+  func test_DestinationCompassDoesNotInventBearingWhenPositionIsMissing() throws {
+    let controller = MikshatCompassViewController(target: CLLocationCoordinate2D(latitude: 24.8, longitude: 46.8), name: "Destination")
+    controller.loadViewIfNeeded()
+    controller.updateReadings(position: nil, reading: (degrees: 120, gps: false))
+    let dial = try XCTUnwrap(descendants(of: MikshatCompassDial.self, in: controller.view).first)
+    XCTAssertNil(dial.bearing)
+    XCTAssertEqual(dial.heading, 120)
+  }
+
+  func test_StationaryGPSWithFreshPositionWaitsForMovementInsteadOfMissingLocation() {
+    let controller = MikshatCompassViewController(target: nil, name: "Compass", general: true)
+    controller.loadViewIfNeeded()
+    let position = CLLocation(coordinate: CLLocationCoordinate2D(latitude: 24.7, longitude: 46.7),
+                             altitude: 0, horizontalAccuracy: 20, verticalAccuracy: -1,
+                             course: -1, speed: 0, timestamp: Date())
+    controller.updateReadings(position: position, reading: (degrees: nil, gps: true))
+    let labels = descendants(of: UILabel.self, in: controller.view)
+    XCTAssertTrue(labels.contains { $0.text == L("mikshat_waiting") })
+    XCTAssertFalse(labels.contains { $0.text?.contains(L("mikshat_location_unavailable")) == true })
+  }
+}

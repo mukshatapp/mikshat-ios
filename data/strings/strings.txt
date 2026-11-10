@@ -46829,3 +46829,9 @@ comment = Mikshat map controls and compass settings
 tags = apple-maps
 en = Switch remaining time and arrival time
 ar = تبديل الوقت المتبقي ووقت الوصول
+
+[mikshat_cached_location]
+comment = Navigation can use the known map-arrow position while GPS is stale; do not imply live speed or location.
+tags = apple-maps
+en = Last known map position — waiting for a location update
+ar = آخر موقع معروف على الخريطة — بانتظار تحديث الموقع

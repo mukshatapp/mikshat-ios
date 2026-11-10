@@ -9,8 +9,9 @@ enum MikshatNavigationCoordinator {
   static let visibilityChanged = Notification.Name("MikshatDirectVisibilityChanged")
 
   static func startCustomNavigation() -> Bool {
-    guard !isDirectActive, let fix = MikshatHeading.currentLocation, let point = MWMRouter.finishPoint(),
-          let map = MapViewController.shared() else {
+    guard !isDirectActive else { return false }
+    LocationManager.start()
+    guard let point = MWMRouter.finishPoint(), let map = MapViewController.shared() else {
       Toast.show(withText: L("mikshat_location_unavailable"))
       return false
     }
@@ -21,7 +22,11 @@ enum MikshatNavigationCoordinator {
       map.present(controller, animated: true)
       return true
     }
-    let hud = MikshatDirectGuidanceView(target: destination)
+    guard let origin = MikshatHeading.navigationLocation else {
+      Toast.show(withText: L("mikshat_location_unavailable"))
+      return false
+    }
+    let hud = MikshatDirectGuidanceView(target: destination, origin: origin)
     directView = hud
     hud.translatesAutoresizingMaskIntoConstraints = false
     map.view.insertSubview(hud, belowSubview: map.placePageContainer)
@@ -33,7 +38,7 @@ enum MikshatNavigationCoordinator {
     let tools = MikshatNavigationActionsView()
     tools.install(in: map.view, above: hud)
     actions = tools
-    MWMRouter.beginMikshatDirect(from: fix.coordinate, to: destination)
+    MWMRouter.beginMikshatDirect(from: origin.coordinate, to: destination)
     NotificationCenter.default.post(name: visibilityChanged, object: nil)
     MapsAppDelegate.theApp().disableStandby()
     hud.start()
@@ -157,11 +162,13 @@ final class MikshatDirectGuidanceView: UIStackView, MWMLocationObserver {
   private var timer: Timer?
   private var lastRebuild: Date = .distantPast
   private var lastPosition: CLLocation?
+  private var lastKnownPosition: CLLocation?
   private var lastRefresh: TimeInterval = 0
   private var lastHeight: CGFloat = 0
 
-  init(target: CLLocationCoordinate2D) {
+  init(target: CLLocationCoordinate2D, origin: CLLocation) {
     self.target = target
+    lastKnownPosition = origin
     super.init(frame: .zero)
     axis = .vertical
     spacing = 12
@@ -258,22 +265,28 @@ final class MikshatDirectGuidanceView: UIStackView, MWMLocationObserver {
     let now = Date().timeIntervalSince1970
     guard now - lastRefresh >= 0.5 else { return }
     lastRefresh = now
-    guard let fix = MikshatHeading.currentLocation else {
+    let arrow = MikshatHeading.navigationLocation
+    if let arrow { lastKnownPosition = arrow }
+    guard let fix = arrow ?? lastKnownPosition else {
       distanceValue.text = "—"; speedValue.text = "—"; timeValue.text = "—"; timeLegend.text = L("mikshat_location_unavailable"); return
     }
+    let fresh = arrow != nil && MikshatHeading.currentLocation != nil && MikshatHeading.isFresh(fix)
     let distance = fix.distance(from: CLLocation(latitude: target.latitude, longitude: target.longitude))
     let parts = MikshatNavigationMath.distanceParts(DistanceFormatter.distanceString(fromMeters: distance))
     distanceValue.text = parts.value
     distanceUnit.text = parts.unit
-    speedValue.text = fix.speed >= 0 ? String(Int((fix.speed * 3.6).rounded())) : "—"
-    if let remaining = estimate.update(distance: distance, speed: fix.speed, timestamp: fix.timestamp.timeIntervalSince1970, now: now) {
+    let kph = (fix.speed * 3.6).rounded()
+    speedValue.text = fresh && kph.isFinite && kph >= 0 && kph < Double(Int.max) ? String(Int(kph)) : "—"
+    if !fresh { estimate = MikshatTravelEstimate() }
+    let remaining = fresh ? estimate.update(distance: distance, speed: fix.speed, timestamp: fix.timestamp.timeIntervalSince1970, now: now) : nil
+    if let remaining {
       timeValue.text = DurationFormatter.routingDurationString(from: remaining)
       timeLegend.text = L("mikshat_remaining_time")
-    } else { timeValue.text = "—"; timeLegend.text = L("mikshat_waiting") }
+    } else { timeValue.text = "—"; timeLegend.text = L(fresh ? "mikshat_waiting" : "mikshat_cached_location") }
     // Keep the existing purple line tied to movement. The independent blue baseline is never rebuilt here.
-    if Date().timeIntervalSince(lastRebuild) > 3,
+    if fresh, Date().timeIntervalSince(lastRebuild) > 3,
        lastPosition == nil || fix.distance(from: lastPosition!) >= 5,
-       let start = MWMRoutePoint(lastLocationAndType: .start, intermediateIndex: 0) {
+       let start = MWMRouter.mikshatUserPosition() {
       lastRebuild = Date()
       lastPosition = fix
       MWMRouter.addPointAndRebuild(start)

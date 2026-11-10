@@ -179,3 +179,28 @@ extension MikshatNavigationMath {
     return url
   }
 }
+
+
+extension MikshatNavigationMath {
+  static func sensorHeading(trueHeading: Double, magneticHeading: Double, accuracy: Double, age: Double, activeSensor: Bool = false) -> Double? {
+    // A live heading service can legitimately retain the same reading while
+    // stationary; it clears that reading on pause, shutdown or sensor error.
+    guard accuracy.isFinite, (0...45).contains(accuracy), age.isFinite, age <= 15,
+          activeSensor || abs(age) <= 15 else { return nil }
+    if trueHeading.isFinite, (0..<360).contains(trueHeading) { return trueHeading }
+    if magneticHeading.isFinite, (0..<360).contains(magneticHeading) { return magneticHeading }
+    return nil
+  }
+
+  static func courseHeading(course: Double, speed: Double, accuracy: Double, age: Double) -> Double? {
+    guard course.isFinite, (0..<360).contains(course), speed.isFinite, speed >= 0.5,
+          accuracy.isFinite, accuracy < 0 || accuracy <= 45, age.isFinite, abs(age) <= 15 else { return nil }
+    return course
+  }
+
+  static func selectHeading(mode: Int, speed: Double, sensor: Double?, course: Double?) -> (degrees: Double?, gps: Bool) {
+    if mode == 1 { return (course, true) }
+    if usesGPS(mode: mode, speed: speed), let course { return (course, true) }
+    return (sensor, false)
+  }
+}

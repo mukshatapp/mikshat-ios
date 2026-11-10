@@ -279,6 +279,8 @@ final class MikshatCompassViewController: UIViewController, MWMLocationObserver 
   private let arrivalValue = MikshatStyle.label("—", size: 25, color: MikshatStyle.cyan)
   private var timer: Timer?
   private var estimate = MikshatTravelEstimate()
+  private var lastCompassRefresh: TimeInterval = 0
+  private var usesHeadingSensor = false
 
   init(target: CLLocationCoordinate2D?, name: String, general: Bool = false) {
     self.general = general
@@ -296,6 +298,7 @@ final class MikshatCompassViewController: UIViewController, MWMLocationObserver 
     view.overrideUserInterfaceStyle = .light
     view.isOpaque = false
     NotificationCenter.default.addObserver(self, selector: #selector(updateTransparency), name: MikshatCompassAppearance.changed, object: nil)
+    NotificationCenter.default.addObserver(self, selector: #selector(refresh), name: MikshatHeadingSensor.changed, object: nil)
     updateTransparency()
     if !qibla {
       [status, speedValue, distanceValue, durationValue, arrivalValue].forEach { $0.textColor = MikshatStyle.green }
@@ -442,6 +445,11 @@ final class MikshatCompassViewController: UIViewController, MWMLocationObserver 
   override func viewWillAppear(_ animated: Bool) {
     super.viewWillAppear(animated)
     updateTransparency()
+    timer?.invalidate()
+    if !usesHeadingSensor {
+      usesHeadingSensor = true
+      MikshatHeadingSensor.shared.begin()
+    }
     LocationManager.add(observer: self)
     LocationManager.start()
     MapsAppDelegate.theApp().disableStandby()
@@ -451,52 +459,96 @@ final class MikshatCompassViewController: UIViewController, MWMLocationObserver 
   override func viewWillDisappear(_ animated: Bool) {
     super.viewWillDisappear(animated)
     timer?.invalidate()
+    if usesHeadingSensor {
+      usesHeadingSensor = false
+      MikshatHeadingSensor.shared.end()
+    }
     LocationManager.remove(observer: self)
     MapsAppDelegate.theApp().enableStandby()
   }
   func onLocationUpdate(_ location: CLLocation) { refresh() }
   func onHeadingUpdate(_ heading: CLHeading) { refresh() }
-  private func refresh() {
+  deinit {
+    timer?.invalidate()
+    if usesHeadingSensor { MikshatHeadingSensor.shared.end() }
+  }
+
+  @objc private func refresh() {
     guard isViewLoaded else { return }
-    guard let fix = MikshatHeading.currentLocation else {
-      dial.bearing = nil
-      dial.alpha = 0.35
+    let now = ProcessInfo.processInfo.systemUptime
+    guard now - lastCompassRefresh >= 0.1 else { return }
+    lastCompassRefresh = now
+    updateReadings(position: MikshatHeading.currentLocation ?? MikshatHeading.navigationLocation,
+                   reading: MikshatHeading.reading(forceSensor: isQibla))
+  }
+
+  func updateReadings(position: CLLocation?, reading: (degrees: Double?, gps: Bool)) {
+    guard isViewLoaded else { return }
+    let heading = reading.degrees.flatMap { $0.isFinite && $0 >= 0 ? $0 : nil }
+    let valid = heading != nil
+    let fresh = position.map { MikshatHeading.isFresh($0) } ?? false
+    let headingStatus: String
+    if valid {
+      headingStatus = L(reading.gps ? "mikshat_heading_gps" : "mikshat_heading_sensor")
+    } else if reading.gps {
+      headingStatus = L(fresh ? "mikshat_waiting" : "mikshat_location_unavailable")
+    } else {
+      headingStatus = L("mikshat_heading_unavailable")
+    }
+
+    // A general compass needs a heading, even when no position is available.
+    // Bearings toward a destination still require a real map position.
+    dial.heading = heading ?? 0
+    dial.bearing = general ? heading : nil
+    dial.alpha = general && valid ? 1 : 0.35
+    dial.accessibilityValue = valid && general ? String(format: "%.0f°", dial.heading) : headingStatus
+    guard let fix = position, CLLocationCoordinate2DIsValid(fix.coordinate) else {
       coordinates.text = "—"
       distanceValue.text = "—"
       copyButton?.isEnabled = false; saveButton?.isEnabled = false
       speedValue.text = "—"; durationValue.text = L("mikshat_waiting"); arrivalValue.text = "—"
-      status.text = L("mikshat_location_unavailable")
+      estimate = MikshatTravelEstimate()
+      status.text = general ? headingStatus : (valid ? headingStatus + "\n" + L("mikshat_location_unavailable") : headingStatus)
       return
     }
+    let locationStatus = fresh ? "" : "\n" + L("mikshat_cached_location")
     coordinates.text = MikshatNavigationMath.coordinatePairs(latitude: fix.coordinate.latitude, longitude: fix.coordinate.longitude)[1]
-    copyButton?.isEnabled = true; saveButton?.isEnabled = true
+    // These actions deliberately keep their existing fresh-location requirement.
+    let canUseCurrentLocation = fresh && MikshatHeading.currentLocation != nil
+    copyButton?.isEnabled = canUseCurrentLocation; saveButton?.isEnabled = canUseCurrentLocation
+    if general {
+      speedValue.text = speedText(for: fresh ? fix : nil, multiline: false)
+      if !fresh { coordinates.text = (coordinates.text ?? "") + locationStatus }
+      status.text = headingStatus + (valid ? " • " + L("mikshat_fixed_arrow") : "")
+      return
+    }
     let destination = target ?? CLLocationCoordinate2D(latitude: 21.422487, longitude: 39.826206)
     let bearing = MikshatNavigationMath.bearing(latitude: fix.coordinate.latitude, longitude: fix.coordinate.longitude, targetLatitude: destination.latitude, targetLongitude: destination.longitude)
-    let reading = MikshatHeading.reading(forceSensor: isQibla)
-    let gps = reading.gps
-    let valid = reading.degrees != nil
     dial.alpha = valid ? 1 : 0.35
-    dial.heading = reading.degrees ?? 0
-    dial.bearing = valid ? (general ? dial.heading : bearing) : nil
-    dial.accessibilityValue = valid ? String(format: "%.0f°", bearing) : L("mikshat_heading_unavailable")
+    dial.bearing = valid ? bearing : nil
+    dial.accessibilityValue = valid ? String(format: "%.0f°", bearing) : headingStatus
     if isQibla {
-      status.text = String(format: L("mikshat_qibla_bearing"), bearing) + (valid ? "" : "\n" + L("mikshat_heading_unavailable"))
-    } else if general {
-      speedValue.text = fix.speed >= 0 ? "\(Int((fix.speed * 3.6).rounded())) \(L("mikshat_kmh"))" : "—"
-      status.text = valid ? L(gps ? "mikshat_heading_gps" : "mikshat_heading_sensor") + " • " + L("mikshat_fixed_arrow") : L("mikshat_heading_unavailable")
-      dial.accessibilityValue = valid ? String(format: "%.0f°", dial.heading) : L("mikshat_heading_unavailable")
+      status.text = String(format: L("mikshat_qibla_bearing"), bearing) + (valid ? "" : "\n" + headingStatus) + locationStatus
     } else {
       let distance = fix.distance(from: CLLocation(latitude: destination.latitude, longitude: destination.longitude))
       distanceValue.text = DistanceFormatter.distanceString(fromMeters: distance)
-      speedValue.text = fix.speed >= 0 ? "\(Int((fix.speed * 3.6).rounded()))\n\(L("mikshat_kmh"))" : "—"
-      let seconds = estimate.update(distance: distance, speed: fix.speed, timestamp: fix.timestamp.timeIntervalSince1970, now: Date().timeIntervalSince1970)
+      speedValue.text = speedText(for: fresh ? fix : nil, multiline: true)
+      if !fresh { estimate = MikshatTravelEstimate() }
+      let seconds = fresh ? estimate.update(distance: distance, speed: fix.speed, timestamp: fix.timestamp.timeIntervalSince1970, now: Date().timeIntervalSince1970) : nil
       if let seconds {
         durationValue.text = DurationFormatter.routingDurationString(from: seconds)
         let formatter = DateFormatter(); formatter.timeStyle = .short
         arrivalValue.text = formatter.string(from: Date().addingTimeInterval(seconds))
       } else { durationValue.text = L("mikshat_waiting"); arrivalValue.text = "—" }
-      status.text = valid ? L(gps ? "mikshat_heading_gps" : "mikshat_heading_sensor") + " • " + L("mikshat_arrow_to_point") : L("mikshat_heading_unavailable")
+      status.text = headingStatus + (valid ? " • " + L("mikshat_arrow_to_point") : "") + locationStatus
     }
+  }
+
+  private func speedText(for fix: CLLocation?, multiline: Bool) -> String {
+    guard let fix, fix.speed.isFinite, fix.speed >= 0 else { return "—" }
+    let kph = (fix.speed * 3.6).rounded()
+    guard kph.isFinite, kph >= 0, kph < Double(Int.max) else { return "—" }
+    return "\(Int(kph))" + (multiline ? "\n" : " ") + L("mikshat_kmh")
   }
 }
 
@@ -558,27 +610,112 @@ final class MikshatSymbols: NSObject {
 
 // One heading policy for the two compasses and direction indicators. Qibla explicitly uses the sensor.
 enum MikshatHeading {
+  static func isFresh(_ fix: CLLocation) -> Bool {
+    fix.horizontalAccuracy.isFinite && fix.horizontalAccuracy >= 0
+      && CLLocationCoordinate2DIsValid(fix.coordinate)
+      && fix.timestamp.timeIntervalSince1970.isFinite
+      && abs(fix.timestamp.timeIntervalSinceNow) <= 15
+  }
+
+  // Freshness is required for speed, ETA and saving/sharing the current GPS fix.
   static var currentLocation: CLLocation? {
-    guard !LocationManager.isLocationProhibited(), let fix = LocationManager.lastLocation(),
-          fix.horizontalAccuracy >= 0, abs(fix.timestamp.timeIntervalSinceNow) <= 15,
-          CLLocationCoordinate2DIsValid(fix.coordinate) else { return nil }
+    guard !LocationManager.isLocationProhibited(), let fix = LocationManager.lastLocation(), isFresh(fix) else { return nil }
     return fix
+  }
+
+  // The map arrow owns navigation coordinates; neither the viewport nor a
+  // previously selected route start is a substitute for the user's position.
+  static var navigationLocation: CLLocation? {
+    guard let arrow = MWMRouter.mikshatUserPosition() else { return nil }
+    let coordinate = CLLocationCoordinate2D(latitude: arrow.latitude, longitude: arrow.longitude)
+    guard CLLocationCoordinate2DIsValid(coordinate) else { return nil }
+    let point = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+    // An arrow without matching GPS metadata is usable but explicitly stale.
+    guard let fix = LocationManager.lastLocation(), CLLocationCoordinate2DIsValid(fix.coordinate),
+          fix.horizontalAccuracy.isFinite, fix.horizontalAccuracy >= 0,
+          point.distance(from: fix) <= max(5, fix.horizontalAccuracy) else {
+      return CLLocation(coordinate: coordinate, altitude: 0, horizontalAccuracy: -1,
+                        verticalAccuracy: -1, timestamp: .distantPast)
+    }
+    return CLLocation(coordinate: coordinate, altitude: fix.altitude,
+                      horizontalAccuracy: fix.horizontalAccuracy, verticalAccuracy: fix.verticalAccuracy,
+                      course: fix.course, speed: fix.speed, timestamp: fix.timestamp)
   }
 
   static func reading(forceSensor: Bool = false) -> (degrees: Double?, gps: Bool) {
     let fix = currentLocation
     let mode = forceSensor ? 0 : UserDefaults.standard.integer(forKey: "mikshat_heading_mode")
-    let gps = MikshatNavigationMath.usesGPS(mode: mode, speed: fix?.speed ?? -1)
-    if gps {
-      guard let fix, fix.course.isFinite, fix.course >= 0, fix.speed >= 0.5,
-            fix.courseAccuracy < 0 || fix.courseAccuracy <= 45 else { return (nil, true) }
-      return (fix.course, true)
+    let course = fix.flatMap {
+      MikshatNavigationMath.courseHeading(course: $0.course, speed: $0.speed,
+                                         accuracy: $0.courseAccuracy, age: $0.timestamp.timeIntervalSinceNow)
     }
-    guard let sensor = LocationManager.lastHeading(), sensor.trueHeading.isFinite,
-          sensor.trueHeading >= 0, sensor.headingAccuracy >= 0, sensor.headingAccuracy <= 45,
-          abs(sensor.timestamp.timeIntervalSinceNow) <= 15 else { return (nil, false) }
-    return (sensor.trueHeading, false)
+    func degrees(_ heading: CLHeading?, activeSensor: Bool) -> Double? {
+      guard let heading else { return nil }
+      return MikshatNavigationMath.sensorHeading(trueHeading: heading.trueHeading, magneticHeading: heading.magneticHeading,
+                                                accuracy: heading.headingAccuracy, age: heading.timestamp.timeIntervalSinceNow,
+                                                activeSensor: activeSensor)
+    }
+    let sensor = degrees(MikshatHeadingSensor.shared.lastHeading, activeSensor: true)
+      ?? degrees(LocationManager.lastHeading(), activeSensor: false)
+    return MikshatNavigationMath.selectHeading(mode: mode, speed: fix?.speed ?? -1, sensor: sensor, course: course)
   }
+}
+
+// A compass sensor does not require GPS authorization or location updates.
+// Scope it to visible compass screens and leave the native GPS owner unchanged.
+final class MikshatHeadingSensor: NSObject, CLLocationManagerDelegate {
+  static let shared = MikshatHeadingSensor()
+  static let changed = Notification.Name("MikshatHeadingSensorChanged")
+  private let manager = CLLocationManager()
+  private var clients = 0
+  private var suspended = false
+  private(set) var lastHeading: CLHeading?
+
+  private override init() {
+    super.init()
+    manager.delegate = self
+    manager.headingFilter = 3
+    let center = NotificationCenter.default
+    center.addObserver(self, selector: #selector(orientationChanged), name: UIDevice.orientationDidChangeNotification, object: nil)
+    center.addObserver(self, selector: #selector(resume), name: UIApplication.didBecomeActiveNotification, object: nil)
+    center.addObserver(self, selector: #selector(pause), name: UIApplication.willResignActiveNotification, object: nil)
+  }
+
+  func begin() {
+    clients += 1
+    suspended = UIApplication.shared.applicationState == .background
+    startIfNeeded()
+  }
+  func end() {
+    clients = max(0, clients - 1)
+    if clients == 0 { manager.stopUpdatingHeading(); lastHeading = nil }
+  }
+  private func startIfNeeded() {
+    guard clients > 0, !suspended, CLLocationManager.headingAvailable() else { return }
+    orientationChanged()
+    manager.startUpdatingHeading()
+  }
+  @objc private func orientationChanged() {
+    switch UIDevice.current.orientation {
+    case .portrait: manager.headingOrientation = .portrait
+    case .portraitUpsideDown: manager.headingOrientation = .portraitUpsideDown
+    case .landscapeLeft: manager.headingOrientation = .landscapeLeft
+    case .landscapeRight: manager.headingOrientation = .landscapeRight
+    default: break
+    }
+  }
+  @objc private func resume() { suspended = false; startIfNeeded() }
+  @objc private func pause() { suspended = true; manager.stopUpdatingHeading(); lastHeading = nil }
+  func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
+    guard clients > 0, !suspended else { return }
+    lastHeading = newHeading
+    NotificationCenter.default.post(name: Self.changed, object: nil)
+  }
+  func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+    lastHeading = nil
+    NotificationCenter.default.post(name: Self.changed, object: nil)
+  }
+  func locationManagerShouldDisplayHeadingCalibration(_ manager: CLLocationManager) -> Bool { true }
 }
 
 enum MikshatLocationActions {

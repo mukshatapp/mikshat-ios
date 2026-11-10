@@ -26,6 +26,8 @@
 #include "platform/local_country_file_utils.hpp"
 #include "platform/localization.hpp"
 
+#include <cmath>
+
 using namespace routing;
 
 namespace
@@ -51,9 +53,28 @@ char const kMikshatBaseline[] = "mikshat-direct-baseline";
 
 + (BOOL)isMikshatDirectActive { return s_mikshatDirectActive; }
 
++ (MWMRoutePoint *)mikshatUserPosition
+{
+  // Use the position that drives the map arrow, never the viewport or a planned route point.
+  auto const position = GetFramework().GetCurrentPosition();
+  if (!position || !std::isfinite(position->x) || !std::isfinite(position->y))
+    return nil;
+  CLLocationCoordinate2D const coordinate =
+      CLLocationCoordinate2DMake(mercator::YToLat(position->y), mercator::XToLon(position->x));
+  if (!CLLocationCoordinate2DIsValid(coordinate))
+    return nil;
+
+  RouteMarkData start;
+  start.m_position = *position;
+  start.m_pointType = RouteMarkType::Start;
+  start.m_isMyPosition = true;
+  start.m_title = L(@"p2p_your_location").UTF8String;
+  return [[MWMRoutePoint alloc] initWithRouteMarkData:start];
+}
+
 + (void)beginMikshatDirectFrom:(CLLocationCoordinate2D)origin to:(CLLocationCoordinate2D)destination
 {
-  if (s_mikshatDirectActive)
+  if (s_mikshatDirectActive || !CLLocationCoordinate2DIsValid(origin) || !CLLocationCoordinate2DIsValid(destination))
     return;
   std::vector<m2::PointD> points = {mercator::FromLatLon(origin.latitude, origin.longitude),
                                   mercator::FromLatLon(destination.latitude, destination.longitude)};
@@ -63,6 +84,24 @@ char const kMikshatBaseline[] = "mikshat-direct-baseline";
   s_mikshatDirectActive = true;
   GetFramework().SetRulerDestinationPolicy(true, true);
   GetFramework().GetRoutingManager().SetPreserveRulerCamera(true);
+
+  auto & routingManager = GetFramework().GetRoutingManager();
+  auto const routePoints = routingManager.GetRoutePoints();
+  bool matchesOrigin = false;
+  for (auto const & point : routePoints)
+    if (point.m_pointType == RouteMarkType::Start)
+      matchesOrigin = point.m_isMyPosition && point.m_position.EqualDxDy(points.front(), mercator::kPointEqualityEps);
+  if (!matchesOrigin && GetFramework().GetCurrentPosition())
+  {
+    RouteMarkData start;
+    start.m_position = points.front();
+    start.m_pointType = RouteMarkType::Start;
+    start.m_isMyPosition = true;
+    start.m_title = L(@"p2p_your_location").UTF8String;
+    // Set the camera/destination policy above before rebuilding the purple line.
+    if (routingManager.AddRoutePoint(std::move(start), false /* optimize */))
+      routingManager.BuildRoute();
+  }
 }
 
 + (void)endMikshatDirect
@@ -437,7 +476,12 @@ char const kMikshatBaseline[] = "mikshat-direct-baseline";
   if (!finishPoint)
     return;
   [self addPoint:finishPoint];
-  if ([MWMLocationManager lastLocation])
+  if ([self type] == MWMRouterTypeRuler)
+  {
+    if (MWMRoutePoint * start = [self mikshatUserPosition])
+      [self addPoint:start];
+  }
+  else if ([MWMLocationManager lastLocation])
     [self addPoint:[[MWMRoutePoint alloc] initWithLastLocationAndType:MWMRoutePointTypeStart intermediateIndex:0]];
   if ([self startPoint] && [self finishPoint])
     [self rebuildWithBestRouter:bestRouter];
@@ -464,6 +508,13 @@ char const kMikshatBaseline[] = "mikshat-direct-baseline";
 + (void)rebuildWithBestRouter:(BOOL)bestRouter
 {
   auto & rm = GetFramework().GetRoutingManager();
+  // Switching from car to direct guidance must also work when the native GPS
+  // accessor is temporarily empty but the map still has a valid user arrow.
+  if (!s_mikshatDirectActive && self.type == MWMRouterTypeRuler && [self router].canAutoAddLastLocation)
+  {
+    if (MWMRoutePoint * start = [self mikshatUserPosition])
+      [self addPoint:start];
+  }
   auto const previousPoints = rm.GetRoutePoints();
   for (auto it = previousPoints.rbegin(); it != previousPoints.rend(); ++it)
   {
