@@ -65,15 +65,41 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
   private var lastLandscape: Bool?
   private var timer: Timer?
 
-  @objc(minimumMapControlsYInView:)
-  static func minimumMapControlsY(in view: UIView) -> CGFloat {
-    guard let controls = view.subviews.first(where: { $0 is MikshatHomeControls }), !controls.isHidden else { return 0 }
-    return controls.frame.maxY + 12
+  private static weak var installedControls: MikshatHomeControls?
+  private static weak var mapControls: UIView?
+  private static var mapControlConstraints: [NSLayoutConstraint] = []
+
+  @objc(attachMapControls:)
+  static func attachMapControls(_ view: UIView) {
+    mapControls = view
+    bindMapControls()
+  }
+
+  private static func bindMapControls() {
+    NSLayoutConstraint.deactivate(mapControlConstraints)
+    mapControlConstraints = []
+    guard let controls = installedControls, let buttons = mapControls else { return }
+    // Native buttons and this stack live in different containers under the map.
+    // Cross-container anchors update after layout without sampling stale frames.
+    var ancestor = buttons.superview
+    while let candidate = ancestor, !controls.isDescendant(of: candidate) { ancestor = candidate.superview }
+    guard ancestor != nil else { return }
+    buttons.translatesAutoresizingMaskIntoConstraints = false
+    mapControlConstraints = [
+      buttons.topAnchor.constraint(equalTo: controls.bottomAnchor, constant: 12),
+      buttons.centerXAnchor.constraint(equalTo: controls.centerXAnchor),
+    ]
+    NSLayoutConstraint.activate(mapControlConstraints)
   }
 
   @objc(installInView:)
   static func install(in view: UIView) {
     MikshatSatelliteController.shared.install(in: view)
+    if let existing = view.subviews.compactMap({ $0 as? MikshatHomeControls }).first {
+      installedControls = existing
+      bindMapControls()
+      return
+    }
     let controls = MikshatHomeControls()
     controls.axis = .vertical
     controls.spacing = 10
@@ -116,6 +142,7 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
     controls.addArrangedSubview(compass)
     controls.addArrangedSubview(qibla)
     view.addSubview(controls)
+    installedControls = controls
     controls.widthConstraint = controls.widthAnchor.constraint(equalToConstant: 68)
     controls.topConstraint = controls.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 64)
     controls.qiblaHeightConstraint = qibla.heightAnchor.constraint(equalToConstant: 64)
@@ -126,6 +153,7 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
       kaaba.centerXAnchor.constraint(equalTo: qibla.centerXAnchor), kaaba.centerYAnchor.constraint(equalTo: qibla.centerYAnchor),
       kaaba.widthAnchor.constraint(equalToConstant: 48), kaaba.heightAnchor.constraint(equalTo: kaaba.widthAnchor),
     ])
+    bindMapControls()
   }
 
   override func layoutSubviews() {
@@ -135,6 +163,7 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
     MikshatSatelliteController.shared.updateLayout(in: parent)
     guard landscape != lastLandscape else { return }
     lastLandscape = landscape
+    Self.mapControls?.setNeedsLayout()
     axis = .vertical
     distribution = .fill
     widthConstraint?.constant = landscape ? 52 : 68

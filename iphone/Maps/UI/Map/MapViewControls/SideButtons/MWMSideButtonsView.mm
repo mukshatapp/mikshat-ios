@@ -20,6 +20,8 @@ CGFloat const kButtonsBottomOffset = 6;
 @property(weak, nonatomic) IBOutlet MWMButton * location;
 
 @property(nonatomic) CGRect availableArea;
+@property(nonatomic, strong) NSLayoutConstraint * widthConstraint;
+@property(nonatomic, strong) NSLayoutConstraint * heightConstraint;
 
 @end
 
@@ -28,7 +30,11 @@ CGFloat const kButtonsBottomOffset = 6;
 - (void)awakeFromNib
 {
   [super awakeFromNib];
-  self.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+  self.autoresizingMask = UIViewAutoresizingNone;
+  self.translatesAutoresizingMaskIntoConstraints = NO;
+  self.widthConstraint = [self.widthAnchor constraintEqualToConstant:52];
+  self.heightConstraint = [self.heightAnchor constraintEqualToConstant:172];
+  [NSLayoutConstraint activateConstraints:@[self.widthConstraint, self.heightConstraint]];
   NSArray<UIButton *> * buttons = @[self.zoomIn, self.zoomOut, self.location];
   NSArray<NSString *> * symbols = @[@"plus", @"minus", @"scope"];
   UIColor * green = [UIColor colorWithRed:22.0/255 green:78.0/255 blue:63.0/255 alpha:1];
@@ -42,36 +48,31 @@ CGFloat const kButtonsBottomOffset = 6;
   }
 }
 
+- (void)didMoveToSuperview
+{
+  [super didMoveToSuperview];
+  if (self.superview)
+    [MikshatHomeControls attachMapControls:self];
+}
+
 - (void)layoutSubviews
 {
   [super layoutSubviews];
-  CGFloat const size = self.superview.bounds.size.width > self.superview.bounds.size.height ? 38 : 52;
+  if (!self.superview)
+    return;
+  CGSize const viewport = self.window ? self.window.bounds.size : self.superview.bounds.size;
+  CGFloat const size = viewport.width > viewport.height ? 44 : 52;
   CGFloat const gap = 8;
+  CGFloat const height = self.zoomHidden ? size : 3 * size + 2 * gap;
+  if (self.widthConstraint.constant != size)
+    self.widthConstraint.constant = size;
+  if (self.heightConstraint.constant != height)
+    self.heightConstraint.constant = height;
   self.zoomIn.frame = CGRectMake(0, 0, size, size);
   self.zoomOut.frame = CGRectMake(0, size + gap, size, size);
   self.location.frame = CGRectMake(0, self.zoomHidden ? 0 : 2 * (size + gap), size, size);
-  self.bounds = CGRectMake(0, 0, size, self.zoomHidden ? size : 3 * size + 2 * gap);
   for (UIButton * button in @[self.zoomIn, self.zoomOut, self.location])
     button.layer.cornerRadius = size / 2;
-  [self layoutXPosition:self.hidden];
-  [self layoutYPosition];
-}
-
-- (void)layoutXPosition:(BOOL)hidden
-{
-  if (hidden)
-    self.minX = self.superview.bounds.size.width;
-  else
-  {
-    CGFloat const columnWidth = self.superview.bounds.size.width > self.superview.bounds.size.height ? 52 : 68;
-    self.maxX = self.superview.bounds.size.width - self.superview.safeAreaInsets.right - 14 - (columnWidth - self.width) / 2;
-  }
-}
-
-- (void)layoutYPosition
-{
-  // Independent of the place-card available area: raised sheets cover these controls.
-  self.minY = [MikshatHomeControls minimumMapControlsYInView:self.superview];
 }
 
 - (void)fadeZoomButtonsShow:(BOOL)show
@@ -93,7 +94,7 @@ CGFloat const kButtonsBottomOffset = 6;
 // Show/hide zoom and location buttons depending on available vertical space.
 - (void)animate
 {
-  [self layoutYPosition];
+  [self setNeedsLayout];
 }
 
 #pragma mark - Properties
@@ -118,7 +119,7 @@ CGFloat const kButtonsBottomOffset = 6;
     [UIView animateWithDuration:AppConstants.defaultAnimationDuration
         animations:^{
           self.alpha = hidden ? 0.0 : 1.0;
-          [self layoutXPosition:hidden];
+
         }
         completion:^(BOOL finished) { self.hidden = hidden; }];
   }
@@ -134,20 +135,8 @@ CGFloat const kButtonsBottomOffset = 6;
     return;
   if (CGRectEqualToRect(self.availableArea, frame))
     return;
-  // If during our show/hide animation position is changed it is corrupted.
-  // Such kind of animation has 2 keys (opacity and position).
-  // But there are other animation cases like change of orientation.
-  // So we can use condition below:
-  // if (self.layer.animationKeys.count != 2)
-  // More elegant way is to check if x values are changed.
-  // If no - there is no need to update self x values.
-  if (self.availableArea.origin.x != frame.origin.x || self.availableArea.size.width != frame.size.width)
-  {
-    self.availableArea = frame;
-    [self layoutXPosition:self.hidden];
-  }
-  else
-    self.availableArea = frame;
+  // Sheet movement must not change the anchors below the Qibla button.
+  self.availableArea = frame;
   [self setNeedsLayout];
 }
 

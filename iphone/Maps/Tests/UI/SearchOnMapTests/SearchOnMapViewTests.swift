@@ -445,3 +445,30 @@ final class MikshatLocationCardTests: XCTestCase {
     XCTAssertFalse(text.contains("omaps.app"))
   }
 }
+
+final class MikshatMapControlLayoutTests: XCTestCase {
+  func test_NativeControlsStayBelowQiblaWhenAvailableAreaChanges() throws {
+    let map = try XCTUnwrap(MapViewController.shared())
+    map.loadViewIfNeeded()
+    let home = try XCTUnwrap(map.view.subviews.compactMap { $0 as? MikshatHomeControls }.first)
+    let buttons = MWMSideButtons.buttons().view!
+    XCTAssertFalse(buttons.superview === home.superview, "Regression covers the actual separate containers")
+    defer { MWMSideButtons.updateAvailableArea(map.view.bounds) }
+    let heights: [CGFloat] = [map.view.bounds.height, 80, 240, map.view.bounds.height]
+    for areaHeight in heights {
+      MWMSideButtons.updateAvailableArea(CGRect(x: 0, y: 0, width: map.view.bounds.width, height: areaHeight))
+      map.view.setNeedsLayout()
+      map.view.layoutIfNeeded()
+      map.view.layoutIfNeeded()
+      let tools = buttons.convert(buttons.bounds, to: map.view)
+      let upperTools = home.convert(home.bounds, to: map.view)
+      XCTAssertEqual(tools.minY, upperTools.maxY + 12, accuracy: 1)
+      XCTAssertEqual(tools.midX, upperTools.midX, accuracy: 1)
+      let nativeButtons = buttons.subviews.compactMap { $0 as? UIButton }.sorted { $0.frame.minY < $1.frame.minY }
+      XCTAssertEqual(nativeButtons.count, 3)
+      for pair in zip(nativeButtons, nativeButtons.dropFirst()) {
+        XCTAssertGreaterThanOrEqual(pair.1.frame.minY, pair.0.frame.maxY + 7)
+      }
+    }
+  }
+}
