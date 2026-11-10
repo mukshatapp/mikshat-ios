@@ -12,6 +12,22 @@ SOURCE = ROOT / 'iphone/Maps/Resources/Mikshat/GOOGLE.sqlitedb'
 
 
 class SatelliteSourceTests(unittest.TestCase):
+    def test_clean_read_only_checkout_needs_no_sqlite_sidecars(self):
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory) / 'checkout # source'
+            folder.mkdir()
+            copy = folder / 'GOOGLE.sqlitedb'
+            copy.write_bytes(SOURCE.read_bytes())
+            copy.chmod(0o444)
+            folder.chmod(0o555)
+            try:
+                source = satellite.configuration(copy)
+                self.assertEqual(source['embeddedTileCount'], 0)
+                self.assertEqual(list(folder.iterdir()), [copy])
+            finally:
+                folder.chmod(0o755)
+                copy.chmod(0o644)
+
     def test_bundled_definition_uses_https_xyz_without_embedded_coverage(self):
         source = satellite.configuration(SOURCE)
         self.assertEqual((source['minZoom'], source['maxZoom']), (0, 20))
@@ -28,6 +44,7 @@ class SatelliteSourceTests(unittest.TestCase):
                 copy = Path(directory) / 'source.db'
                 copy.write_bytes(SOURCE.read_bytes())
                 with sqlite3.connect(copy) as connection:
+                    connection.execute('PRAGMA journal_mode=DELETE')
                     connection.execute(f'UPDATE info SET {column}=?', (value,))
                 with self.assertRaises(ValueError):
                     satellite.configuration(copy)

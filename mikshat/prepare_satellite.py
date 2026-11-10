@@ -7,7 +7,9 @@ from urllib.parse import urlsplit
 
 
 def configuration(path):
-    with sqlite3.connect(f"file:{path}?mode=ro", uri=True) as connection:
+    # This bundled definition is immutable. Its WAL header must not make SQLite
+    # require writable -wal/-shm sidecars in a clean CI checkout.
+    with sqlite3.connect(path.resolve().as_uri() + "?mode=ro&immutable=1", uri=True) as connection:
         connection.row_factory = sqlite3.Row
         rows = connection.execute("SELECT * FROM info").fetchall()
         if len(rows) != 1:
