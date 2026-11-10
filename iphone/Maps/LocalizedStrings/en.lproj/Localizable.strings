@@ -1393,3 +1393,27 @@
 
 /* Mikshat navigation and location sharing */
 "mikshat_share_message" = "📍 %@ via Mikshat\nFor navigation and outdoor maps\n\nCoordinates:\n%@\n\nOpen in Mikshat:\n%@";
+
+/* Mikshat map controls and compass settings */
+"mikshat_compass_settings" = "Compass settings";
+
+/* Mikshat map controls and compass settings */
+"mikshat_compass_transparency_title" = "Compass transparency";
+
+/* Mikshat map controls and compass settings */
+"mikshat_compass_transparency_enable" = "Enable background transparency";
+
+/* Mikshat map controls and compass settings */
+"mikshat_compass_transparency_amount" = "Background transparency";
+
+/* Mikshat map controls and compass settings */
+"mikshat_compass_transparency_hint" = "Show the map behind the general and navigation compasses. 0% opaque, 100% transparent.";
+
+/* Mikshat map controls and compass settings */
+"mikshat_satellite_enable" = "Enable satellite imagery";
+
+/* Mikshat map controls and compass settings */
+"mikshat_satellite_disable" = "Disable satellite imagery";
+
+/* Mikshat map controls and compass settings */
+"mikshat_toggle_time" = "Switch remaining time and arrival time";

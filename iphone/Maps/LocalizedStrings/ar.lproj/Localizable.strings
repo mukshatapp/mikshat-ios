@@ -1393,3 +1393,27 @@
 
 /* Mikshat navigation and location sharing */
 "mikshat_share_message" = "📍 %@ عبر مكشات\nللملاحة والخرائط البرية\n\nالإحداثيات:\n%@\n\nافتح الموقع في تطبيق مكشات:\n%@";
+
+/* Mikshat map controls and compass settings */
+"mikshat_compass_settings" = "إعدادات البوصلة";
+
+/* Mikshat map controls and compass settings */
+"mikshat_compass_transparency_title" = "شفافية البوصلة";
+
+/* Mikshat map controls and compass settings */
+"mikshat_compass_transparency_enable" = "تفعيل شفافية الخلفية";
+
+/* Mikshat map controls and compass settings */
+"mikshat_compass_transparency_amount" = "درجة شفافية الخلفية";
+
+/* Mikshat map controls and compass settings */
+"mikshat_compass_transparency_hint" = "إظهار الخريطة خلف البوصلة العامة وبوصلة التوجيه. 0% معتمة، 100% شفافة.";
+
+/* Mikshat map controls and compass settings */
+"mikshat_satellite_enable" = "تشغيل صور الأقمار الصناعية";
+
+/* Mikshat map controls and compass settings */
+"mikshat_satellite_disable" = "إيقاف صور الأقمار الصناعية";
+
+/* Mikshat map controls and compass settings */
+"mikshat_toggle_time" = "تبديل الوقت المتبقي ووقت الوصول";
