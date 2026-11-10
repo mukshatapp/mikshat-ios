@@ -11,16 +11,16 @@ extension UISearchBar {
     }
   }
 
-  @objc override func sw_didMoveToWindow() {
+  @objc func sw_searchBarDidMoveToWindow() {
     // A nil app window (a CarPlay-first launch, or a disconnected phone scene) must not match a
     // view that is leaving the hierarchy: nil === nil is true.
     guard let appWindow = MapsAppDelegate.theApp().window, appWindow === window else {
-      sw_didMoveToWindow()
+      sw_searchBarDidMoveToWindow()
       return
     }
     applyTheme()
     isStyleApplied = true
-    sw_didMoveToWindow()
+    sw_searchBarDidMoveToWindow()
   }
 }
 

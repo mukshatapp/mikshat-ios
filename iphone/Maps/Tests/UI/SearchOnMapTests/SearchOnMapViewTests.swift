@@ -643,3 +643,92 @@ final class MikshatCompassLocationIndependenceTests: XCTestCase {
     XCTAssertFalse(labels.contains { $0.text?.contains(L("mikshat_location_unavailable")) == true })
   }
 }
+
+private final class SearchThemeFieldProbe: UITextField {
+  var themeApplications = 0
+  override func applyTheme() {
+    themeApplications += 1
+    super.applyTheme()
+  }
+}
+
+private final class SearchThemeBarProbe: UISearchBar {
+  var themeApplications = 0
+  override func applyTheme() {
+    themeApplications += 1
+    super.applyTheme()
+  }
+}
+
+final class SearchThemeWindowLifecycleTests: XCTestCase {
+  func test_UIKitSearchControlsAttachAndDetachWithTheirThemeHooksActive() throws {
+    _ = StyleManager.shared
+    let window = try XCTUnwrap(MapsAppDelegate.theApp().window)
+    let host = UIView(frame: window.bounds)
+    host.isUserInteractionEnabled = false
+    window.addSubview(host)
+    defer { host.removeFromSuperview() }
+    let field = SearchThemeFieldProbe(frame: CGRect(x: 0, y: 0, width: 200, height: 44))
+    field.setStyle(.background)
+    let search = SearchThemeBarProbe(frame: CGRect(x: 0, y: 50, width: 300, height: 44))
+    search.setStyle(.searchOnMapSearchBar)
+    for _ in 0..<20 {
+      host.addSubview(field)
+      host.addSubview(search)
+      XCTAssertTrue(field.window === window)
+      XCTAssertTrue(search.window === window)
+      XCTAssertTrue(field.isStyleApplied)
+      XCTAssertTrue(search.isStyleApplied)
+      field.removeFromSuperview()
+      search.removeFromSuperview()
+      XCTAssertNil(field.window)
+      XCTAssertNil(search.window)
+    }
+    XCTAssertGreaterThanOrEqual(field.themeApplications, 20)
+    XCTAssertGreaterThanOrEqual(search.themeApplications, 20)
+    XCTAssertLessThan(field.themeApplications, 200, "A window notification must finish without recursively re-entering theming")
+    XCTAssertLessThan(search.themeApplications, 200)
+  }
+
+  func test_ReinstallingThemeHooksDoesNotExchangeThemBackToTheOriginalMethods() throws {
+    _ = StyleManager.shared
+    // A second installation must be harmless. Calling twice here would hide an
+    // exchange-based bug by undoing and then reinstalling the hooks.
+    SwizzleStyle.swizzle()
+    defer { SwizzleStyle.swizzle() }
+    let window = try XCTUnwrap(MapsAppDelegate.theApp().window)
+    let field = SearchThemeFieldProbe(frame: CGRect(x: 0, y: 0, width: 200, height: 44))
+    field.setStyle(.background)
+    window.addSubview(field)
+    defer { field.removeFromSuperview() }
+    XCTAssertGreaterThan(field.themeApplications, 0)
+    XCTAssertTrue(field.isStyleApplied)
+  }
+
+  func test_SearchOpensFocusesAndClosesRepeatedlyInNormalAndRoutingModes() throws {
+    let map = try XCTUnwrap(MapViewController.shared())
+    map.loadViewIfNeeded()
+    let manager = SearchOnMapManager()
+    defer { manager.close() }
+    for routing in [false, true] {
+      for _ in 0..<20 {
+        manager.startSearching(isRouting: routing)
+        let controller = try XCTUnwrap(manager.viewController)
+        let attached = expectation(description: "Search attachment and deferred keyboard focus completed")
+        DispatchQueue.main.async { attached.fulfill() }
+        wait(for: [attached], timeout: 2)
+        XCTAssertTrue(controller.parent === map)
+        let bar = try XCTUnwrap(findSearchBar(in: controller.view))
+        XCTAssertTrue(bar.searchTextField.isFirstResponder)
+        manager.close()
+        let detached = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in controller.parent == nil }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [detached], timeout: 3), .completed)
+      }
+    }
+  }
+
+  private func findSearchBar(in view: UIView) -> UISearchBar? {
+    if let bar = view as? UISearchBar { return bar }
+    return view.subviews.lazy.compactMap { findSearchBar(in: $0) }.first
+  }
+}

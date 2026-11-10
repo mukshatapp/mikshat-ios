@@ -1,4 +1,5 @@
 #import "SwizzleStyle.h"
+#import "SwizzleRuntime.h"
 #import <UIKit/UIKit.h>
 #import "objc/message.h"
 #import "objc/runtime.h"
@@ -7,30 +8,28 @@
 
 + (void)swizzle
 {
-  [SwizzleStyle swizzle:[UISearchBar class] methodName:@"didMoveToWindow"];
-  [SwizzleStyle swizzle:[UITextField class] methodName:@"didMoveToWindow"];
-  [SwizzleStyle swizzle:[UIView class] methodName:@"didMoveToWindow"];
-}
-
-+ (void)swizzle:(Class)forClass methodName:(NSString *)methodName
-{
-  SEL originalMethod = NSSelectorFromString(methodName);
-  SEL newMethod = NSSelectorFromString([NSString stringWithFormat:@"%@%@", @"sw_", methodName]);
-  [SwizzleStyle swizzle:forClass from:originalMethod to:newMethod];
+  static dispatch_once_t onceToken;
+  dispatch_once(&onceToken, ^{
+    // Each class needs its own alias for the original implementation. A UIKit
+    // override can call super, whose hook must not dispatch back to that alias.
+    [SwizzleStyle swizzle:[UISearchBar class]
+                    from:@selector(didMoveToWindow)
+                      to:NSSelectorFromString(@"sw_searchBarDidMoveToWindow")];
+    [SwizzleStyle swizzle:[UITextField class]
+                    from:@selector(didMoveToWindow)
+                      to:NSSelectorFromString(@"sw_textFieldDidMoveToWindow")];
+    [SwizzleStyle swizzle:[UIView class]
+                    from:@selector(didMoveToWindow)
+                      to:NSSelectorFromString(@"sw_viewDidMoveToWindow")];
+  });
 }
 
 + (void)swizzle:(Class)forClass from:(SEL)original to:(SEL)new
 {
-  Method originalMethod = class_getInstanceMethod(forClass, original);
-  Method newMethod = class_getInstanceMethod(forClass, new);
-  if (class_addMethod(forClass, original, method_getImplementation(newMethod), method_getTypeEncoding(newMethod)))
+  if (!MWMSwizzleInstanceMethods(forClass, original, new))
   {
-    class_replaceMethod(forClass, new, method_getImplementation(originalMethod),
-                        method_getTypeEncoding(originalMethod));
-  }
-  else
-  {
-    method_exchangeImplementations(originalMethod, newMethod);
+    [NSException raise:NSInternalInconsistencyException
+                format:@"Cannot install theme hook for %@", NSStringFromClass(forClass)];
   }
 }
 

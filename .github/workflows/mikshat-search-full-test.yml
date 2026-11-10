@@ -1,0 +1,165 @@
+name: Mikshat full-app search regression
+
+on:
+  push:
+    branches:
+      - diagnostics/search-full-app
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mikshat-search-full-app-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  search-regression:
+    name: Real app on iPhone 16 / iOS 26
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+
+    steps:
+      - name: Check out the diagnostic revision
+        uses: actions/checkout@v4
+
+      - name: Record toolchain and available simulators
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/search-diagnostics
+          xcodebuild -version | tee build/search-diagnostics/toolchain.txt
+          xcrun --sdk iphonesimulator --show-sdk-version | tee -a build/search-diagnostics/toolchain.txt
+          uname -m | tee -a build/search-diagnostics/toolchain.txt
+          xcrun simctl list --json runtimes > build/search-diagnostics/runtimes.json
+          xcrun simctl list --json devicetypes > build/search-diagnostics/device-types.json
+
+      - name: Fetch pinned submodules
+        shell: bash
+        run: |
+          set -euo pipefail
+          git submodule update --init --recursive --depth 1 --jobs 8
+
+      - name: Prepare app resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 mikshat/prepare_branding.py
+          python3 mikshat/prepare_satellite.py
+
+      - name: Ensure Metal compiler is available
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! xcrun metal -v >/dev/null 2>&1; then
+            xcodebuild -downloadComponent MetalToolchain
+            xcrun -k
+          fi
+          xcrun metal -v
+
+      - name: Select and boot iPhone 16 with iOS 26
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+
+          def simctl(*arguments):
+              return subprocess.run(['xcrun', 'simctl', *arguments], check=True, capture_output=True, text=True).stdout
+
+          runtimes = json.loads(simctl('list', '--json', 'runtimes'))['runtimes']
+          candidates = [runtime for runtime in runtimes
+                        if runtime.get('isAvailable')
+                        and runtime.get('identifier', '').startswith('com.apple.CoreSimulator.SimRuntime.iOS-26-')]
+          if not candidates:
+              raise SystemExit('No available iOS 26 runtime. See build/search-diagnostics/runtimes.json; do not substitute another iOS version silently.')
+          runtime = max(candidates, key=lambda value: tuple(int(part) for part in value['version'].split('.')))
+          device_type = 'com.apple.CoreSimulator.SimDeviceType.iPhone-16'
+          device_types = json.loads(simctl('list', '--json', 'devicetypes'))['devicetypes']
+          if not any(value['identifier'] == device_type for value in device_types):
+              raise SystemExit('This Xcode installation has no iPhone 16 simulator device type.')
+          devices = json.loads(simctl('list', '--json', 'devices', 'available'))['devices']
+          matching = [device for device in devices.get(runtime['identifier'], [])
+                      if device.get('deviceTypeIdentifier') == device_type]
+          if matching:
+              device = matching[0]
+              udid = device['udid']
+              if device['state'] != 'Booted':
+                  simctl('boot', udid)
+          else:
+              udid = simctl('create', 'Mikshat Search iPhone 16', device_type, runtime['identifier']).strip()
+              simctl('boot', udid)
+          subprocess.run(['xcrun', 'simctl', 'bootstatus', udid, '-b'], check=True)
+          selection = dict(device='iPhone 16', udid=udid, runtime=runtime['identifier'], version=runtime['version'])
+          Path('build/search-diagnostics/simulator-selection.json').write_text(json.dumps(selection, indent=2) + '\n')
+          with open(os.environ['GITHUB_ENV'], 'a') as stream:
+              stream.write(f'MIKSHAT_SIMULATOR_UDID={udid}\n')
+          print(json.dumps(selection))
+          PY
+
+      - name: Build and run the real app search tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild test \
+            -workspace xcode/omim.xcworkspace \
+            -scheme OMaps \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "id=$MIKSHAT_SIMULATOR_UDID" \
+            -destination-timeout 120 \
+            -derivedDataPath build/SearchDerivedData \
+            -resultBundlePath build/SearchRegressions.xcresult \
+            -parallel-testing-enabled NO \
+            -maximum-concurrent-test-simulator-destinations 1 \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 120 \
+            -maximum-test-execution-time-allowance 180 \
+            -only-testing:OMapsTests/SearchThemeWindowLifecycleTests \
+            -only-testing:OMapsTests/SearchOnMapManagerTests \
+            -only-testing:OMapsTests/SearchOnMapHeaderViewTests \
+            -only-testing:OMapsTests/SearchTabLayoutRegressionTests \
+            ARCHS="$(uname -m)" \
+            ONLY_ACTIVE_ARCH=YES \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee build/search-diagnostics/xcodebuild-search-tests.log
+
+      - name: Collect app crash reports and simulator log
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p build/search-diagnostics/crash-reports
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil
+          source = Path.home() / 'Library/Logs/DiagnosticReports'
+          destination = Path('build/search-diagnostics/crash-reports')
+          if source.exists():
+              for report in source.rglob('*'):
+                  if report.is_file() and report.suffix in ('.ips', '.crash', '.hang'):
+                      if any(name in report.name.lower() for name in ('organic', 'omaps')):
+                          shutil.copy2(report, destination / report.name)
+          PY
+          if [[ -n "${MIKSHAT_SIMULATOR_UDID:-}" ]]; then
+            xcrun simctl spawn "$MIKSHAT_SIMULATOR_UDID" log show --last 3m --style compact \
+              --predicate 'process CONTAINS[c] "Organic" OR process CONTAINS[c] "OMaps"' \
+              > build/search-diagnostics/simulator-app.log 2>&1 || true
+          fi
+
+      - name: Upload raw logs and test result bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mikshat-search-full-app-${{ github.run_id }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            build/search-diagnostics/
+            build/SearchRegressions.xcresult/
