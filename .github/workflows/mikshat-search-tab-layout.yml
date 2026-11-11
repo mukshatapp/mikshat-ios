@@ -39,12 +39,15 @@ jobs:
           subprocess.run(['xcrun', 'simctl', 'bootstatus', udid, '-b'], check=True)
           Path('/tmp/mikshat-tab-udid').write_text(udid)
           PY
-      - name: Reproduce 4.6.9 stale collection geometry
+      - name: Trace baseline layout timing and visible-window behavior
         run: |
-          bash mikshat/tests/tab-layout-probe/run_probe.sh /tmp/mikshat-tab-baseline tab-results/baseline "$(cat /tmp/mikshat-tab-udid)" baseline as-is failed
-      - name: Verify delegate-metrics invalidation using actual candidate source
+          bash mikshat/tests/tab-layout-probe/run_probe.sh /tmp/mikshat-tab-baseline tab-results/baseline "$(cat /tmp/mikshat-tab-udid)" baseline as-is failed trace
+      - name: Trace metrics candidate layout timing and visible-window behavior
         run: |
-          bash mikshat/tests/tab-layout-probe/run_probe.sh "$GITHUB_WORKSPACE" tab-results/metrics "$(cat /tmp/mikshat-tab-udid)" metrics metrics passed
+          bash mikshat/tests/tab-layout-probe/run_probe.sh "$GITHUB_WORKSPACE" tab-results/metrics "$(cat /tmp/mikshat-tab-udid)" metrics metrics failed trace
+      - name: Test experimental child-bounds notification candidate
+        run: |
+          bash mikshat/tests/tab-layout-probe/run_probe.sh "$GITHUB_WORKSPACE" tab-results/bounds-notify "$(cat /tmp/mikshat-tab-udid)" bounds-notify bounds-notify passed trace
       - uses: actions/upload-artifact@v4
         if: always()
         with:

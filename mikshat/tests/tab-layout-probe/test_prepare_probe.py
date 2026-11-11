@@ -41,6 +41,28 @@ class PreparationTests(unittest.TestCase):
             self.assertIn('let selectedIndex, hasContentItem(at: selectedIndex) {\n        tabsContentCollectionView.layoutIfNeeded()\n', source)
             self.assertEqual(report['variant'], 'metrics')
 
+    def test_trace_records_source_instrumentation_and_preserves_layout(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            report = probe.prepare(ROOT, output, 'trace', 'as-is', trace_layout=True)
+            traced = (output / 'TabView.compiled.swift').read_text()
+            self.assertTrue(report['traceLayout'])
+            self.assertFalse(report['transform']['trace']['layoutBehaviorChanged'])
+            for stage in ['parent-entry', 'parent-after-super', 'parent-compare', 'delegate-size']:
+                self.assertIn('probeTrace("' + stage + '"', traced)
+            self.assertIn('tabsContentCollectionView.scrollToItem(', traced)
+
+    def test_bounds_candidate_notifies_only_for_size_changes_and_uses_both_initializers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            report = probe.prepare(ROOT, output, 'bounds-notify', 'bounds-notify')
+            source = (output / 'TabView.compiled.swift').read_text()
+            self.assertIn('if oldValue.size != bounds.size { onSizeChange?() }', source)
+            self.assertIn('onSizeChange = { [weak self] in self?.setNeedsLayout() }', source)
+            self.assertEqual(source.count('tabsContentCollectionView = TabContentCollectionView('), 2)
+            self.assertIn('invalidation.invalidateFlowLayoutDelegateMetrics = true', source)
+            self.assertEqual(report['transform']['boundsNotification']['initializersReplaced'], 2)
+
 
 if __name__ == '__main__':
     unittest.main()

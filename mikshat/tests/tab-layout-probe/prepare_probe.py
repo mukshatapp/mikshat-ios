@@ -44,6 +44,14 @@ extension UIView {
 }
 class MWMViewController: UIViewController {}
 
+private var probeTraceCount = 0
+private func probeTrace(_ stage: String, _ values: Any...) {
+  guard probeTraceCount < 300 else { return }
+  probeTraceCount += 1
+  print("MIKSHAT_TAB_TRACE \(stage) \(values)")
+  fflush(stdout)
+}
+
 '''
 
 APP = r'''
@@ -65,6 +73,22 @@ final class TabProbeDelegate: UIResponder, UIApplicationDelegate {
 
   private func check(_ value: Bool, _ message: String) {
     if !value { failures.append(message) }
+  }
+
+  private func sample(_ name: String, tabs: TabView, content: UICollectionView) {
+    let ratio = content.bounds.width > 0 ? content.contentOffset.x / content.bounds.width : nil
+    let detail: [String: Any] = [
+      "case": name, "bounds": [content.bounds.width, content.bounds.height],
+      "contentSize": [content.contentSize.width, content.contentSize.height],
+      "offset": [content.contentOffset.x, content.contentOffset.y],
+      "selectedIndex": tabs.selectedIndex ?? -1, "pagePosition": ratio ?? -1,
+      "windowAttached": tabs.window != nil,
+      "safeAreaInsets": [tabs.safeAreaInsets.top, tabs.safeAreaInsets.left,
+                         tabs.safeAreaInsets.bottom, tabs.safeAreaInsets.right],
+    ]
+    geometry.append(detail)
+    print("MIKSHAT_TAB_PROBE \(detail)")
+    fflush(stdout)
   }
 
   private func runCase(_ name: String, sizes: [CGSize], hosted: Bool = false) {
@@ -127,6 +151,41 @@ final class TabProbeDelegate: UIResponder, UIApplicationDelegate {
     // Stable layout passes should keep the selected page without geometry churn.
     for _ in 0..<10 { tabs.setNeedsLayout(); tabs.layoutIfNeeded() }
     check(tabs.selectedIndex == 1, "\(name): stable passes changed selected tab")
+    sample("\(name)-after-stable", tabs: tabs, content: content)
+  }
+
+  private func runNextLoopCase(completion: @escaping () -> Void) {
+    let controller = TabViewController()
+    controller.loadViewIfNeeded()
+    controller.viewControllers = [UIViewController(), UIViewController()]
+    let tabs = controller.tabView
+    tabs.selectedIndex = 1
+    guard let host = window?.rootViewController,
+          let content = tabs.subviews.compactMap({ $0 as? UICollectionView }).first else {
+      failures.append("hosted-next-loop: missing host or collection")
+      completion()
+      return
+    }
+    host.addChild(controller)
+    host.view.addSubview(tabs)
+    controller.didMove(toParent: host)
+    check(tabs.window != nil, "hosted-next-loop: view is not window-attached")
+    for size in [CGSize(width: 320, height: 480), CGSize(width: 480, height: 320)] {
+      tabs.frame = CGRect(origin: .zero, size: size)
+      tabs.setNeedsLayout()
+      tabs.layoutIfNeeded()
+      tabs.layoutIfNeeded()
+    }
+    sample("hosted-next-loop-immediate", tabs: tabs, content: content)
+    // Let a visible-window UIKit/CA layout transaction finish. No explicit layout,
+    // invalidation, frame assignment, or forced stable passes occur in between.
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+      self.sample("hosted-next-loop-deferred", tabs: tabs, content: content)
+      controller.willMove(toParent: nil)
+      tabs.removeFromSuperview()
+      controller.removeFromParent()
+      completion()
+    }
   }
 
   private func exercise() {
@@ -136,6 +195,10 @@ final class TabProbeDelegate: UIResponder, UIApplicationDelegate {
     runCase("nonempty-collapse", sizes: [CGSize(width: 320, height: 480), .zero, CGSize(width: 480, height: 320)])
     runCase("hosted-resize", sizes: [CGSize(width: 320, height: 480), CGSize(width: 480, height: 320)], hosted: true)
     runCase("hosted-collapse", sizes: [CGSize(width: 320, height: 480), .zero, CGSize(width: 480, height: 320)], hosted: true)
+    runNextLoopCase { self.finish() }
+  }
+
+  private func finish() {
     let result = failures.isEmpty ? "passed" : "failed"
     let report: [String: Any] = [
       "result": result, "label": "__LABEL__", "iOS": UIDevice.current.systemVersion,
@@ -178,14 +241,70 @@ def guarded_variant(source):
     return source[:start] + body + source[end:], {'removed': removed, 'insertedBeforeScroll': insertion.rstrip()}
 
 
-def prepare(root, output, label, variant):
+def trace_variant(source):
+    edits = [
+        ('  override func layoutSubviews() {\n    super.layoutSubviews()\n    let width = pageCount',
+         '''  override func layoutSubviews() {
+    probeTrace("parent-entry", bounds.size, tabsContentCollectionView.bounds.size, lastContentSize)
+    super.layoutSubviews()
+    probeTrace("parent-after-super", bounds.size, tabsContentCollectionView.bounds.size, lastContentSize)
+    let width = pageCount'''),
+        ('    let contentSize = tabsContentCollectionView.bounds.size\n',
+         '''    let contentSize = tabsContentCollectionView.bounds.size
+    probeTrace("parent-compare", bounds.size, contentSize, lastContentSize)
+'''),
+        ('    let size = CGSize(width: max(0, bounds.width), height: max(0, bounds.height))\n',
+         '''    let size = CGSize(width: max(0, bounds.width), height: max(0, bounds.height))
+    probeTrace("delegate-size", collectionView == tabsContentCollectionView ? "content" : "header",
+               collectionView.bounds.size, lastContentSize, size)
+'''),
+    ]
+    for before, after in edits:
+        if source.count(before) != 1:
+            raise ValueError('Expected exactly one trace insertion point: ' + before)
+        source = source.replace(before, after, 1)
+    return source, {'stages': ['parent-entry', 'parent-after-super', 'parent-compare', 'delegate-size'],
+                    'limit': 300, 'layoutBehaviorChanged': False}
+
+
+def bounds_notify_variant(source):
+    subclass = '''private class TabContentCollectionView: UICollectionView {
+  var onSizeChange: (() -> Void)?
+
+  override var bounds: CGRect {
+    didSet {
+      if oldValue.size != bounds.size { onSizeChange?() }
+    }
+  }
+}
+
+'''
+    property_before = '  private let tabsContentCollectionView: UICollectionView\n'
+    property_after = '  private let tabsContentCollectionView: TabContentCollectionView\n'
+    init_before = 'tabsContentCollectionView = UICollectionView(frame: .zero, collectionViewLayout: tabsContentLayout)'
+    init_after = 'tabsContentCollectionView = TabContentCollectionView(frame: .zero, collectionViewLayout: tabsContentLayout)'
+    configure_before = '  private func configureContent() {\n'
+    configure_after = '''  private func configureContent() {
+    tabsContentCollectionView.onSizeChange = { [weak self] in self?.setNeedsLayout() }
+'''
+    if source.count(property_before) != 1 or source.count(init_before) != 2 or source.count(configure_before) != 1:
+        raise ValueError('Unexpected content collection construction for bounds-notify candidate')
+    source = subclass + source
+    source = source.replace(property_before, property_after, 1)
+    source = source.replace(init_before, init_after)
+    source = source.replace(configure_before, configure_after, 1)
+    return source, {'subclass': subclass.splitlines(), 'contentCollectionType': 'TabContentCollectionView',
+                    'initializersReplaced': 2, 'sizeChangeAction': 'weak parent setNeedsLayout()'}
+
+
+def prepare(root, output, label, variant, trace_layout=False):
     output.mkdir(parents=True, exist_ok=True)
     source = (root / TAB).read_text()
     original = source
     transform = None
-    if variant in ('guarded', 'metrics'):
+    if variant in ('guarded', 'metrics', 'bounds-notify'):
         source, transform = guarded_variant(source)
-    if variant == 'metrics':
+    if variant in ('metrics', 'bounds-notify'):
         original_invalidation = '      tabsContentLayout.invalidateLayout()\n'
         metrics_invalidation = '''      let invalidation = UICollectionViewFlowLayoutInvalidationContext()
       invalidation.invalidateFlowLayoutDelegateMetrics = true
@@ -197,13 +316,19 @@ def prepare(root, output, label, variant):
                 raise ValueError('Expected exactly one content-layout invalidation')
             source = source.replace(original_invalidation, metrics_invalidation, 1)
         transform['delegateMetricsInvalidation'] = metrics_invalidation.splitlines()
+    if variant == 'bounds-notify':
+        source, notification = bounds_notify_variant(source)
+        transform['boundsNotification'] = notification
+    if trace_layout:
+        source, trace = trace_variant(source)
+        transform = dict(transform or {}, trace=trace)
     controller = (root / CONTROLLER).read_text()
     (output / 'TabView.original.swift').write_text(original)
     (output / 'TabView.compiled.swift').write_text(source)
     (output / 'TabViewController.original.swift').write_text(controller)
     (output / 'Probe.swift').write_text(PREFIX + source + '\n' + controller + APP.replace('__LABEL__', label))
     digest = lambda value: hashlib.sha256(value.encode()).hexdigest()
-    report = dict(label=label, variant=variant, sourceRoot=str(root),
+    report = dict(label=label, variant=variant, traceLayout=trace_layout, sourceRoot=str(root),
                   tabSource=TAB, originalSHA256=digest(original), compiledSHA256=digest(source),
                   controllerSource=CONTROLLER, controllerSHA256=digest(controller), transform=transform)
     (output / 'source-manifest.json').write_text(json.dumps(report, indent=2) + '\n')
@@ -215,8 +340,9 @@ if __name__ == '__main__':
     parser.add_argument('--source-root', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--label', required=True)
-    parser.add_argument('--variant', choices=['as-is', 'guarded', 'metrics'], default='as-is')
+    parser.add_argument('--variant', choices=['as-is', 'guarded', 'metrics', 'bounds-notify'], default='as-is')
+    parser.add_argument('--trace-layout', action='store_true')
     args = parser.parse_args()
     if not re.fullmatch('[A-Za-z0-9-]+', args.label):
         parser.error('label must contain only letters, digits or hyphens')
-    print(json.dumps(prepare(args.source_root.resolve(), args.output.resolve(), args.label, args.variant)))
+    print(json.dumps(prepare(args.source_root.resolve(), args.output.resolve(), args.label, args.variant, args.trace_layout)))

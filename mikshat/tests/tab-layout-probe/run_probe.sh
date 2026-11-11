@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SOURCE_ROOT OUTPUT_DIRECTORY BOOTED_UDID LABEL VARIANT EXPECTED_RESULT
+# SOURCE_ROOT OUTPUT_DIRECTORY BOOTED_UDID LABEL VARIANT EXPECTED_RESULT [trace]
 set -euo pipefail
 source_root=$1
 output_directory=$2
@@ -10,7 +10,9 @@ expected_result=$6
 probe_scripts=$(cd "$(dirname "$0")" && pwd)
 mkdir -p "$output_directory"
 output_directory=$(cd "$output_directory" && pwd)
-python3 "$probe_scripts/prepare_probe.py" --source-root "$source_root" --output "$output_directory/generated" --label "$probe_label" --variant "$probe_variant"
+prepare_args=("$probe_scripts/prepare_probe.py" --source-root "$source_root" --output "$output_directory/generated" --label "$probe_label" --variant "$probe_variant")
+if [[ "${7:-}" == trace ]]; then prepare_args+=(--trace-layout); fi
+python3 "${prepare_args[@]}"
 probe_sdk=$(xcrun --sdk iphonesimulator --show-sdk-path)
 probe_target="$(uname -m)-apple-ios15.0-simulator"
 probe_app="$output_directory/TabLayoutProbe.app"
