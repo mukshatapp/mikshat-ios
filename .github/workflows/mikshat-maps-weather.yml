@@ -226,7 +226,7 @@ jobs:
       if: always()
       run: python3 mikshat/tests/weather-data/collect-native-images.py "$MIKSHAT_SIMULATOR_UDID" build/weather-screenshots
     - name: Package simulator-only test application
-      if: always()
+      if: always() && steps.search-tests.outcome == 'success'
       run: |
         python3 - <<'PYCODE'
         from pathlib import Path
