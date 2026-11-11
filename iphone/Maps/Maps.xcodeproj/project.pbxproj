@@ -700,6 +700,12 @@
 		A6B8C0030000000000000001 /* MikshatSatellite.swift in Sources */ = {isa = PBXBuildFile; fileRef = A6B8C0030000000000000002 /* MikshatSatellite.swift */; };
 		A6B8C0030000000000000003 /* GOOGLE.sqlitedb in Resources */ = {isa = PBXBuildFile; fileRef = A6B8C0030000000000000004 /* GOOGLE.sqlitedb */; };
 		A6B8C0030000000000000005 /* MikshatSatellite.json in Resources */ = {isa = PBXBuildFile; fileRef = A6B8C0030000000000000006 /* MikshatSatellite.json */; };
+		82034E1ADFE11D725DD445DB /* MikshatWeatherData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EE14583A4D60E7E0D96D8B9 /* MikshatWeatherData.swift */; };
+		5F63290EC74989A482EDD63E /* MikshatWeatherViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C4C46B31257E57DE3F9C9EF /* MikshatWeatherViewController.swift */; };
+		263634E5E7623B24C50FA11E /* MikshatMemoryDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1173A06B6959B382B7C7716E /* MikshatMemoryDiagnostics.swift */; };
+		F00CF1CED5EA863FBBA99723 /* MikshatWeatherViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECE76EF25BEFF62E98FDE2A5 /* MikshatWeatherViewTests.swift */; };
+		2D7826B96397DBCA1CC933A0 /* SearchHistoryOnlyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1067C686AC3C81E430216275 /* SearchHistoryOnlyTests.swift */; };
+		89BC41D00BDE6C84859459CE /* MikshatMemoryDiagnosticsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C21A5100D9E7780856FFE168 /* MikshatMemoryDiagnosticsTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1886,6 +1892,12 @@
 		A6B8C0030000000000000002 /* MikshatSatellite.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MikshatSatellite.swift; path = UI/Mikshat/MikshatSatellite.swift; sourceTree = SOURCE_ROOT; };
 		A6B8C0030000000000000004 /* GOOGLE.sqlitedb */ = {isa = PBXFileReference; lastKnownFileType = file; name = GOOGLE.sqlitedb; path = Resources/Mikshat/GOOGLE.sqlitedb; sourceTree = SOURCE_ROOT; };
 		A6B8C0030000000000000006 /* MikshatSatellite.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = MikshatSatellite.json; path = Resources/Mikshat/MikshatSatellite.json; sourceTree = SOURCE_ROOT; };
+		9EE14583A4D60E7E0D96D8B9 /* MikshatWeatherData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MikshatWeatherData.swift; path = UI/Mikshat/Weather/MikshatWeatherData.swift; sourceTree = SOURCE_ROOT; };
+		3C4C46B31257E57DE3F9C9EF /* MikshatWeatherViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MikshatWeatherViewController.swift; path = UI/Mikshat/Weather/MikshatWeatherViewController.swift; sourceTree = SOURCE_ROOT; };
+		1173A06B6959B382B7C7716E /* MikshatMemoryDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MikshatMemoryDiagnostics.swift; path = UI/Mikshat/MikshatMemoryDiagnostics.swift; sourceTree = SOURCE_ROOT; };
+		ECE76EF25BEFF62E98FDE2A5 /* MikshatWeatherViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MikshatWeatherViewTests.swift; path = Tests/UI/Weather/MikshatWeatherViewTests.swift; sourceTree = SOURCE_ROOT; };
+		1067C686AC3C81E430216275 /* SearchHistoryOnlyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SearchHistoryOnlyTests.swift; path = Tests/UI/SearchOnMapTests/SearchHistoryOnlyTests.swift; sourceTree = SOURCE_ROOT; };
+		C21A5100D9E7780856FFE168 /* MikshatMemoryDiagnosticsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MikshatMemoryDiagnosticsTests.swift; path = Tests/UI/SearchOnMapTests/MikshatMemoryDiagnosticsTests.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -2268,6 +2280,7 @@
 				1A4D381982BD4FCD9308F4D1 /* RoutePointCollectionViewCellTests.swift */,
 				E79F77A472014212B40FDE97 /* PlacePageTests */,
 				ED810EC32D566E7600ECDE2C /* SearchOnMapTests */,
+				EE07D322E9A58648728E9F48 /* MikshatFeatureTests */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -2292,6 +2305,9 @@
 				A6B8C0020000000000000006 /* MikshatNavigationCoordinator.swift */,
 				A6B8C0020000000000000004 /* MikshatCoordinateInputView.swift */,
 				A6B8C0030000000000000002 /* MikshatSatellite.swift */,
+				9EE14583A4D60E7E0D96D8B9 /* MikshatWeatherData.swift */,
+				3C4C46B31257E57DE3F9C9EF /* MikshatWeatherViewController.swift */,
+				1173A06B6959B382B7C7716E /* MikshatMemoryDiagnostics.swift */,
 				A6B8C0030000000000000004 /* GOOGLE.sqlitedb */,
 				A6B8C0030000000000000006 /* MikshatSatellite.json */,
 				A6B8C0020000000000000002 /* MikshatInterface.swift */,
@@ -4264,6 +4280,16 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		EE07D322E9A58648728E9F48 /* MikshatFeatureTests */ = {
+			isa = PBXGroup;
+			children = (
+				ECE76EF25BEFF62E98FDE2A5 /* MikshatWeatherViewTests.swift */,
+				1067C686AC3C81E430216275 /* SearchHistoryOnlyTests.swift */,
+				C21A5100D9E7780856FFE168 /* MikshatMemoryDiagnosticsTests.swift */,
+			);
+			name = MikshatFeatureTests;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -5057,6 +5083,9 @@
 				A6B8C0020000000000000005 /* MikshatNavigationCoordinator.swift in Sources */,
 				A6B8C0020000000000000003 /* MikshatCoordinateInputView.swift in Sources */,
 				A6B8C0030000000000000001 /* MikshatSatellite.swift in Sources */,
+				82034E1ADFE11D725DD445DB /* MikshatWeatherData.swift in Sources */,
+				5F63290EC74989A482EDD63E /* MikshatWeatherViewController.swift in Sources */,
+				263634E5E7623B24C50FA11E /* MikshatMemoryDiagnostics.swift in Sources */,
 				A6B8C0020000000000000001 /* MikshatInterface.swift in Sources */,
 				A6B8C0010000000000000003 /* MikshatToolsViewController.swift in Sources */,
 				A6B8C0010000000000000001 /* MikshatNavigationMath.swift in Sources */,
@@ -5129,6 +5158,9 @@
 				ED91433B3001A0000081DF0B /* DeepLinkHandlerTests.swift in Sources */,
 				ED810EC52D566E9B00ECDE2C /* SearchOnMapTests.swift in Sources */,
 				2C6B64E5A79043179FD58BDC /* SearchOnMapViewTests.swift in Sources */,
+				F00CF1CED5EA863FBBA99723 /* MikshatWeatherViewTests.swift in Sources */,
+				2D7826B96397DBCA1CC933A0 /* SearchHistoryOnlyTests.swift in Sources */,
+				89BC41D00BDE6C84859459CE /* MikshatMemoryDiagnosticsTests.swift in Sources */,
 				81711202831385EF1E2F0356 /* TTSVoicePreviewPlayerTests.swift in Sources */,
 				EDF838C22C00B9D6007E4E67 /* MetadataItemStubs.swift in Sources */,
 				EDC4E3612C5E2576009286A2 /* RecentlyDeletedCategoriesViewModelTests.swift in Sources */,
@@ -5449,7 +5481,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 4.6.10;
+				MARKETING_VERSION = 4.6.11;
 				OTHER_SWIFT_FLAGS = "$(inherited)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.mikshat.maps.debug;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -5470,7 +5502,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 4.6.10;
+				MARKETING_VERSION = 4.6.11;
 				OTHER_SWIFT_FLAGS = "$(inherited)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.mikshat.maps;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -5525,7 +5557,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 4.6.10;
+				MARKETING_VERSION = 4.6.11;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mikshat.maps.debug.widgetextension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -5554,7 +5586,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 4.6.10;
+				MARKETING_VERSION = 4.6.11;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mikshat.maps.widgetextension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";

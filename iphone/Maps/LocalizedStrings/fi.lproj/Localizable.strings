@@ -476,7 +476,6 @@
 
 /* «Hide» context menu */
 "hide" = "Piilota";
-"categories" = "Luokat";
 "history" = "Historia";
 "search_not_found" = "Pahoittelut, hakutuloksia ei ole.";
 
@@ -1222,3 +1221,69 @@
 
 /* Accessibility label for the button that reverses the complete planned route, including intermediate stops. */
 "reverse_route" = "Käännä reitti";
+
+"mikshat_weather_available_hours" = "%d of the next 12 hours available";
+"mikshat_weather_condition_clear" = "Clear";
+"mikshat_weather_condition_drizzle_dense" = "Dense drizzle";
+"mikshat_weather_condition_drizzle_light" = "Light drizzle";
+"mikshat_weather_condition_drizzle_moderate" = "Moderate drizzle";
+"mikshat_weather_condition_fog" = "Fog";
+"mikshat_weather_condition_freezing_drizzle_dense" = "Dense freezing drizzle";
+"mikshat_weather_condition_freezing_drizzle_light" = "Light freezing drizzle";
+"mikshat_weather_condition_freezing_rain_heavy" = "Heavy freezing rain";
+"mikshat_weather_condition_freezing_rain_light" = "Light freezing rain";
+"mikshat_weather_condition_mainly_clear" = "Mainly clear";
+"mikshat_weather_condition_overcast" = "Overcast";
+"mikshat_weather_condition_partly_cloudy" = "Partly cloudy";
+"mikshat_weather_condition_rain_heavy" = "Heavy rain";
+"mikshat_weather_condition_rain_light" = "Slight rain";
+"mikshat_weather_condition_rain_moderate" = "Moderate rain";
+"mikshat_weather_condition_rain_showers_light" = "Slight rain showers";
+"mikshat_weather_condition_rain_showers_moderate" = "Moderate rain showers";
+"mikshat_weather_condition_rain_showers_violent" = "Violent rain showers";
+"mikshat_weather_condition_rime_fog" = "Depositing rime fog";
+"mikshat_weather_condition_snow_grains" = "Snow grains";
+"mikshat_weather_condition_snow_heavy" = "Heavy snowfall";
+"mikshat_weather_condition_snow_light" = "Slight snowfall";
+"mikshat_weather_condition_snow_moderate" = "Moderate snowfall";
+"mikshat_weather_condition_snow_showers_heavy" = "Heavy snow showers";
+"mikshat_weather_condition_snow_showers_light" = "Slight snow showers";
+"mikshat_weather_condition_thunderstorm" = "Thunderstorm";
+"mikshat_weather_condition_thunderstorm_hail_heavy" = "Thunderstorm with heavy hail";
+"mikshat_weather_condition_thunderstorm_hail_slight" = "Thunderstorm with slight hail";
+"mikshat_weather_condition_unknown" = "Weather unavailable";
+"mikshat_weather_coordinates" = "Coordinates: %@";
+"mikshat_weather_current" = "Current conditions";
+"mikshat_weather_gusts" = "Gusts";
+"mikshat_weather_hour_gusts" = "Gusts: %@";
+"mikshat_weather_hour_wind" = "Wind: %@";
+"mikshat_weather_invalid_location" = "The selected coordinates are invalid.";
+"mikshat_weather_last_updated" = "Last updated: %@";
+"mikshat_weather_loading" = "Loading forecast…";
+"mikshat_weather_model_notice" = "Values are model estimates and may differ from direct weather station observations.";
+"mikshat_weather_next_12_hours" = "Next 12 hours";
+"mikshat_weather_no_saved_forecast" = "No saved forecast for this location";
+"mikshat_weather_no_saved_retry" = "No saved forecast for this location. Unable to connect; try again.";
+"mikshat_weather_offline_saved" = "Offline — showing saved data.";
+"mikshat_weather_refresh" = "Refresh forecast";
+"mikshat_weather_refresh_failed_saved" = "Unable to update; showing saved data with its last update time.";
+"mikshat_weather_saved_data" = "Saved data";
+"mikshat_weather_selected_location" = "Selected map location";
+"mikshat_weather_temperature_accessibility" = "Temperature: %@ degrees Celsius";
+"mikshat_weather_title" = "Weather";
+"mikshat_weather_unavailable" = "Unavailable";
+"mikshat_weather_updating" = "Updating forecast…";
+"mikshat_weather_wind_calm" = "Calm wind";
+"mikshat_weather_wind_e" = "east";
+"mikshat_weather_wind_from" = "From %@";
+"mikshat_weather_wind_n" = "north";
+"mikshat_weather_wind_ne" = "northeast";
+"mikshat_weather_wind_nw" = "northwest";
+"mikshat_weather_wind_s" = "south";
+"mikshat_weather_wind_se" = "southeast";
+"mikshat_weather_wind_speed" = "Wind speed";
+"mikshat_weather_wind_sw" = "southwest";
+"mikshat_weather_wind_unavailable" = "Wind direction unavailable";
+"mikshat_weather_wind_w" = "west";
+
+"mikshat_kmh" = "km/h";

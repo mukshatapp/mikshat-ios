@@ -6,6 +6,13 @@
 // How many seconds to wait before the request fails.
 static constexpr NSTimeInterval kTimeoutIntervalInSeconds = 10;
 
+// Use the original full URL: Drive files share /download and differ only by query,
+// and redirects can change the current URL. Resume data belongs to this request.
+static NSString * DownloadIdentity(NSURLSessionTask * task)
+{
+  return task.originalRequest.URL.absoluteString ?: task.currentRequest.URL.absoluteString;
+}
+
 @interface TaskInfo : NSObject
 
 @property(nonatomic, strong) NSURLSessionTask * task;
@@ -69,12 +76,16 @@ static constexpr NSTimeInterval kTimeoutIntervalInSeconds = 10;
 @property(nonatomic, strong) NSURLSession * session;
 @property(nonatomic, strong) NSMutableDictionary * tasks;
 @property(nonatomic, strong) NSMutableDictionary * restoredTasks;
+// The C++ queue may still hold the ID returned before asynchronous restoration.
+@property(nonatomic, strong) NSMutableDictionary<NSNumber *, NSNumber *> * taskAliases;
 /// Maps a full download URL string => resume NSData. Keyed by the full URL, not just the path,
 /// because resume data is bound to the server that produced it: -downloadTaskWithResumeData:
 /// rebuilds the request from the blob and re-issues it to that server, so reusing it for a
 /// different mirror (CDN fallback or ?map-download-server) would ignore the newly selected server.
 @property(nonatomic, strong) NSMutableDictionary * resumeData;
 @property(nonatomic, strong) MapFileSaveStrategy * saveStrategy;
+
+- (void)removeAliasesForTaskIdentifier:(NSUInteger)taskIdentifier;
 
 @end
 
@@ -106,30 +117,41 @@ static constexpr NSTimeInterval kTimeoutIntervalInSeconds = 10;
     _tasks = [NSMutableDictionary dictionary];
     _saveStrategy = saveStrategy;
     _restoredTasks = [NSMutableDictionary dictionary];
+    _taskAliases = [NSMutableDictionary dictionary];
     _resumeData = [NSMutableDictionary dictionary];
 
     [_session getAllTasksWithCompletionHandler:^(NSArray<__kindof NSURLSessionTask *> * _Nonnull downloadTasks) {
       dispatch_async(dispatch_get_main_queue(), ^{
         for (NSURLSessionTask * downloadTask in downloadTasks)
         {
+          if (downloadTask.state == NSURLSessionTaskStateCanceling ||
+              downloadTask.state == NSURLSessionTaskStateCompleted)
+            continue;
           TaskInfo * info = [self.tasks objectForKey:@(downloadTask.taskIdentifier)];
           if (info)
             continue;
 
-          NSString * urlString = downloadTask.currentRequest.URL.path;
+          NSString * urlString = DownloadIdentity(downloadTask);
 
           BOOL isTaskReplaced = NO;
           // Replacing task with another one which was added into queue earlier (on previous application session).
           for (id key in self.tasks)
           {
             TaskInfo * info = [self.tasks objectForKey:key];
-            if (![info.task.currentRequest.URL.path isEqualToString:urlString])
+            if (![DownloadIdentity(info.task) isEqualToString:urlString])
               continue;
 
             TaskInfo * newInfo = [[TaskInfo alloc] initWithTask:downloadTask
                                                      completion:info.completion
                                                        progress:info.progress];
+            downloadTask.taskDescription = info.task.taskDescription;
             [self.tasks setObject:newInfo forKey:@(downloadTask.taskIdentifier)];
+            NSNumber * replacedId = @(info.task.taskIdentifier);
+            NSNumber * restoredId = @(downloadTask.taskIdentifier);
+            for (NSNumber * alias in self.taskAliases.allKeys)
+              if ([self.taskAliases[alias] isEqual:replacedId])
+                self.taskAliases[alias] = restoredId;
+            self.taskAliases[replacedId] = restoredId;
 
             [info.task cancel];
             [self.tasks removeObjectForKey:@(info.task.taskIdentifier)];
@@ -153,13 +175,13 @@ static constexpr NSTimeInterval kTimeoutIntervalInSeconds = 10;
                      progress:(DownloadProgressBlock)progress
 {
   NSUInteger taskIdentifier;
-  NSURLSessionTask * restoredTask = [self.restoredTasks objectForKey:url.path];
+  NSURLSessionTask * restoredTask = [self.restoredTasks objectForKey:url.absoluteString];
   if (restoredTask)
   {
     restoredTask.taskDescription = filePath;
     TaskInfo * info = [[TaskInfo alloc] initWithTask:restoredTask completion:completion progress:progress];
     [self.tasks setObject:info forKey:@(restoredTask.taskIdentifier)];
-    [self.restoredTasks removeObjectForKey:url.path];
+    [self.restoredTasks removeObjectForKey:url.absoluteString];
     taskIdentifier = restoredTask.taskIdentifier;
   }
   else
@@ -179,11 +201,13 @@ static constexpr NSTimeInterval kTimeoutIntervalInSeconds = 10;
 
 - (void)cancelTaskWithIdentifier:(NSUInteger)taskIdentifier
 {
+  taskIdentifier = (self.taskAliases[@(taskIdentifier)] ?: @(taskIdentifier)).unsignedIntegerValue;
+  [self removeAliasesForTaskIdentifier:taskIdentifier];
   TaskInfo * info = self.tasks[@(taskIdentifier)];
   if (info)
   {
     [info.task cancel];
-    [self.resumeData removeObjectForKey:info.task.currentRequest.URL.absoluteString];
+    [self.resumeData removeObjectForKey:DownloadIdentity(info.task)];
     [self.tasks removeObjectForKey:@(taskIdentifier)];
   }
   else
@@ -194,7 +218,7 @@ static constexpr NSTimeInterval kTimeoutIntervalInSeconds = 10;
       if (restoredTask.taskIdentifier == taskIdentifier)
       {
         [restoredTask cancel];
-        [self.resumeData removeObjectForKey:restoredTask.currentRequest.URL.absoluteString];
+        [self.resumeData removeObjectForKey:DownloadIdentity(restoredTask)];
         [self.restoredTasks removeObjectForKey:key];
         break;
       }
@@ -202,10 +226,18 @@ static constexpr NSTimeInterval kTimeoutIntervalInSeconds = 10;
   }
 }
 
+- (void)removeAliasesForTaskIdentifier:(NSUInteger)taskIdentifier
+{
+  NSNumber * taskId = @(taskIdentifier);
+  for (NSNumber * alias in self.taskAliases.allKeys)
+    if ([alias isEqual:taskId] || [self.taskAliases[alias] isEqual:taskId])
+      [self.taskAliases removeObjectForKey:alias];
+}
+
 - (void)clear
 {
   // Fast enumeration over an NSDictionary yields its keys, not its values: self.tasks is keyed by
-  // task identifier and restoredTasks by URL path. Iterate allValues to cancel the task objects.
+  // task identifier and restoredTasks by full URL. Iterate allValues to cancel the task objects.
   for (TaskInfo * info in self.tasks.allValues)
     [info.task cancel];
 
@@ -214,6 +246,7 @@ static constexpr NSTimeInterval kTimeoutIntervalInSeconds = 10;
 
   [self.tasks removeAllObjects];
   [self.restoredTasks removeAllObjects];
+  [self.taskAliases removeAllObjects];
   [self.resumeData removeAllObjects];
 }
 
@@ -221,11 +254,8 @@ static constexpr NSTimeInterval kTimeoutIntervalInSeconds = 10;
 
 - (void)finishDownloading:(NSURLSessionTask *)downloadTask error:(nullable NSError *)error
 {
-  NSString * urlPath = downloadTask.currentRequest.URL.path;
-  [self.restoredTasks removeObjectForKey:urlPath];
-
-  // Resume data is keyed by the full URL (see resumeData declaration), unlike restoredTasks above.
-  NSString * urlString = downloadTask.currentRequest.URL.absoluteString;
+  NSString * urlString = DownloadIdentity(downloadTask);
+  [self.restoredTasks removeObjectForKey:urlString];
   if (error && error.userInfo && error.userInfo[NSURLSessionDownloadTaskResumeData])
     self.resumeData[urlString] = error.userInfo[NSURLSessionDownloadTaskResumeData];
   else
@@ -235,6 +265,7 @@ static constexpr NSTimeInterval kTimeoutIntervalInSeconds = 10;
   if (!info)
     return;
 
+  [self removeAliasesForTaskIdentifier:downloadTask.taskIdentifier];
   info.completion(error);
 
   [self.tasks removeObjectForKey:@(downloadTask.taskIdentifier)];
@@ -246,10 +277,11 @@ static constexpr NSTimeInterval kTimeoutIntervalInSeconds = 10;
 {
   NSError * error;
   // Check for HTTP errors.
-  // TODO: Check and prevent redirects.
   NSInteger statusCode = ((NSHTTPURLResponse *)downloadTask.response).statusCode;
+  NSString * mimeType = downloadTask.response.MIMEType.lowercaseString;
   // 206 for resumed downloads.
-  if (statusCode != 200 && statusCode != 206)
+  if ((statusCode != 200 && statusCode != 206) || [mimeType isEqualToString:@"text/html"] ||
+      [mimeType isEqualToString:@"application/xhtml+xml"])
   {
     LOG(LWARNING,
         ("Failed to download", downloadTask.originalRequest.URL.absoluteString, "HTTP statusCode:", statusCode));

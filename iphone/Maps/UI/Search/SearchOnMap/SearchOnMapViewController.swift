@@ -32,7 +32,7 @@ final class SearchOnMapViewController: UIViewController {
   private let headerView = SearchOnMapHeaderView()
   private let searchResultsView = UIView()
   private let resultsTableView = UITableView()
-  private let historyAndCategoryTabViewController = SearchTabViewController()
+  private let historyViewController = SearchTabViewController()
   private var searchingActivityView = PlaceholderView(hasActivityIndicator: true)
   private var searchNoResultsView = PlaceholderView(title: L("search_not_found"),
                                                     subtitle: L("search_not_found_query"))
@@ -127,7 +127,7 @@ final class SearchOnMapViewController: UIViewController {
     setupHeaderView()
     setupSearchResultsView()
     setupResultsTableView()
-    setupHistoryAndCategoryTabView()
+    setupHistoryView()
   }
 
   private func setupDimView() {
@@ -179,8 +179,8 @@ final class SearchOnMapViewController: UIViewController {
     resultsTableView.keyboardDismissMode = .onDrag
   }
 
-  private func setupHistoryAndCategoryTabView() {
-    historyAndCategoryTabViewController.delegate = self
+  private func setupHistoryView() {
+    historyViewController.delegate = self
   }
 
   private func layoutViews() {
@@ -214,7 +214,7 @@ final class SearchOnMapViewController: UIViewController {
     ])
 
     layoutResultsView()
-    layoutHistoryAndCategoryTabView()
+    layoutHistoryView()
     layoutSearchNoResultsView()
     layoutSearchingView()
     updateFrameOfPresentedViewInContainerView()
@@ -232,18 +232,18 @@ final class SearchOnMapViewController: UIViewController {
     ])
   }
 
-  private func layoutHistoryAndCategoryTabView() {
-    addChild(historyAndCategoryTabViewController)
-    searchResultsView.addSubview(historyAndCategoryTabViewController.view)
-    historyAndCategoryTabViewController.view.translatesAutoresizingMaskIntoConstraints = false
+  private func layoutHistoryView() {
+    addChild(historyViewController)
+    searchResultsView.addSubview(historyViewController.view)
+    historyViewController.view.translatesAutoresizingMaskIntoConstraints = false
 
     NSLayoutConstraint.activate([
-      historyAndCategoryTabViewController.view.topAnchor.constraint(equalTo: searchResultsView.topAnchor),
-      historyAndCategoryTabViewController.view.leadingAnchor.constraint(equalTo: searchResultsView.leadingAnchor),
-      historyAndCategoryTabViewController.view.trailingAnchor.constraint(equalTo: searchResultsView.trailingAnchor),
-      historyAndCategoryTabViewController.view.bottomAnchor.constraint(equalTo: searchResultsView.bottomAnchor),
+      historyViewController.view.topAnchor.constraint(equalTo: searchResultsView.topAnchor),
+      historyViewController.view.leadingAnchor.constraint(equalTo: searchResultsView.leadingAnchor),
+      historyViewController.view.trailingAnchor.constraint(equalTo: searchResultsView.trailingAnchor),
+      historyViewController.view.bottomAnchor.constraint(equalTo: searchResultsView.bottomAnchor),
     ])
-    historyAndCategoryTabViewController.didMove(toParent: self)
+    historyViewController.didMove(toParent: self)
   }
 
   private func layoutSearchNoResultsView() {
@@ -334,7 +334,7 @@ final class SearchOnMapViewController: UIViewController {
   private func setContent(_ content: Content) {
     switch content {
     case .historyAndCategory:
-      historyAndCategoryTabViewController.reloadSearchHistory()
+      historyViewController.reloadSearchHistory()
     case .results(let results):
       if searchResults != results {
         searchResults = results
@@ -353,7 +353,7 @@ final class SearchOnMapViewController: UIViewController {
   private func viewToShow(for content: Content) -> UIView {
     switch content {
     case .historyAndCategory:
-      return historyAndCategoryTabViewController.view
+      return historyViewController.view
     case .results:
       return resultsTableView
     case .noResults:
@@ -365,7 +365,7 @@ final class SearchOnMapViewController: UIViewController {
 
   private func showView(_ view: UIView) {
     let viewsToHide: [UIView] = [resultsTableView,
-                                 historyAndCategoryTabViewController.view,
+                                 historyViewController.view,
                                  searchNoResultsView,
                                  searchingActivityView].filter { $0 != view }
     viewsToHide.forEach { $0.isHidden = true; $0.alpha = 0 }
@@ -445,7 +445,7 @@ extension SearchOnMapViewController: ModallyPresentedViewController {
   func presentationFrameDidChange(_ frame: CGRect) {
     let translationY = frame.origin.y
     resultsTableView.contentInset.bottom = translationY
-    historyAndCategoryTabViewController.presentationFrameDidChange(frame)
+    historyViewController.presentationFrameDidChange(frame)
     searchNoResultsView.presentationFrameDidChange(frame)
     searchingActivityView.presentationFrameDidChange(frame)
   }

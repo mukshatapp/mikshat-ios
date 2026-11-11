@@ -1,6 +1,7 @@
 #include "storage/map_files_downloader.hpp"
 
 #include "storage/queued_country.hpp"
+#include "storage/saudi_map_download_source.hpp"
 
 #include "platform/downloader_utils.hpp"
 #include "platform/http_client.hpp"
@@ -56,7 +57,7 @@ MapFilesDownloader::~MapFilesDownloader()
 
 void MapFilesDownloader::DownloadMapFile(QueuedCountry && queuedCountry)
 {
-  if (!m_serversList.empty())
+  if (FindSaudiMapDownloadSource(queuedCountry.GetCountryId()) || !m_serversList.empty())
   {
     Download(std::move(queuedCountry));
     return;
@@ -228,6 +229,19 @@ std::vector<std::string> MapFilesDownloader::MakeUrlList(std::string const & rel
     urls.emplace_back(url::Join(server, relativeUrl));
 
   return urls;
+}
+
+std::vector<std::string> MapFilesDownloader::MakeUrlList(QueuedCountry const & queuedCountry) const
+{
+  if (auto const * source = FindSaudiMapDownloadSource(queuedCountry.GetCountryId()))
+  {
+    // Drive supplies complete maps only. An unsupported catalog must fail through
+    // the usual downloader error UI, without fetching stale bytes or another source.
+    if (queuedCountry.GetFileType() != MapFileType::Map || queuedCountry.GetDataVersion() != kSaudiMapDataVersion)
+      return {};
+    return {source->GetUrl()};
+  }
+  return MakeUrlList(queuedCountry.GetRelativeUrl());
 }
 
 std::string GetAcceptLanguage()

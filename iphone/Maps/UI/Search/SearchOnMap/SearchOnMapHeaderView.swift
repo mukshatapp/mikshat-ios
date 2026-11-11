@@ -50,6 +50,7 @@ final class SearchOnMapHeaderView: UIView {
   private var searchBarLeadingWithRouteActionsConstraint: NSLayoutConstraint!
   private var wantsKeyboard = false
   private var focusRequestPending = false
+  private var didRecordKeyboardShown = false
   private var hasRouteActions = false
   private var areRouteActionsVisible = false
 
@@ -57,7 +58,11 @@ final class SearchOnMapHeaderView: UIView {
     super.init(frame: frame)
     setupView()
     layoutView()
+    NotificationCenter.default.addObserver(self, selector: #selector(keyboardDidShow),
+                                           name: UIResponder.keyboardDidShowNotification, object: nil)
   }
+
+  deinit { NotificationCenter.default.removeObserver(self) }
 
   @available(*, unavailable)
   required init?(coder _: NSCoder) {
@@ -261,6 +266,13 @@ final class SearchOnMapHeaderView: UIView {
     if window != nil && wantsKeyboard { setIsSearching(true) }
   }
 
+  @objc private func keyboardDidShow() {
+    guard !didRecordKeyboardShown, wantsKeyboard, window != nil,
+          searchBar.isFirstResponder || searchBar.searchTextField.isFirstResponder else { return }
+    didRecordKeyboardShown = true
+    MikshatMemoryDiagnostics.logSearchPhase(.keyboardShown)
+  }
+
   func setIsSearching(_ isSearching: Bool) {
     wantsKeyboard = isSearching
     if !isSearching {
@@ -274,9 +286,9 @@ final class SearchOnMapHeaderView: UIView {
       guard let self else { return }
       self.focusRequestPending = false
       guard self.wantsKeyboard, self.window != nil, !self.searchBar.isFirstResponder else { return }
-      LOG(.info, "MikshatSearch phase=keyboard-focus-begin")
+      MikshatMemoryDiagnostics.logSearchPhase(.keyboardFocusBegin)
       self.searchBar.becomeFirstResponder()
-      LOG(.info, "MikshatSearch phase=keyboard-focus-returned")
+      MikshatMemoryDiagnostics.logSearchPhase(.keyboardFocusReturned)
     }
   }
 

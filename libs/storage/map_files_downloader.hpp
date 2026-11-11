@@ -75,6 +75,7 @@ public:
 protected:
   bool IsDownloadingAllowed() const;
   std::vector<std::string> MakeUrlList(std::string const & relativeUrl) const;
+  std::vector<std::string> MakeUrlList(QueuedCountry const & queuedCountry) const;
 
   // Synchronously loads list of servers by http client.
   downloader::MetaConfig LoadMetaConfig() const;

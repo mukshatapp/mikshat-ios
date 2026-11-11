@@ -3,6 +3,7 @@
 #include "storage/storage_tests/test_map_files_downloader.hpp"
 
 #include "storage/queued_country.hpp"
+#include "storage/saudi_map_download_source.hpp"
 #include "storage/storage.hpp"
 
 #include "platform/chunks_download_strategy.hpp"
@@ -604,5 +605,50 @@ UNIT_CLASS_TEST(StorageDownloadTest, FailedIntegrityCheck)
   // to be dropped instead of being registered as a map.
   TEST(!storage.GetLatestLocalFile(kCorrupted), ());
   TEST(!Platform::IsFileExistsByFullPath(DownloadPath(storage, kCorrupted)), ());
+}
+
+UNIT_CLASS_TEST(StorageDownloadTest, SaudiDriveHtmlPreservesInstalledMap)
+{
+  base::ScopedLogAbortLevelChanger const ignoreErrors(LCRITICAL);
+  auto const & source = kSaudiMapDownloadSources.front();
+  auto const id = std::string(source.m_countryId);
+  // Registration also checks the bundled World maps when their version matches this catalog.
+  auto const makeWorldLeaf = [](std::string const & name)
+  {
+    auto const reader = GetPlatform().GetReader(name + DATA_FILE_EXTENSION, "r");
+    return R"({"id":")" + name + R"(","s":)" + strings::to_string(reader->Size()) + "}";
+  };
+  auto const json = R"({"id":"Countries","v":)" + strings::to_string(kSaudiMapDataVersion) +
+                    R"(,"g":[{"id":")" + id + R"(","s":)" + strings::to_string(source.m_size) +
+                    R"(,"h":")" + std::string(source.m_hash) + R"("},)" + makeWorldLeaf(WORLD_FILE_NAME) + "," +
+                    makeWorldLeaf(WORLD_COASTS_FILE_NAME) + "]}";
+  auto const oldVersion = kSaudiMapDataVersion - 1;
+  TEST(!PrepareDirToDownloadCountry(oldVersion, {}).empty(), ());
+  auto const installedPath = GetFilePath(oldVersion, {}, id, MapFileType::Map);
+  {
+    FileWriter writer(installedPath);
+    writer.Write("installed-map", 13);
+  }
+  auto const installedHash = coding::Blake3::CalculateMwmBase64(installedPath);
+  bool didDownload = false;
+  Storage storage(json, std::make_unique<TestMapFilesDownloader>());
+  InitStorage(storage, [&didDownload](CountryId const &, LocalFilePtr const) { didDownload = true; });
+  TEST_EQUAL(storage.CountryStatusEx(id), Status::OnDiskOutOfDate, ());
+  storage.SetEnabledIntegrityValidationForTesting(false);
+  TEST(!PrepareDirToDownloadCountry(kSaudiMapDataVersion, {}).empty(), ());
+  {
+    FileWriter writer(DownloadPath(storage, id));
+    std::string const html = "<!doctype html><html>Download quota exceeded</html>";
+    writer.Write(html.data(), html.size());
+  }
+
+  // A cached HTTP-200 HTML response must also fail after a retry or relaunch.
+  storage.DownloadNode(id);
+  DrainFileAndGui();
+  TEST(!didDownload, ());
+  TEST_EQUAL(storage.CountryStatusEx(id), Status::DownloadFailed, ());
+  TEST(!Platform::IsFileExistsByFullPath(DownloadPath(storage, id)), ());
+  TEST_EQUAL(coding::Blake3::CalculateMwmBase64(installedPath), installedHash, ());
+  TEST_EQUAL(storage.GetLatestLocalFile(id)->GetVersion(), oldVersion, ());
 }
 }  // namespace storage_download_tests

@@ -4,72 +4,54 @@ protocol SearchTabViewControllerDelegate: UIScrollViewDelegate {
 }
 
 @objc
-final class SearchTabViewController: TabViewController {
-  private enum Tab: Int {
-    case history
-    case categories
-  }
-
+final class SearchTabViewController: MWMViewController {
   private static let selectedIndexKey = "SearchTabViewController_selectedIndexKey"
+  private let frameworkHelper: MWMSearchFrameworkHelper.Type
+  private let userDefaults: UserDefaults
+  private lazy var historyViewController = SearchHistoryViewController(frameworkHelper: frameworkHelper,
+                                                                       delegate: self)
+
   @objc weak var delegate: SearchTabViewControllerDelegate?
 
-  private var frameworkHelper = MWMSearchFrameworkHelper.self
-  private var tabs: [Tab] = []
+  init(frameworkHelper: MWMSearchFrameworkHelper.Type = MWMSearchFrameworkHelper.self,
+       userDefaults: UserDefaults = .standard) {
+    self.frameworkHelper = frameworkHelper
+    self.userDefaults = userDefaults
+    super.init(nibName: nil, bundle: nil)
+  }
 
-  private var activeTab: Tab = .init(rawValue:
-    UserDefaults.standard.integer(forKey: SearchTabViewController.selectedIndexKey)) ?? .categories {
-    didSet {
-      UserDefaults.standard.set(activeTab.rawValue, forKey: SearchTabViewController.selectedIndexKey)
-    }
+  @available(*, unavailable)
+  required init?(coder _: NSCoder) {
+    fatalError("init(coder:) has not been implemented")
   }
 
   override func viewDidLoad() {
     super.viewDidLoad()
 
-    tabs = Settings.searchHistoryEnabled() ? [.history, .categories] : [.categories]
-    viewControllers = tabs.map { viewController(for: $0) }
-    tabView.showsTabBar = tabs.count > 1
-
-    let selectedTab: Tab
-    if !tabs.contains(.history) || frameworkHelper.isSearchHistoryEmpty() {
-      selectedTab = .categories
-    } else {
-      selectedTab = activeTab
-    }
-    tabView.selectedIndex = tabs.firstIndex(of: selectedTab) ?? 0
-  }
-
-  override func viewDidDisappear(_ animated: Bool) {
-    super.viewDidDisappear(animated)
-    guard let selectedIndex = tabView.selectedIndex,
-          tabs.indices.contains(selectedIndex) else { return }
-    activeTab = tabs[selectedIndex]
+    // Older builds persisted Categories as page 1. History is now displayed
+    // directly, so normalize old and out-of-range values to its sole index.
+    userDefaults.set(0, forKey: Self.selectedIndexKey)
+    addChild(historyViewController)
+    let historyView = historyViewController.view!
+    historyView.translatesAutoresizingMaskIntoConstraints = false
+    view.addSubview(historyView)
+    NSLayoutConstraint.activate([
+      historyView.topAnchor.constraint(equalTo: view.topAnchor),
+      historyView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+      historyView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+      historyView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+    ])
+    historyViewController.didMove(toParent: self)
   }
 
   func reloadSearchHistory() {
-    guard let historyIndex = tabs.firstIndex(of: .history) else { return }
-    (viewControllers[historyIndex] as? SearchHistoryViewController)?.reload()
-  }
-
-  private func viewController(for tab: Tab) -> UIViewController {
-    switch tab {
-    case .history:
-      let history = SearchHistoryViewController(frameworkHelper: frameworkHelper,
-                                                delegate: self)
-      history.title = L("history")
-      return history
-    case .categories:
-      let categories = SearchCategoriesViewController(frameworkHelper: frameworkHelper,
-                                                      delegate: self)
-      categories.title = L("categories")
-      return categories
-    }
+    historyViewController.reload()
   }
 }
 
 extension SearchTabViewController: ModallyPresentedViewController {
   func presentationFrameDidChange(_ frame: CGRect) {
-    viewControllers.forEach { ($0 as? ModallyPresentedViewController)?.presentationFrameDidChange(frame) }
+    historyViewController.presentationFrameDidChange(frame)
   }
 }
 
@@ -80,17 +62,6 @@ extension SearchTabViewController: UIScrollViewDelegate {
 
   func scrollViewWillEndDragging(_ scrollView: UIScrollView, withVelocity velocity: CGPoint, targetContentOffset: UnsafeMutablePointer<CGPoint>) {
     delegate?.scrollViewWillEndDragging?(scrollView, withVelocity: velocity, targetContentOffset: targetContentOffset)
-  }
-}
-
-extension SearchTabViewController: SearchCategoriesViewControllerDelegate {
-  func categoriesViewController(_: SearchCategoriesViewController,
-                                didSelect category: String) {
-    let preferredLang = AppInfo.shared().languageId
-    let supportedBySearchLang = MWMSearchFrameworkHelper.isLanguageSupported(preferredLang) ? preferredLang : "en"
-    let searchText = L(category, languageCode: supportedBySearchLang) + " "
-    let query = SearchQuery(searchText, locale: supportedBySearchLang, source: .category)
-    delegate?.searchTabController(self, didSearch: query)
   }
 }
 

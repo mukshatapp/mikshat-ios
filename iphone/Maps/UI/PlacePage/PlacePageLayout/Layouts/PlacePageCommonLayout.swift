@@ -58,6 +58,25 @@ class PlacePageCommonLayout: NSObject, IPlacePageLayout {
     let vc = storyboard.instantiateViewController(ofType: PlacePageInfoViewController.self)
     vc.placePageInfoData = placePageData.infoData
     vc.delegate = interactor
+    // Freeze the selected map point for this page. Weather never substitutes
+    // the phone's current location or starts a location permission request.
+    let coordinate = placePageData.locationCoordinate
+    let name = placePageData.previewData.title
+    vc.didTapWeather = { [weak vc] in
+      Task { @MainActor [weak vc] in
+        guard let vc, vc.viewIfLoaded?.window != nil else { return }
+        var ancestor: UIViewController? = vc
+        while let candidate = ancestor {
+          guard candidate.presentedViewController == nil,
+                !candidate.isBeingDismissed, !candidate.isMovingFromParent else { return }
+          ancestor = candidate.parent
+        }
+        let weather = MikshatWeatherViewController(name: name,
+                                                  latitude: coordinate.latitude,
+                                                  longitude: coordinate.longitude)
+        vc.present(weather, animated: true)
+      }
+    }
     return vc
   }()
 
@@ -113,8 +132,6 @@ class PlacePageCommonLayout: NSObject, IPlacePageLayout {
     if let productsViewController = productsViewController() {
       viewControllers.append(productsViewController)
     }
-
-
 
     LocationManager.add(observer: self)
     if let lastLocation = LocationManager.lastLocation() {

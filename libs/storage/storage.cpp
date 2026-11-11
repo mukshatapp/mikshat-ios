@@ -5,6 +5,7 @@
 // #include "storage/diff_scheme/diff_scheme_loader.hpp"
 #include "storage/downloader.hpp"
 #include "storage/map_files_downloader.hpp"
+#include "storage/saudi_map_download_source.hpp"
 #include "storage/storage_helpers.hpp"
 
 #include "platform/downloader_utils.hpp"
@@ -595,6 +596,13 @@ void Storage::DownloadCountry(CountryId const & countryId, MapFileType type)
 {
   CHECK_THREAD_CHECKER(m_threadChecker, ());
 
+  if (FindSaudiMapDownloadSource(countryId))
+  {
+    // The supplied Drive folder contains no .mwmdiff files.
+    type = MapFileType::Map;
+    m_diffsDataSource->RemoveDiffForCountry(countryId);
+  }
+
   if (IsCountryInQueue(countryId) || m_downloadingCountries.contains(countryId) ||
       IsDiffApplyingInProgressToCountry(countryId))
     return;
@@ -799,9 +807,25 @@ void Storage::OnDownloadFinished(QueuedCountry const & queuedCountry, DownloadSt
     OnFinishDownloading();
   };
 
-  auto const hash = status == DownloadStatus::Completed && m_integrityValidationEnabled
-                      ? GetCountryFile(countryId).GetHash()
-                      : std::string{};
+  auto const * source = FindSaudiMapDownloadSource(countryId);
+  if (status == DownloadStatus::Completed && source &&
+      (m_currentVersion != kSaudiMapDataVersion || fileType != MapFileType::Map))
+  {
+    finishFn(DownloadStatus::FailedIntegrityCheck);
+    return;
+  }
+  // Drive can return HTTP 200 with a confirmation, permission, or quota HTML page.
+  // Always verify its pinned bytes before registration, even if ordinary CDN
+  // integrity checking was disabled. Hashing uses a fixed 64 KiB read buffer.
+  std::string hash;
+  if (status == DownloadStatus::Completed)
+  {
+    if (source)
+      hash = source->m_hash;
+    else if (m_integrityValidationEnabled)
+      hash = GetCountryFile(countryId).GetHash();
+  }
+  auto const expectedSize = source ? source->m_size : uint64_t{0};
   if (!hash.empty())
   {
     auto const size = static_cast<int64_t>(queuedCountry.GetDownloadSize());
@@ -809,7 +833,8 @@ void Storage::OnDownloadFinished(QueuedCountry const & queuedCountry, DownloadSt
     // Hashing runs on the file thread to keep the GUI responsive; completion returns
     // to Storage's owner thread before accessing its state.
 
-    GetPlatform().RunTask(Platform::Thread::File, [path, hash, lifetime = std::weak_ptr(it->second.m_lifetime),
+    GetPlatform().RunTask(Platform::Thread::File, [path, hash, expectedSize,
+                                                   lifetime = std::weak_ptr(it->second.m_lifetime),
                                                    fn = std::move(finishFn)]() mutable
     {
       if (lifetime.expired())
@@ -818,7 +843,9 @@ void Storage::OnDownloadFinished(QueuedCountry const & queuedCountry, DownloadSt
       std::string readError;
       try
       {
-        if (coding::Blake3::CalculateMwmBase64(path) == hash)
+        uint64_t actualSize = 0;
+        if ((expectedSize == 0 || (base::GetFileSize(path, actualSize) && actualSize == expectedSize)) &&
+            coding::Blake3::CalculateMwmBase64(path) == hash)
           status = DownloadStatus::Completed;
       }
       catch (Reader::Exception const & ex)
@@ -904,8 +931,7 @@ void Storage::RegisterDownloadedFiles(CountryId const & countryId, MapFileType t
   std::string const path = GetFileDownloadPath(countryId, type);
   if (!base::RenameFileX(path, localFile->GetPath(type)))
   {
-    /// @todo If localFile already exists (valid), remove it from disk and return false?
-    localFile->DeleteFromDisk(type);
+    // A failed replacement must preserve the previously installed map.
     fn(false);
     return;
   }
@@ -1418,7 +1444,8 @@ void Storage::DownloadNode(CountryId const & countryId, bool isUpdate /* = false
     if (descendantNode.IsLeaf() && GetNodeStatus(descendantNode).status != NodeStatus::OnDisk)
     {
       auto const countryId = descendantNode.Value().Name();
-      auto const fileType = isUpdate && m_diffsDataSource->HasDiffFor(countryId) ? MapFileType::Diff : MapFileType::Map;
+      bool const hasDiff = !FindSaudiMapDownloadSource(countryId) && m_diffsDataSource->HasDiffFor(countryId);
+      auto const fileType = isUpdate && hasDiff ? MapFileType::Diff : MapFileType::Map;
 
       DownloadCountry(countryId, fileType);
     }
@@ -1656,6 +1683,8 @@ void Storage::OnFinishDownloading()
 void Storage::OnDiffStatusReceived(diffs::NameDiffInfoMap && diffs)
 {
   m_diffsDataSource->SetDiffInfo(std::move(diffs));
+  for (auto const & source : kSaudiMapDownloadSources)
+    m_diffsDataSource->RemoveDiffForCountry(std::string(source.m_countryId));
 
   SetMapSchemeForCountriesWithAbsentDiffs([this](auto const & id) { return !m_diffsDataSource->HasDiffFor(id); });
 
@@ -1666,7 +1695,7 @@ void Storage::OnDiffStatusReceived(diffs::NameDiffInfoMap && diffs)
   {
     auto const countryId = FindCountryIdByFile(localDiff.GetCountryName());
 
-    if (m_diffsDataSource->HasDiffFor(countryId))
+    if (!FindSaudiMapDownloadSource(countryId) && m_diffsDataSource->HasDiffFor(countryId))
       UpdateNode(countryId);
     else
       localDiff.DeleteFromDisk(MapFileType::Diff);
@@ -1955,7 +1984,7 @@ bool Storage::GetUpdateInfo(CountryId const & countryId, UpdateInfo & updateInfo
     LocalAndRemoteSize const sizes = CountrySizeInBytes(countryId);
     updateInfo.m_maxFileSizeInBytes = std::max(updateInfo.m_maxFileSizeInBytes, sizes.second);
 
-    if (m_diffsDataSource->HasDiffFor(countryId))
+    if (!FindSaudiMapDownloadSource(countryId) && m_diffsDataSource->HasDiffFor(countryId))
     {
       uint64_t size;
       m_diffsDataSource->SizeToDownloadFor(countryId, size);

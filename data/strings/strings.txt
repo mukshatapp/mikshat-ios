@@ -14108,7 +14108,7 @@ zh-Hans = 隐藏
 zh-Hant = 隱藏
 
 [categories]
-tags = android-app,android-libs-car,apple-maps,qt
+tags = android-app,android-libs-car,qt
 en = Categories
 af = Kategorieë
 ar = التصنيفات
@@ -46835,3 +46835,381 @@ comment = Navigation can use the known map-arrow position while GPS is stale; do
 tags = apple-maps
 en = Last known map position — waiting for a location update
 ar = آخر موقع معروف على الخريطة — بانتظار تحديث الموقع
+
+[mikshat_weather_available_hours]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = %d of the next 12 hours available
+ar = المتاح %d من أصل 12 ساعة مستقبلية
+
+[mikshat_weather_condition_clear]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Clear
+ar = صافٍ
+
+[mikshat_weather_condition_drizzle_dense]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Dense drizzle
+ar = رذاذ كثيف
+
+[mikshat_weather_condition_drizzle_light]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Light drizzle
+ar = رذاذ خفيف
+
+[mikshat_weather_condition_drizzle_moderate]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Moderate drizzle
+ar = رذاذ متوسط
+
+[mikshat_weather_condition_fog]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Fog
+ar = ضباب
+
+[mikshat_weather_condition_freezing_drizzle_dense]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Dense freezing drizzle
+ar = رذاذ متجمّد كثيف
+
+[mikshat_weather_condition_freezing_drizzle_light]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Light freezing drizzle
+ar = رذاذ متجمّد خفيف
+
+[mikshat_weather_condition_freezing_rain_heavy]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Heavy freezing rain
+ar = أمطار متجمّدة غزيرة
+
+[mikshat_weather_condition_freezing_rain_light]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Light freezing rain
+ar = أمطار متجمّدة خفيفة
+
+[mikshat_weather_condition_mainly_clear]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Mainly clear
+ar = صافٍ غالبًا
+
+[mikshat_weather_condition_overcast]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Overcast
+ar = غائم
+
+[mikshat_weather_condition_partly_cloudy]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Partly cloudy
+ar = غائم جزئيًا
+
+[mikshat_weather_condition_rain_heavy]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Heavy rain
+ar = أمطار غزيرة
+
+[mikshat_weather_condition_rain_light]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Slight rain
+ar = أمطار خفيفة
+
+[mikshat_weather_condition_rain_moderate]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Moderate rain
+ar = أمطار متوسطة
+
+[mikshat_weather_condition_rain_showers_light]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Slight rain showers
+ar = زخات مطر خفيفة
+
+[mikshat_weather_condition_rain_showers_moderate]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Moderate rain showers
+ar = زخات مطر متوسطة
+
+[mikshat_weather_condition_rain_showers_violent]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Violent rain showers
+ar = زخات مطر شديدة
+
+[mikshat_weather_condition_rime_fog]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Depositing rime fog
+ar = ضباب مع صقيع
+
+[mikshat_weather_condition_snow_grains]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Snow grains
+ar = حبيبات ثلج
+
+[mikshat_weather_condition_snow_heavy]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Heavy snowfall
+ar = ثلوج كثيفة
+
+[mikshat_weather_condition_snow_light]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Slight snowfall
+ar = ثلوج خفيفة
+
+[mikshat_weather_condition_snow_moderate]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Moderate snowfall
+ar = ثلوج متوسطة
+
+[mikshat_weather_condition_snow_showers_heavy]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Heavy snow showers
+ar = زخات ثلج كثيفة
+
+[mikshat_weather_condition_snow_showers_light]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Slight snow showers
+ar = زخات ثلج خفيفة
+
+[mikshat_weather_condition_thunderstorm]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Thunderstorm
+ar = عاصفة رعدية
+
+[mikshat_weather_condition_thunderstorm_hail_heavy]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Thunderstorm with heavy hail
+ar = عاصفة رعدية مع بَرَد شديد
+
+[mikshat_weather_condition_thunderstorm_hail_slight]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Thunderstorm with slight hail
+ar = عاصفة رعدية مع بَرَد خفيف
+
+[mikshat_weather_condition_unknown]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Weather unavailable
+ar = حالة الجو غير متوفرة
+
+[mikshat_weather_coordinates]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Coordinates: %@
+ar = الإحداثيات: %@
+
+[mikshat_weather_current]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Current conditions
+ar = الحالة الحالية
+
+[mikshat_weather_gusts]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Gusts
+ar = الهبات
+
+[mikshat_weather_hour_gusts]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Gusts: %@
+ar = الهبات: %@
+
+[mikshat_weather_hour_wind]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Wind: %@
+ar = الرياح: %@
+
+[mikshat_weather_invalid_location]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = The selected coordinates are invalid.
+ar = إحداثيات الموقع غير صالحة.
+
+[mikshat_weather_last_updated]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Last updated: %@
+ar = آخر تحديث: %@
+
+[mikshat_weather_loading]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Loading forecast…
+ar = جارٍ تحميل التوقعات…
+
+[mikshat_weather_model_notice]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Values are model estimates and may differ from direct weather station observations.
+ar = القيم تقديرات نموذجية وليست بالضرورة قراءات مباشرة من محطة رصد.
+
+[mikshat_weather_next_12_hours]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Next 12 hours
+ar = الساعات الـ12 القادمة
+
+[mikshat_weather_no_saved_forecast]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = No saved forecast for this location
+ar = لا توجد توقعات محفوظة لهذا الموقع
+
+[mikshat_weather_no_saved_retry]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = No saved forecast for this location. Unable to connect; try again.
+ar = لا توجد توقعات محفوظة لهذا الموقع. تعذر الاتصال؛ أعد المحاولة.
+
+[mikshat_weather_offline_saved]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Offline — showing saved data.
+ar = دون اتصال — تُعرض بيانات محفوظة.
+
+[mikshat_weather_refresh]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Refresh forecast
+ar = تحديث التوقعات
+
+[mikshat_weather_refresh_failed_saved]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Unable to update; showing saved data with its last update time.
+ar = تعذر تحديث التوقعات؛ تُعرض بيانات محفوظة مع وقت آخر تحديث.
+
+[mikshat_weather_saved_data]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Saved data
+ar = بيانات محفوظة
+
+[mikshat_weather_selected_location]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Selected map location
+ar = الموقع المحدد على الخريطة
+
+[mikshat_weather_temperature_accessibility]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Temperature: %@ degrees Celsius
+ar = الحرارة: %@ درجة مئوية
+
+[mikshat_weather_title]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Weather
+ar = أحوال الطقس
+
+[mikshat_weather_unavailable]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Unavailable
+ar = غير متوفرة
+
+[mikshat_weather_updating]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Updating forecast…
+ar = جارٍ تحديث التوقعات…
+
+[mikshat_weather_wind_calm]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Calm wind
+ar = رياح ساكنة
+
+[mikshat_weather_wind_e]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = east
+ar = الشرق
+
+[mikshat_weather_wind_from]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = From %@
+ar = قادمة من %@
+
+[mikshat_weather_wind_n]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = north
+ar = الشمال
+
+[mikshat_weather_wind_ne]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = northeast
+ar = الشمال الشرقي
+
+[mikshat_weather_wind_nw]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = northwest
+ar = الشمال الغربي
+
+[mikshat_weather_wind_s]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = south
+ar = الجنوب
+
+[mikshat_weather_wind_se]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = southeast
+ar = الجنوب الشرقي
+
+[mikshat_weather_wind_speed]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Wind speed
+ar = سرعة الرياح
+
+[mikshat_weather_wind_sw]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = southwest
+ar = الجنوب الغربي
+
+[mikshat_weather_wind_unavailable]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Wind direction unavailable
+ar = اتجاه الرياح غير متوفر
+
+[mikshat_weather_wind_w]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = west
+ar = الغرب

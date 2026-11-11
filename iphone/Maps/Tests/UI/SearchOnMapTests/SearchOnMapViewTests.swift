@@ -180,12 +180,15 @@ final class SearchOnMapManagerTests: XCTestCase {
     }
     searchController.view.layoutIfNeeded()
     let tabs = try XCTUnwrap(searchController.children.compactMap { $0 as? SearchTabViewController }.first)
-    let contentCollection = try XCTUnwrap(tabs.view.subviews.compactMap { $0 as? UICollectionView }.first)
+    let history = try XCTUnwrap(tabs.children.compactMap { $0 as? SearchHistoryViewController }.first)
+    let historyTable = try XCTUnwrap(history.view.subviews.compactMap { $0 as? UITableView }.first)
     XCTAssertEqual(searchController.view.safeAreaInsets.left, expectedLeadingInset, accuracy: 1)
     XCTAssertEqual(searchController.availableAreaView.frame.minX,
                    searchController.view.safeAreaInsets.left, accuracy: 1)
     XCTAssertEqual(tabs.view.safeAreaInsets.left, 0, accuracy: 1)
-    XCTAssertEqual(contentCollection.adjustedContentInset.left, 0, accuracy: 1)
+    XCTAssertEqual(historyTable.adjustedContentInset.left, 0, accuracy: 1)
+    XCTAssertEqual(history.view.frame, tabs.view.bounds)
+    XCTAssertEqual(historyTable.frame, history.view.bounds)
   }
 
   func test_GivenSearchModes_WhenStartedRepeatedly_ThenReusesOnlyMatchingMode() throws {
@@ -570,19 +573,68 @@ final class SearchTabLayoutRegressionTests: XCTestCase {
   }
 
   func test_SelectedPageSurvivesResizingWithoutRepeatedLayoutScrolling() throws {
-    let controller = TabViewController()
-    controller.loadViewIfNeeded()
-    controller.viewControllers = [UIViewController(), UIViewController()]
-    let tabs = controller.tabView
-    tabs.selectedIndex = 1
-    let content = try XCTUnwrap(tabs.subviews.compactMap { $0 as? UICollectionView }.first)
-    for size in [CGSize(width: 320, height: 480), CGSize(width: 480, height: 320)] {
-      tabs.frame = CGRect(origin: .zero, size: size)
+    let directions: [UISemanticContentAttribute] = [.forceLeftToRight, .forceRightToLeft]
+    for direction in directions {
+      let controller = TabViewController()
+      controller.loadViewIfNeeded()
+      controller.viewControllers = [UIViewController(), UIViewController()]
+      let tabs = controller.tabView
+      tabs.selectedIndex = 1
+      let content = try XCTUnwrap(tabs.subviews.compactMap { $0 as? UICollectionView }.first)
+      let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first {
+        $0.activationState == .foregroundActive
+      }
+      let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: .zero)
+      window.frame = CGRect(x: 0, y: 0, width: 320, height: 480)
+      window.rootViewController = controller
+      func applyDirection(to view: UIView) {
+        view.semanticContentAttribute = direction
+        view.subviews.forEach { applyDirection(to: $0) }
+      }
+      applyDirection(to: window)
+      applyDirection(to: tabs)
+      controller.viewControllers.forEach { applyDirection(to: $0.view) }
+      for collection in collections(in: tabs) {
+        collection.semanticContentAttribute = direction
+        collection.collectionViewLayout.invalidateLayout()
+      }
+      window.isHidden = false
+      defer { window.isHidden = true }
+
+      for size in [CGSize(width: 320, height: 480), CGSize(width: 480, height: 320)] {
+        window.frame.size = size
+        tabs.frame = CGRect(origin: .zero, size: size)
+        tabs.setNeedsLayout()
+        tabs.layoutIfNeeded()
+        let offset = content.contentOffset
+        tabs.setNeedsLayout()
+        tabs.layoutIfNeeded()
+        XCTAssertEqual(content.contentOffset, offset, "A same-size layout must preserve the visible page")
+        let expectedDirection: UIUserInterfaceLayoutDirection = direction == .forceRightToLeft ? .rightToLeft : .leftToRight
+        XCTAssertEqual(content.effectiveUserInterfaceLayoutDirection, expectedDirection)
+        XCTAssertEqual(tabs.selectedIndex, 1)
+        let path = IndexPath(item: 1, section: 0)
+        let attributes = try XCTUnwrap(content.layoutAttributesForItem(at: path))
+        XCTAssertEqual(attributes.frame.minX, content.bounds.minX, accuracy: 1)
+        XCTAssertEqual(attributes.frame.width, content.bounds.width, accuracy: 1)
+        let center = CGPoint(x: content.bounds.midX, y: content.bounds.midY)
+        XCTAssertEqual(content.indexPathForItem(at: center), path)
+        let cell = try XCTUnwrap(content.cellForItem(at: path))
+        XCTAssertTrue(controller.viewControllers[1].view.isDescendant(of: cell.contentView))
+      }
+
+      // Ordinary layout passes must also leave an unfinished swipe in place.
+      let first = try XCTUnwrap(content.layoutAttributesForItem(at: IndexPath(item: 0, section: 0)))
+      let second = try XCTUnwrap(content.layoutAttributesForItem(at: IndexPath(item: 1, section: 0)))
+      let middle = CGPoint(x: (first.frame.midX + second.frame.midX) / 2 - content.bounds.width / 2,
+                           y: content.contentOffset.y)
+      content.setContentOffset(middle, animated: false)
       tabs.setNeedsLayout()
       tabs.layoutIfNeeded()
+      tabs.setNeedsLayout()
       tabs.layoutIfNeeded()
+      XCTAssertEqual(content.contentOffset.x, middle.x, accuracy: 1)
       XCTAssertEqual(tabs.selectedIndex, 1)
-      XCTAssertEqual(content.contentOffset.x / content.bounds.width, 1, accuracy: 0.01)
     }
   }
 }
