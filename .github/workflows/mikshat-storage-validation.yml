@@ -1,0 +1,168 @@
+name: Mikshat storage validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - diagnostics/mikshat-storage-validation
+
+permissions:
+  contents: read
+
+jobs:
+  storage-tests:
+    name: Ubuntu 24.04 Clang 19 Debug storage_tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    env:
+      PRESET: ci
+
+    steps:
+      - name: Checkout diagnostic sources
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 128
+
+      - name: Checkout pinned submodules
+        run: |
+          mkdir -p "$RUNNER_TEMP/storage-validation"
+          if ! git submodule update --depth 1 --init --recursive --jobs=20 \
+            > "$RUNNER_TEMP/storage-validation/submodules.log" 2>&1; then
+            tail -c 131072 "$RUNNER_TEMP/storage-validation/submodules.log"
+            exit 1
+          fi
+          echo "Checked out repository-pinned submodule commits."
+
+      - name: Install existing Linux CMake dependencies
+        run: |
+          log="$RUNNER_TEMP/storage-validation/dependencies.log"
+          if ! bash -e -o pipefail > "$log" 2>&1 <<'BASH'
+            sudo apt update -y
+            sudo apt install -y \
+              clang-19 \
+              libgl1-mesa-dev \
+              libgl1-mesa-dri \
+              libglx-mesa0 \
+              libglvnd-dev \
+              libharfbuzz-dev \
+              libqt6svg6-dev \
+              libxcursor-dev \
+              libxi-dev \
+              libxinerama-dev \
+              libxrandr-dev \
+              ninja-build \
+              qt6-base-dev \
+              qt6-l10n-tools \
+              qt6-positioning-dev \
+              qt6-tools-dev \
+              qt6-translations-l10n \
+              xauth \
+              xvfb
+          BASH
+          then
+            tail -c 131072 "$log"
+            exit 1
+          fi
+          echo "Installed the dependency list from build-cmake.yaml's Linux job."
+
+      - name: Restore existing Clang 19 ccache
+        uses: hendrikmuhs/ccache-action@v1.2.24
+        with:
+          key: CMake-ubuntu-24.04-clang-19-OFF-Debug
+          max-size: 2G
+          save: false
+
+      - name: Configure existing CI preset
+        env:
+          CC: clang-19
+          CXX: clang++-19
+          CMAKE_C_COMPILER_LAUNCHER: ccache
+          CMAKE_CXX_COMPILER_LAUNCHER: ccache
+        run: |
+          log="$RUNNER_TEMP/storage-validation/configure.log"
+          if ! cmake --preset "$PRESET" -DCMAKE_BUILD_TYPE=Debug -DCMAKE_UNITY_BUILD=OFF \
+            > "$log" 2>&1; then
+            tail -c 131072 "$log"
+            exit 1
+          fi
+          echo "Configured preset ci: build/, Debug, Clang 19, unity OFF."
+
+      - name: Build only storage_tests and required libraries
+        run: |
+          log="$RUNNER_TEMP/storage-validation/build.log"
+          if ! cmake --build --preset "$PRESET" --target storage_tests --parallel 4 \
+            > "$log" 2>&1; then
+            tail -c 131072 "$log"
+            exit 1
+          fi
+          test -x build/storage_tests
+          echo "Built build/storage_tests; no application or other test targets requested."
+
+      - name: Prepare storage test fixtures
+        run: |
+          log="$RUNNER_TEMP/storage-validation/fixtures.log"
+          if ! bash -e -o pipefail > "$log" 2>&1 <<'BASH'
+            sudo locale-gen en_US
+            sudo locale-gen en_US.UTF-8
+            sudo locale-gen es_ES
+            sudo locale-gen es_ES.UTF-8
+            sudo locale-gen fr_FR
+            sudo locale-gen fr_FR.UTF-8
+            sudo locale-gen ru_RU
+            sudo locale-gen ru_RU.UTF-8
+            sudo update-locale
+            ctest --test-dir build --show-only=json-v1 -R '^storage_tests$' \
+              > "$RUNNER_TEMP/storage-validation/test-plan.json"
+            python3 - "$RUNNER_TEMP/storage-validation/test-plan.json" <<'PY'
+          import json
+          import subprocess
+          import sys
+
+          with open(sys.argv[1]) as stream:
+              plan = json.load(stream)
+          tests = {test["name"]: test for test in plan["tests"]}
+          expected = {"storage_tests", "OmimStartTestServer", "OmimStopTestServer"}
+          if set(tests) != expected:
+              raise SystemExit(f"Unexpected CTest selection: {sorted(tests)}")
+          # Use the interpreter actually selected by CMake for the TestServer fixture.
+          python = tests["OmimStartTestServer"]["command"][0]
+          subprocess.run([python, "-m", "pip", "install", "--disable-pip-version-check",
+                          "--quiet", "--break-system-packages", "tornado"], check=True)
+          subprocess.run([python, "-c", "import tornado; print('Tornado fixture dependency ready')"], check=True)
+          print("Selected only storage_tests and its automatic TestServer setup/cleanup.")
+          PY
+          BASH
+          then
+            tail -c 131072 "$log"
+            exit 1
+          fi
+          echo "Storage test fixtures and existing CI locales are ready."
+
+      - name: Run storage_tests with automatic CTest fixtures
+        run: |
+          log="$RUNNER_TEMP/storage-validation/ctest.log"
+          set +e
+          ctest --test-dir build --verbose --output-on-failure --no-tests=error --timeout 600 \
+            -R '^storage_tests$' > "$log" 2>&1
+          status=$?
+          set -e
+          if (( $(wc -c < "$log") > 1048576 )); then
+            echo "Console shows the final 1 MiB; the artifact contains the complete CTest log."
+          fi
+          tail -c 1048576 "$log"
+          exit "$status"
+
+      - name: Upload complete storage validation logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mikshat-storage-validation-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/storage-validation/
+            build/Testing/Temporary/LastTest.log
+            build/Testing/Temporary/LastTestsFailed.log
+          if-no-files-found: warn
+          retention-days: 7
