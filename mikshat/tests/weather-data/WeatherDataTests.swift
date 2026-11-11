@@ -194,7 +194,7 @@ private enum WeatherDataTests {
     let client = FixtureClient(snapshot)
     await client.set(.wrongCoordinate)
     let repository = MikshatWeatherRepository(cacheDirectory: directory, client: client, now: { now })
-    func rejected() async -> Bool {
+    @Sendable func rejected() async -> Bool {
       do { _ = try await repository.refresh(for: coordinate); return false }
       catch MikshatWeatherError.invalidResponse { return true }
       catch { return false }
