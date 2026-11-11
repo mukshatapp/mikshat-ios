@@ -47,7 +47,15 @@ jobs:
           bash mikshat/tests/tab-layout-probe/run_probe.sh "$GITHUB_WORKSPACE" tab-results/metrics "$(cat /tmp/mikshat-tab-udid)" metrics metrics failed trace
       - name: Test experimental child-bounds notification candidate
         run: |
-          bash mikshat/tests/tab-layout-probe/run_probe.sh "$GITHUB_WORKSPACE" tab-results/bounds-notify "$(cat /tmp/mikshat-tab-udid)" bounds-notify bounds-notify passed trace
+          bash mikshat/tests/tab-layout-probe/run_probe.sh "$GITHUB_WORKSPACE" tab-results/bounds-notify "$(cat /tmp/mikshat-tab-udid)" bounds-notify bounds-notify failed trace
+      - name: Test explicit child setNeedsLayout candidate
+        if: ${{ !cancelled() }}
+        run: |
+          bash mikshat/tests/tab-layout-probe/run_probe.sh "$GITHUB_WORKSPACE" tab-results/needs-layout "$(cat /tmp/mikshat-tab-udid)" needs-layout needs-layout passed trace
+      - name: Test UIKit bounds-change invalidation-context candidate
+        if: ${{ !cancelled() }}
+        run: |
+          bash mikshat/tests/tab-layout-probe/run_probe.sh "$GITHUB_WORKSPACE" tab-results/bounds-layout "$(cat /tmp/mikshat-tab-udid)" bounds-layout bounds-layout passed trace
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -49,6 +49,7 @@ except subprocess.TimeoutExpired as error:
     (output / 'probe-outcome.json').write_text(json.dumps({'result': 'timeout', 'expected': expected}) + '\n')
     raise SystemExit('Tab layout probe timed out')
 (output / 'launch.log').write_bytes(log)
+print(log.decode(errors='replace'))
 container = subprocess.check_output(['xcrun', 'simctl', 'get_app_container', udid, bundle, 'data'], text=True).strip()
 report = Path(container) / 'Documents/probe-result.json'
 payload = json.loads(report.read_text()) if report.exists() else {'result': 'terminated_without_report', 'returnCode': result.returncode}
@@ -56,6 +57,5 @@ payload.update(expected=expected, optimization='-O -whole-module-optimization')
 (output / 'probe-outcome.json').write_text(json.dumps(payload, indent=2) + '\n')
 print(json.dumps(payload))
 if payload['result'] != expected:
-    print(log[-15000:].decode(errors='replace'))
     raise SystemExit(f"Expected {expected}, got {payload['result']}")
 PY

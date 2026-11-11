@@ -55,6 +55,16 @@ is a pass with the same immediate assertions, without asynchronous realignment.
 This transformation applies only to the compiled probe copy until native results
 support a production change.
 
+The trace run disproved the old-child-bounds hypothesis: after `super` the parent
+already observes the new viewport size, yet delegate sizes stay cached. Two new
+experimental variants test separate mechanisms: `needs-layout` explicitly marks
+the collection view dirty before guarded `layoutIfNeeded`; `bounds-layout` uses
+a private flow-layout subclass to invalidate delegate metrics/attributes through
+UIKit's own bounds-change invalidation hooks. Its stored property retains the
+base `UICollectionViewFlowLayout` type. Trace records stored/active layout object
+identities, active class and estimated item sizes. Full native trace logs are also
+printed in GitHub job logs so they require no artifact download.
+
 Only fonts, colors, separator construction, label font scaling and the app's
 base view-controller dependency are stubbed. UIKit collections, Auto Layout,
 production tab layout and controller code, and optimized Swift execution are

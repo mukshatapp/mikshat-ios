@@ -63,6 +63,23 @@ class PreparationTests(unittest.TestCase):
             self.assertIn('invalidation.invalidateFlowLayoutDelegateMetrics = true', source)
             self.assertEqual(report['transform']['boundsNotification']['initializersReplaced'], 2)
 
+    def test_needs_layout_marks_view_dirty_before_guarded_prepare(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            probe.prepare(ROOT, output, 'needs-layout', 'needs-layout')
+            source = (output / 'TabView.compiled.swift').read_text()
+            self.assertIn('tabsContentCollectionView.setNeedsLayout()\n        tabsContentCollectionView.layoutIfNeeded()', source)
+
+    def test_bounds_layout_uses_framework_invalidation_hooks_with_base_property_type(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            probe.prepare(ROOT, output, 'bounds-layout', 'bounds-layout', trace_layout=True)
+            source = (output / 'TabView.compiled.swift').read_text()
+            self.assertIn('tabsContentLayout: UICollectionViewFlowLayout = TabContentFlowLayout()', source)
+            self.assertIn('override func shouldInvalidateLayout(forBoundsChange', source)
+            self.assertIn('override func invalidationContext(forBoundsChange', source)
+            self.assertIn('ObjectIdentifier(tabsContentCollectionView.collectionViewLayout)', source)
+
 
 if __name__ == '__main__':
     unittest.main()
