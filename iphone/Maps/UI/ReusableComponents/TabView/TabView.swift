@@ -212,7 +212,6 @@ class TabView: UIView {
     tabsCollectionView.backgroundColor = .clear
 
     slidingView.backgroundColor = tintColor
-    slidingView.accessibilityIdentifier = "tab-selection-indicator"
 
     headerView.backgroundColor = barTintColor
     headerView.addSubview(tabsCollectionView)
@@ -261,7 +260,7 @@ class TabView: UIView {
     slidingViewHeight.isActive = true
     slidingView.bottomAnchor.constraint(equalTo: headerView.bottomAnchor).isActive = true
 
-    slidingViewLeft = slidingView.leftAnchor.constraint(equalTo: headerView.leftAnchor)
+    slidingViewLeft = slidingView.leftAnchor.constraint(equalTo: safeAreaLayoutGuide.leftAnchor)
     slidingViewLeft.isActive = true
     slidingViewWidth = slidingView.widthAnchor.constraint(equalToConstant: 0)
     slidingViewWidth.isActive = true
@@ -297,20 +296,11 @@ class TabView: UIView {
   }
 
   private func currentSelectedPosition() -> CGFloat {
-    let count = pageCount
-    guard count > 1, tabsContentCollectionView.bounds.width > 0,
-          hasContentItem(at: 0), hasContentItem(at: count - 1),
-          let first = tabsContentCollectionView.layoutAttributesForItem(at: IndexPath(item: 0, section: 0)),
-          let last = tabsContentCollectionView.layoutAttributesForItem(at: IndexPath(item: count - 1, section: 0)) else {
+    guard tabsContentCollectionView.bounds.width > 0 else {
       return CGFloat(selectedIndex ?? 0)
     }
-    // UIKit can mirror item order in RTL. Interpolate logical indices between
-    // actual item centers instead of treating the leftmost physical page as item 0.
-    let span = last.frame.midX - first.frame.midX
-    guard span.isFinite, span != 0 else { return CGFloat(selectedIndex ?? 0) }
-    let position = (tabsContentCollectionView.bounds.midX - first.frame.midX) / span * CGFloat(count - 1)
-    guard position.isFinite else { return CGFloat(selectedIndex ?? 0) }
-    return min(max(0, position), CGFloat(count - 1))
+
+    return tabsContentCollectionView.contentOffset.x / tabsContentCollectionView.bounds.width
   }
 
   private func updateHeaderSelectionProgress() {
@@ -323,48 +313,6 @@ class TabView: UIView {
       headerCell.updateSelectionProgress(headerSelectionProgress(for: indexPath.item,
                                                                  selectedPosition: selectedPosition))
     }
-    updateSlidingIndicator(at: selectedPosition)
-  }
-
-  private func updateSlidingIndicator(at position: CGFloat) {
-    guard pageCount > 0, contentFrame.width > 0,
-          tabsContentCollectionView.bounds.width > 0, tabsContentCollectionView.bounds.height > 0,
-          tabsCollectionView.bounds.width > 0 else {
-      setSlidingIndicatorGeometry(left: 0, width: 0)
-      return
-    }
-    guard position.isFinite,
-          tabsCollectionView.numberOfSections > 0,
-          tabsCollectionView.numberOfItems(inSection: 0) == pageCount else { return }
-    let clampedPosition = min(max(0, position), CGFloat(pageCount - 1))
-    let lower = Int(clampedPosition.rounded(.down))
-    let upper = min(lower + 1, pageCount - 1)
-    guard let first = headerItemFrame(at: lower), let last = headerItemFrame(at: upper) else { return }
-    let progress = clampedPosition - CGFloat(lower)
-    let left = first.minX + (last.minX - first.minX) * progress
-    let width = first.width + (last.width - first.width) * progress
-    guard left.isFinite, width.isFinite else { return }
-    setSlidingIndicatorGeometry(left: left, width: width)
-  }
-
-  private func headerItemFrame(at index: Int) -> CGRect? {
-    let path = IndexPath(item: index, section: 0)
-    if let cell = tabsCollectionView.cellForItem(at: path) {
-      // Convert the displayed cell through UIKit's hierarchy, including any RTL mirroring.
-      return cell.convert(cell.bounds, to: headerView)
-    }
-    guard let attributes = tabsCollectionView.layoutAttributesForItem(at: path) else { return nil }
-    return tabsCollectionView.convert(attributes.frame, to: headerView)
-  }
-
-  private func setSlidingIndicatorGeometry(left: CGFloat, width: CGFloat) {
-    guard slidingViewWidth.constant != width || slidingViewLeft.constant != left else { return }
-    slidingViewWidth.constant = width
-    slidingViewLeft.constant = left
-    // Both horizontal constraints belong to this header. Apply them in the same
-    // pass as the item frames, rather than retaining the pre-resize indicator frame.
-    headerView.setNeedsLayout()
-    headerView.layoutIfNeeded()
   }
 
   func reloadData() {
@@ -384,11 +332,15 @@ class TabView: UIView {
 
   override func layoutSubviews() {
     super.layoutSubviews()
+    let width = pageCount > 0 ? max(0, contentFrame.width) / CGFloat(pageCount) : 0
+    let left = width * CGFloat(selectedIndex ?? 0)
+    if slidingViewWidth.constant != width { slidingViewWidth.constant = width }
+    if slidingViewLeft.constant != left { slidingViewLeft.constant = left }
+
     let headerSize = tabsCollectionView.bounds.size
     if headerSize != lastHeaderSize {
       lastHeaderSize = headerSize
       tabsLayout.invalidateLayout()
-      tabsCollectionView.layoutIfNeeded()
     }
     let contentSize = tabsContentCollectionView.bounds.size
     if contentSize != lastContentSize {
@@ -403,7 +355,7 @@ class TabView: UIView {
          let selectedIndex, hasContentItem(at: selectedIndex) {
         tabsContentCollectionView.layoutIfNeeded()
         tabsContentCollectionView.scrollToItem(at: IndexPath(item: selectedIndex, section: 0),
-                                               at: .centeredHorizontally,
+                                               at: .left,
                                                animated: false)
       }
     }
@@ -450,6 +402,10 @@ extension TabView: UICollectionViewDelegateFlowLayout {
       return
     }
 
+    if scrollView.contentSize.width > 0 {
+      let scrollOffset = scrollView.contentOffset.x / scrollView.contentSize.width
+      slidingViewLeft.constant = scrollOffset * contentFrame.width
+    }
     updateHeaderSelectionProgress()
   }
 
@@ -466,8 +422,8 @@ extension TabView: UICollectionViewDelegateFlowLayout {
       return
     }
 
-    guard scrollView.bounds.width > 0, pageCount > 0 else { return }
-    let position = currentSelectedPosition().rounded()
+    guard scrollView.bounds.width > 0 else { return }
+    let position = (scrollView.contentOffset.x / scrollView.bounds.width).rounded()
     guard position.isFinite, position >= 0, position < CGFloat(pageCount) else { return }
     selectedIndex = Int(position)
     if let selectedIndex = selectedIndex, selectedIndex != lastSelectedIndex {
@@ -481,7 +437,7 @@ extension TabView: UICollectionViewDelegateFlowLayout {
       let isSelected = selectedIndex == indexPath.item
       if !isSelected {
         selectedIndex = indexPath.item
-        tabsContentCollectionView.scrollToItem(at: indexPath, at: .centeredHorizontally, animated: true)
+        tabsContentCollectionView.scrollToItem(at: indexPath, at: .left, animated: true)
         delegate?.tabView(self, didSelectTabAt: selectedIndex!)
       }
     }
