@@ -863,6 +863,26 @@ private func requireRenderedArabicMapIfRequested(_ map: MapViewController) throw
                   userInfo: [NSLocalizedDescriptionKey: "Arabic launch arguments were not applied: \(language)"])
   }
   XCTAssertEqual(UIView.userInterfaceLayoutDirection(for: .unspecified), .rightToLeft)
+  // Hosted tests can start while UIKit is still activating the application.
+  // Wait for its real foreground window before requesting normal map layout.
+  let foregroundReady = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+    guard UIApplication.shared.applicationState == .active,
+          let window = map.viewIfLoaded?.window else { return false }
+    return window.isKeyWindow && !window.isHidden && window.alpha > 0 && !window.bounds.isEmpty
+  }, object: nil)
+  let foregroundOutcome = XCTWaiter.wait(for: [foregroundReady], timeout: 20)
+  guard foregroundOutcome == .completed else {
+    let window = map.viewIfLoaded?.window
+    try? appendRendererCoverage(event: "setup-failed", map: map,
+                                extra: ["stage": "application-activation",
+                                        "applicationState": UIApplication.shared.applicationState.rawValue,
+                                        "windowAttached": window != nil,
+                                        "windowKey": window?.isKeyWindow ?? false,
+                                        "windowHidden": window?.isHidden ?? true,
+                                        "waitOutcome": String(describing: foregroundOutcome)])
+    throw NSError(domain: "MikshatSearchRendererSetup", code: 7,
+                  userInfo: [NSLocalizedDescriptionKey: "Application did not become active with a visible key window within 20 seconds; search-rendering coverage was not executed."])
+  }
   XCTAssertEqual(map.view.effectiveUserInterfaceLayoutDirection, .rightToLeft)
   let window = try XCTUnwrap(map.view.window)
   XCTAssertFalse(window.isHidden)

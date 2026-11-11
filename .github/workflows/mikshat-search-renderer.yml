@@ -265,7 +265,7 @@ jobs:
         set -euo pipefail
         python3 - <<'PYCODE'
         from pathlib import Path
-        import json,os,plistlib,subprocess
+        import json,math,os,plistlib,subprocess
         products=Path('build/SearchDerivedData/Build/Products').resolve()
         plans=[p for p in products.glob('*.xctestrun') if p.name!='MikshatRendererArabic.xctestrun']
         if not plans:
@@ -311,8 +311,36 @@ jobs:
             raise SystemExit(f'Expected one Debug app, found {len(apps)}')
         app=apps[0]
         udid=os.environ['MIKSHAT_SIMULATOR_UDID']
+        bundle='com.mikshat.maps.debug'
+        previous=subprocess.run(['xcrun','simctl','get_app_container',udid,bundle,'data'],capture_output=True,text=True)
+        old_container=previous.stdout.strip() if previous.returncode==0 else None
+        # Native regression fixtures persist screen geometry/settings. Give
+        # normal rendering a fresh sandbox while reusing the same built app.
+        print(json.dumps(dict(event='renderer-isolation-start',bundleIdentifier=bundle,oldContainer=old_container)))
+        subprocess.run(['xcrun','simctl','uninstall',udid,bundle],check=True)
         subprocess.run(['xcrun','simctl','install',udid,str(app)],check=True)
-        container=subprocess.run(['xcrun','simctl','get_app_container',udid,'com.mikshat.maps.debug','data'],check=True,capture_output=True,text=True).stdout.strip()
+        container=subprocess.run(['xcrun','simctl','get_app_container',udid,bundle,'data'],check=True,capture_output=True,text=True).stdout.strip()
+        isolation=dict(bundleIdentifier=bundle,oldContainer=old_container,newContainer=container,
+                       reason='Uninstall/reinstall only the diagnostic Debug app to discard native-test persisted screen geometry and settings before normal rendering; compiled app and test products are reused unchanged.')
+        # AnyRectD serializes global centre x/y, angle, then local min/max x/y.
+        # Keep this search profile near synthetic GPS instead of World overview.
+        latitude,longitude=24.7136,46.6753
+        mercator_y=math.degrees(math.log(math.tan(math.pi/4+math.radians(latitude)/2)))
+        viewport_values=(longitude,mercator_y,0,-0.1,-0.2,0.1,0.2)
+        if not all(math.isfinite(value) for value in viewport_values):
+            raise SystemExit('Controlled search viewport must contain seven finite values')
+        if not (-180<longitude-0.1<longitude+0.1<180 and -180<mercator_y-0.2<mercator_y+0.2<180):
+            raise SystemExit('Controlled search viewport must fit inside the Mercator world')
+        viewport_text=' '.join(format(value,'.12g') for value in viewport_values)
+        settings_path=Path(container)/'Documents/settings.ini'
+        settings_path.parent.mkdir(parents=True,exist_ok=True)
+        settings_lines=settings_path.read_text().splitlines() if settings_path.exists() else []
+        settings_lines=[line for line in settings_lines if not line.startswith('ScreenClipRect=')]
+        settings_lines.append('ScreenClipRect='+viewport_text)
+        settings_path.write_text('\n'.join(settings_lines)+'\n')
+        viewport=dict(settingsPath=str(settings_path),key='ScreenClipRect',text=viewport_text,
+                      syntheticGps=[latitude,longitude],serialization='AnyRectD: centreX centreY angle localMinX localMinY localMaxX localMaxY',
+                      reason='Controlled valid local search viewport around synthetic Riyadh GPS; excludes World overview assertion coverage. Production assertions remain enabled.')
         (Path(container)/'Documents/mikshat-renderer-coverage.jsonl').unlink(missing_ok=True)
         privacy=[]
         for service in ('location','location-always'):
@@ -320,12 +348,12 @@ jobs:
             privacy.append(dict(service=service,returncode=result.returncode,output=result.stdout+result.stderr))
         location=subprocess.run(['xcrun','simctl','location',udid,'set','24.7136,46.6753'],capture_output=True,text=True)
         synthetic=dict(source='simctl fixed location; not a user GPS reading',coordinate='24.7136,46.6753',returncode=location.returncode,output=location.stdout+location.stderr)
-        Path('build/search-diagnostics/renderer-launch.json').write_text(json.dumps(dict(original=str(original),patched=str(target),targets=patched,privacy=privacy,syntheticLocation=synthetic,
+        Path('build/search-diagnostics/renderer-launch.json').write_text(json.dumps(dict(original=str(original),patched=str(target),targets=patched,privacy=privacy,syntheticLocation=synthetic,containerIsolation=isolation,controlledViewport=viewport,
             firstSession='Seeded installation ID via launch arguments to match an existing app user'),indent=2)+'\n')
         with open(os.environ['GITHUB_ENV'],'a') as stream:
             stream.write(f'MIKSHAT_RENDERER_XCTESTRUN={target}\n')
             stream.write('MIKSHAT_RENDERER_APP_ID=com.mikshat.maps.debug\n')
-        print(json.dumps(patched))
+        print(json.dumps(dict(targets=patched,containerIsolation=isolation,controlledViewport=viewport)))
         PYCODE
     - name: Run only the normal-renderer Arabic search cases
       id: renderer-tests
