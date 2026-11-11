@@ -20,7 +20,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: mikshat-maps-weather-native
-          run-id: '43004753974'
+          run-id: '43012332780'
           repository: ${{ github.repository }}
           github-token: ${{ github.token }}
           path: evidence
@@ -74,7 +74,7 @@ jobs:
               return path
 
           emit('Source repository: ' + os.environ.get('GITHUB_REPOSITORY', '(unknown)'))
-          emit('Source run: 43004753974; artifact: mikshat-maps-weather-native')
+          emit('Source run: 43012332780; artifact: mikshat-maps-weather-native')
           emit('Evidence only: existing artifact, synthetic weather fixtures, actual UIKit viewport renders.')
           emit('These renders do not establish physical-device or actual rotation coverage.')
 
@@ -193,7 +193,7 @@ jobs:
           emit(json.dumps(metrics, ensure_ascii=False, indent=2))
           if os.environ.get('GITHUB_STEP_SUMMARY'):
               with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as stream:
-                  stream.write('Native artifact evidence from run 43004753974.\n\n')
+                  stream.write('Native artifact evidence from run 43012332780.\n\n')
                   stream.write(f'- Native summary passed: {summary_passed}\n')
                   stream.write(f'- Exact 12-image fixture manifest passed: {manifest_passed}\n')
                   stream.write(f'- Completed cases: {passed_count} passed, {failed_count} failed, {skipped_count} skipped, {cancelled_count} cancelled.\n')
