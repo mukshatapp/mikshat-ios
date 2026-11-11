@@ -217,29 +217,6 @@ final class TabProbeDelegate: UIResponder, UIApplicationDelegate {
 '''
 
 
-def guarded_variant(source):
-    start = source.index('  override func layoutSubviews()', source.index('class TabView:'))
-    end = source.index('\n}\n\nextension TabView: UICollectionViewDataSource', start)
-    body = source[start:end]
-    removed = []
-    lines = body.splitlines(keepends=True)
-    for line in [
-        '      // Prepare the new item sizes before scrollToItem clamps its offset using\n',
-        '      // contentSize; otherwise a rotation can still use the old page geometry.\n',
-        '      tabsContentCollectionView.layoutIfNeeded()\n',
-    ]:
-        if line in lines:
-            lines.remove(line)
-            removed.append(line.rstrip())
-    body = ''.join(lines)
-    target = '        tabsContentCollectionView.scrollToItem(at: IndexPath(item: selectedIndex, section: 0),'
-    if body.count(target) != 1:
-        raise ValueError('Expected exactly one geometry-change scroll target')
-    insertion = '        tabsContentCollectionView.layoutIfNeeded()\n'
-    if insertion not in body:
-        body = body.replace(target, insertion + target, 1)
-    return source[:start] + body + source[end:], {'removed': removed, 'insertedBeforeScroll': insertion.rstrip()}
-
 
 def trace_variant(source):
     edits = [
@@ -272,99 +249,17 @@ def trace_variant(source):
                     'limit': 300, 'layoutBehaviorChanged': False}
 
 
-def bounds_notify_variant(source):
-    subclass = '''private class TabContentCollectionView: UICollectionView {
-  var onSizeChange: (() -> Void)?
-
-  override var bounds: CGRect {
-    didSet {
-      if oldValue.size != bounds.size { onSizeChange?() }
-    }
-  }
-}
-
-'''
-    property_before = '  private let tabsContentCollectionView: UICollectionView\n'
-    property_after = '  private let tabsContentCollectionView: TabContentCollectionView\n'
-    init_before = 'tabsContentCollectionView = UICollectionView(frame: .zero, collectionViewLayout: tabsContentLayout)'
-    init_after = 'tabsContentCollectionView = TabContentCollectionView(frame: .zero, collectionViewLayout: tabsContentLayout)'
-    configure_before = '  private func configureContent() {\n'
-    configure_after = '''  private func configureContent() {
-    tabsContentCollectionView.onSizeChange = { [weak self] in self?.setNeedsLayout() }
-'''
-    if source.count(property_before) != 1 or source.count(init_before) != 2 or source.count(configure_before) != 1:
-        raise ValueError('Unexpected content collection construction for bounds-notify candidate')
-    source = subclass + source
-    source = source.replace(property_before, property_after, 1)
-    source = source.replace(init_before, init_after)
-    source = source.replace(configure_before, configure_after, 1)
-    return source, {'subclass': subclass.splitlines(), 'contentCollectionType': 'TabContentCollectionView',
-                    'initializersReplaced': 2, 'sizeChangeAction': 'weak parent setNeedsLayout()'}
-
-
-def bounds_layout_variant(source):
-    subclass = '''private class TabContentFlowLayout: UICollectionViewFlowLayout {
-  override func shouldInvalidateLayout(forBoundsChange newBounds: CGRect) -> Bool {
-    let sizeChanged = collectionView.map { $0.bounds.size != newBounds.size } ?? false
-    return sizeChanged || super.shouldInvalidateLayout(forBoundsChange: newBounds)
-  }
-
-  override func invalidationContext(forBoundsChange newBounds: CGRect) -> UICollectionViewLayoutInvalidationContext {
-    let context = super.invalidationContext(forBoundsChange: newBounds)
-    if let collectionView, collectionView.bounds.size != newBounds.size,
-       let flowContext = context as? UICollectionViewFlowLayoutInvalidationContext {
-      flowContext.invalidateFlowLayoutDelegateMetrics = true
-      flowContext.invalidateFlowLayoutAttributes = true
-    }
-    return context
-  }
-}
-
-'''
-    before = '  private let tabsContentLayout = UICollectionViewFlowLayout()\n'
-    after = '  private let tabsContentLayout: UICollectionViewFlowLayout = TabContentFlowLayout()\n'
-    if source.count(before) != 1:
-        raise ValueError('Unexpected content layout construction for bounds-layout candidate')
-    source = subclass + source.replace(before, after, 1)
-    return source, {'subclass': subclass.splitlines(), 'storedPropertyType': 'UICollectionViewFlowLayout',
-                    'notification': 'UIKit layout invalidation context before viewport size change'}
-
 
 def prepare(root, output, label, variant, trace_layout=False):
     output.mkdir(parents=True, exist_ok=True)
     source = (root / TAB).read_text()
     original = source
+    if variant != 'as-is':
+        raise ValueError('The permanent probe compiles source as-is; experimental variants are unsupported')
     transform = None
-    if variant in ('guarded', 'metrics', 'bounds-notify', 'needs-layout', 'bounds-layout'):
-        source, transform = guarded_variant(source)
-    if variant in ('metrics', 'bounds-notify', 'needs-layout', 'bounds-layout'):
-        original_invalidation = '      tabsContentLayout.invalidateLayout()\n'
-        metrics_invalidation = '''      let invalidation = UICollectionViewFlowLayoutInvalidationContext()
-      invalidation.invalidateFlowLayoutDelegateMetrics = true
-      invalidation.invalidateFlowLayoutAttributes = true
-      tabsContentLayout.invalidateLayout(with: invalidation)
-'''
-        if metrics_invalidation not in source:
-            if source.count(original_invalidation) != 1:
-                raise ValueError('Expected exactly one content-layout invalidation')
-            source = source.replace(original_invalidation, metrics_invalidation, 1)
-        transform['delegateMetricsInvalidation'] = metrics_invalidation.splitlines()
-    if variant == 'bounds-notify':
-        source, notification = bounds_notify_variant(source)
-        transform['boundsNotification'] = notification
-    if variant == 'needs-layout':
-        before = '        tabsContentCollectionView.layoutIfNeeded()\n'
-        after = '        tabsContentCollectionView.setNeedsLayout()\n' + before
-        if source.count(before) != 1:
-            raise ValueError('Expected exactly one guarded content prepare for needs-layout candidate')
-        source = source.replace(before, after, 1)
-        transform['setNeedsLayoutBeforePrepare'] = True
-    if variant == 'bounds-layout':
-        source, layout = bounds_layout_variant(source)
-        transform['boundsLayout'] = layout
     if trace_layout:
         source, trace = trace_variant(source)
-        transform = dict(transform or {}, trace=trace)
+        transform = {'trace': trace}
     controller = (root / CONTROLLER).read_text()
     (output / 'TabView.original.swift').write_text(original)
     (output / 'TabView.compiled.swift').write_text(source)
@@ -383,7 +278,7 @@ if __name__ == '__main__':
     parser.add_argument('--source-root', type=Path, required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--label', required=True)
-    parser.add_argument('--variant', choices=['as-is', 'guarded', 'metrics', 'bounds-notify', 'needs-layout', 'bounds-layout'], default='as-is')
+    parser.add_argument('--variant', choices=['as-is'], default='as-is')
     parser.add_argument('--trace-layout', action='store_true')
     args = parser.parse_args()
     if not re.fullmatch('[A-Za-z0-9-]+', args.label):

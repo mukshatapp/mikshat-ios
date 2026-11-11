@@ -1,4 +1,5 @@
 from pathlib import Path
+import hashlib
 import importlib.util
 import tempfile
 import unittest
@@ -10,75 +11,37 @@ ROOT = Path(__file__).resolve().parents[3]
 
 
 class PreparationTests(unittest.TestCase):
-    def test_guarded_variant_prepares_only_inside_scroll_guard(self):
-        source, changes = probe.guarded_variant((ROOT / probe.TAB).read_text())
-        body = source[source.index('class TabView:'):]
-        self.assertIn('let selectedIndex, hasContentItem(at: selectedIndex) {\n        tabsContentCollectionView.layoutIfNeeded()\n', body)
-        self.assertNotIn('\n      tabsContentCollectionView.layoutIfNeeded()', body)
-        self.assertIsInstance(changes, dict)
-
-    def test_guarded_transform_is_idempotent(self):
-        first, _ = probe.guarded_variant((ROOT / probe.TAB).read_text())
-        second, _ = probe.guarded_variant(first)
-        self.assertEqual(first, second)
-
-    def test_as_is_keeps_actual_source_unchanged(self):
+    def test_as_is_compiles_exact_production_files_and_records_hashes(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory)
-            probe.prepare(ROOT, output, 'baseline', 'as-is')
-            self.assertEqual((output / 'TabView.compiled.swift').read_bytes(), (ROOT / probe.TAB).read_bytes())
-            self.assertIn('class TabView:', (output / 'Probe.swift').read_text())
-            self.assertIn('class TabViewController:', (output / 'Probe.swift').read_text())
+            report = probe.prepare(ROOT, output, 'current', 'as-is')
+            source = (ROOT / probe.TAB).read_bytes()
+            controller = (ROOT / probe.CONTROLLER).read_bytes()
+            self.assertEqual((output / 'TabView.compiled.swift').read_bytes(), source)
+            self.assertEqual((output / 'TabViewController.original.swift').read_bytes(), controller)
+            self.assertEqual(report['originalSHA256'], hashlib.sha256(source).hexdigest())
+            self.assertEqual(report['compiledSHA256'], report['originalSHA256'])
+            self.assertEqual(report['controllerSHA256'], hashlib.sha256(controller).hexdigest())
+            self.assertIsNone(report['transform'])
+            app = (output / 'Probe.swift').read_text()
+            self.assertIn(source.decode(), app)
+            self.assertIn(controller.decode(), app)
 
-    def test_metrics_variant_invalidates_cached_delegate_sizes(self):
-        with tempfile.TemporaryDirectory() as directory:
-            output = Path(directory)
-            report = probe.prepare(ROOT, output, 'metrics', 'metrics')
-            source = (output / 'TabView.compiled.swift').read_text()
-            self.assertIn('invalidation.invalidateFlowLayoutDelegateMetrics = true', source)
-            self.assertIn('invalidation.invalidateFlowLayoutAttributes = true', source)
-            self.assertIn('tabsContentLayout.invalidateLayout(with: invalidation)', source)
-            self.assertIn('let selectedIndex, hasContentItem(at: selectedIndex) {\n        tabsContentCollectionView.layoutIfNeeded()\n', source)
-            self.assertEqual(report['variant'], 'metrics')
-
-    def test_trace_records_source_instrumentation_and_preserves_layout(self):
+    def test_optional_trace_records_exact_instrumented_source(self):
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory)
             report = probe.prepare(ROOT, output, 'trace', 'as-is', trace_layout=True)
-            traced = (output / 'TabView.compiled.swift').read_text()
+            traced = (output / 'TabView.compiled.swift').read_bytes()
             self.assertTrue(report['traceLayout'])
             self.assertFalse(report['transform']['trace']['layoutBehaviorChanged'])
-            for stage in ['parent-entry', 'parent-after-super', 'parent-compare', 'delegate-size']:
-                self.assertIn('probeTrace("' + stage + '"', traced)
-            self.assertIn('tabsContentCollectionView.scrollToItem(', traced)
+            self.assertEqual(report['compiledSHA256'], hashlib.sha256(traced).hexdigest())
+            for stage in ['parent-entry', 'parent-after-super', 'parent-compare', 'layout-identity', 'delegate-size']:
+                self.assertIn('probeTrace("' + stage + '"', traced.decode())
 
-    def test_bounds_candidate_notifies_only_for_size_changes_and_uses_both_initializers(self):
+    def test_experimental_layout_transformations_are_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
-            output = Path(directory)
-            report = probe.prepare(ROOT, output, 'bounds-notify', 'bounds-notify')
-            source = (output / 'TabView.compiled.swift').read_text()
-            self.assertIn('if oldValue.size != bounds.size { onSizeChange?() }', source)
-            self.assertIn('onSizeChange = { [weak self] in self?.setNeedsLayout() }', source)
-            self.assertEqual(source.count('tabsContentCollectionView = TabContentCollectionView('), 2)
-            self.assertIn('invalidation.invalidateFlowLayoutDelegateMetrics = true', source)
-            self.assertEqual(report['transform']['boundsNotification']['initializersReplaced'], 2)
-
-    def test_needs_layout_marks_view_dirty_before_guarded_prepare(self):
-        with tempfile.TemporaryDirectory() as directory:
-            output = Path(directory)
-            probe.prepare(ROOT, output, 'needs-layout', 'needs-layout')
-            source = (output / 'TabView.compiled.swift').read_text()
-            self.assertIn('tabsContentCollectionView.setNeedsLayout()\n        tabsContentCollectionView.layoutIfNeeded()', source)
-
-    def test_bounds_layout_uses_framework_invalidation_hooks_with_base_property_type(self):
-        with tempfile.TemporaryDirectory() as directory:
-            output = Path(directory)
-            probe.prepare(ROOT, output, 'bounds-layout', 'bounds-layout', trace_layout=True)
-            source = (output / 'TabView.compiled.swift').read_text()
-            self.assertIn('tabsContentLayout: UICollectionViewFlowLayout = TabContentFlowLayout()', source)
-            self.assertIn('override func shouldInvalidateLayout(forBoundsChange', source)
-            self.assertIn('override func invalidationContext(forBoundsChange', source)
-            self.assertIn('ObjectIdentifier(tabsContentCollectionView.collectionViewLayout)', source)
+            with self.assertRaisesRegex(ValueError, 'compiles source as-is'):
+                probe.prepare(ROOT, Path(directory), 'unsupported', 'experimental')
 
 
 if __name__ == '__main__':
