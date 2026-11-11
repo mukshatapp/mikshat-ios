@@ -3,6 +3,12 @@ import Foundation
 import FoundationNetworking
 #endif
 
+private enum MikshatWeatherTime {
+  static func isValid(_ unixTime: Double) -> Bool {
+    unixTime.isFinite && unixTime >= 0 && unixTime <= 253_402_300_799
+  }
+}
+
 struct MikshatWeatherCoordinate: Codable, Hashable, Sendable {
   let latitude: Double
   let longitude: Double
@@ -36,7 +42,7 @@ struct MikshatWeatherSample: Codable, Equatable, Sendable {
   let isDay: Bool?
 
   fileprivate var isValid: Bool {
-    time.timeIntervalSince1970.isFinite && time.timeIntervalSince1970 >= 0 &&
+    MikshatWeatherTime.isValid(time.timeIntervalSince1970) &&
       [temperatureC, windSpeedKmh, windDirectionDegrees, windGustsKmh].allSatisfy { $0?.isFinite ?? true } &&
       (windSpeedKmh.map { $0 >= 0 } ?? true) && (windGustsKmh.map { $0 >= 0 } ?? true)
   }
@@ -65,7 +71,7 @@ struct MikshatWeatherSnapshot: Codable, Equatable, Sendable {
   }
 
   fileprivate var isValid: Bool {
-    coordinate.isValid && fetchedAt.timeIntervalSince1970.isFinite &&
+    coordinate.isValid && MikshatWeatherTime.isValid(fetchedAt.timeIntervalSince1970) &&
       TimeZone(identifier: timeZoneIdentifier) != nil && current.isValid &&
       !hourly.isEmpty && hourly.count <= 96 && hourly.allSatisfy(\.isValid) &&
       zip(hourly, hourly.dropFirst()).allSatisfy { $0.time < $1.time }
@@ -291,11 +297,11 @@ enum MikshatWeatherParser {
     do { decoded = try JSONDecoder().decode(Response.self, from: data) }
     catch { throw MikshatWeatherError.invalidResponse }
     guard TimeZone(identifier: decoded.timezone) != nil,
-          let currentTime = decoded.current.time, validTime(currentTime) else {
+          let currentTime = decoded.current.time, MikshatWeatherTime.isValid(currentTime) else {
       throw MikshatWeatherError.invalidResponse
     }
     let hours = decoded.hourly
-    guard !hours.time.isEmpty, hours.time.count <= 96, hours.time.allSatisfy(validTime),
+    guard !hours.time.isEmpty, hours.time.count <= 96, hours.time.allSatisfy(MikshatWeatherTime.isValid),
           zip(hours.time, hours.time.dropFirst()).allSatisfy({ $1 - $0 == 3600 }) else {
       throw MikshatWeatherError.inconsistentHours
     }
@@ -317,10 +323,6 @@ enum MikshatWeatherParser {
                                          timeZoneIdentifier: decoded.timezone, current: current, hourly: samples)
     guard snapshot.isValid else { throw MikshatWeatherError.invalidResponse }
     return snapshot
-  }
-
-  private static func validTime(_ value: Double) -> Bool {
-    value.isFinite && value >= 0 && value <= 253_402_300_799
   }
 
   private static func validateUnits(_ units: [String: String], present: [Bool]) throws {
@@ -474,7 +476,7 @@ actor MikshatWeatherRepository {
           let disk = try? JSONDecoder().decode(DiskCache.self, from: data), disk.version == 1 else { return }
     entries = disk.entries.filter { key, entry in
       entry.snapshot.isValid && entry.snapshot.coordinate.cacheKey == key &&
-        entry.lastAccessed.timeIntervalSince1970.isFinite
+        MikshatWeatherTime.isValid(entry.lastAccessed.timeIntervalSince1970)
     }
     trim()
   }

@@ -261,7 +261,7 @@ class TabView: UIView {
     slidingViewHeight.isActive = true
     slidingView.bottomAnchor.constraint(equalTo: headerView.bottomAnchor).isActive = true
 
-    slidingViewLeft = slidingView.leftAnchor.constraint(equalTo: safeAreaLayoutGuide.leftAnchor)
+    slidingViewLeft = slidingView.leftAnchor.constraint(equalTo: headerView.leftAnchor)
     slidingViewLeft.isActive = true
     slidingViewWidth = slidingView.widthAnchor.constraint(equalToConstant: 0)
     slidingViewWidth.isActive = true
@@ -327,22 +327,44 @@ class TabView: UIView {
   }
 
   private func updateSlidingIndicator(at position: CGFloat) {
-    guard position.isFinite, pageCount > 0, tabsCollectionView.bounds.width > 0,
+    guard pageCount > 0, contentFrame.width > 0,
+          tabsContentCollectionView.bounds.width > 0, tabsContentCollectionView.bounds.height > 0,
+          tabsCollectionView.bounds.width > 0 else {
+      setSlidingIndicatorGeometry(left: 0, width: 0)
+      return
+    }
+    guard position.isFinite,
           tabsCollectionView.numberOfSections > 0,
           tabsCollectionView.numberOfItems(inSection: 0) == pageCount else { return }
     let clampedPosition = min(max(0, position), CGFloat(pageCount - 1))
     let lower = Int(clampedPosition.rounded(.down))
     let upper = min(lower + 1, pageCount - 1)
-    guard let first = tabsCollectionView.layoutAttributesForItem(at: IndexPath(item: lower, section: 0)),
-          let last = tabsCollectionView.layoutAttributesForItem(at: IndexPath(item: upper, section: 0)) else { return }
+    guard let first = headerItemFrame(at: lower), let last = headerItemFrame(at: upper) else { return }
     let progress = clampedPosition - CGFloat(lower)
-    let x = first.frame.minX + (last.frame.minX - first.frame.minX) * progress
-    let width = first.frame.width + (last.frame.width - first.frame.width) * progress
-    let frame = tabsCollectionView.convert(CGRect(x: x, y: 0, width: width, height: 0), to: self)
-    let left = frame.minX - safeAreaLayoutGuide.layoutFrame.minX
-    guard left.isFinite, frame.width.isFinite else { return }
-    if slidingViewWidth.constant != frame.width { slidingViewWidth.constant = frame.width }
-    if slidingViewLeft.constant != left { slidingViewLeft.constant = left }
+    let left = first.minX + (last.minX - first.minX) * progress
+    let width = first.width + (last.width - first.width) * progress
+    guard left.isFinite, width.isFinite else { return }
+    setSlidingIndicatorGeometry(left: left, width: width)
+  }
+
+  private func headerItemFrame(at index: Int) -> CGRect? {
+    let path = IndexPath(item: index, section: 0)
+    if let cell = tabsCollectionView.cellForItem(at: path) {
+      // Convert the displayed cell through UIKit's hierarchy, including any RTL mirroring.
+      return cell.convert(cell.bounds, to: headerView)
+    }
+    guard let attributes = tabsCollectionView.layoutAttributesForItem(at: path) else { return nil }
+    return tabsCollectionView.convert(attributes.frame, to: headerView)
+  }
+
+  private func setSlidingIndicatorGeometry(left: CGFloat, width: CGFloat) {
+    guard slidingViewWidth.constant != width || slidingViewLeft.constant != left else { return }
+    slidingViewWidth.constant = width
+    slidingViewLeft.constant = left
+    // Both horizontal constraints belong to this header. Apply them in the same
+    // pass as the item frames, rather than retaining the pre-resize indicator frame.
+    headerView.setNeedsLayout()
+    headerView.layoutIfNeeded()
   }
 
   func reloadData() {

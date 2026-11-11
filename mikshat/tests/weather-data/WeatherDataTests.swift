@@ -23,7 +23,10 @@ private final class Clock: @unchecked Sendable {
 }
 
 private actor FixtureClient: MikshatWeatherClient {
-  enum Behavior: Equatable { case success, failure, delayed, wrongCoordinate, rateLimited, held }
+  enum Behavior: Equatable {
+    case success, failure, delayed, wrongCoordinate, rateLimited, held
+    case invalidCurrentTime, invalidHourlyTime, invalidFetchedAt
+  }
   private let original: MikshatWeatherSnapshot
   private var behavior: Behavior = .success
   private(set) var count = 0
@@ -38,11 +41,20 @@ private actor FixtureClient: MikshatWeatherClient {
     case .rateLimited: throw MikshatWeatherError.rateLimited(until: now.addingTimeInterval(120))
     case .delayed, .wrongCoordinate: try await Task.sleep(nanoseconds: 80_000_000)
     case .held: await withCheckedContinuation { held = $0 }
-    case .success: break
+    case .success, .invalidCurrentTime, .invalidHourlyTime, .invalidFetchedAt: break
     }
     let resultCoordinate = behavior == .wrongCoordinate ? MikshatWeatherCoordinate(latitude: 0, longitude: 0) : coordinate
-    return MikshatWeatherSnapshot(coordinate: resultCoordinate, fetchedAt: now, timeZoneIdentifier: original.timeZoneIdentifier,
-                                 current: original.current, hourly: original.hourly)
+    let invalidDate = Date(timeIntervalSince1970: 1e20)
+    func invalidTime(_ sample: MikshatWeatherSample) -> MikshatWeatherSample {
+      MikshatWeatherSample(time: invalidDate, temperatureC: sample.temperatureC, windSpeedKmh: sample.windSpeedKmh,
+                           windDirectionDegrees: sample.windDirectionDegrees, windGustsKmh: sample.windGustsKmh,
+                           weatherCode: sample.weatherCode, isDay: sample.isDay)
+    }
+    return MikshatWeatherSnapshot(
+      coordinate: resultCoordinate, fetchedAt: behavior == .invalidFetchedAt ? invalidDate : now,
+      timeZoneIdentifier: original.timeZoneIdentifier,
+      current: behavior == .invalidCurrentTime ? invalidTime(original.current) : original.current,
+      hourly: behavior == .invalidHourlyTime ? [invalidTime(original.hourly[0])] : original.hourly)
   }
 }
 
@@ -61,6 +73,7 @@ private enum WeatherDataTests {
     try await repositoryTests(snapshot)
     try await concurrentValidationTests(snapshot)
     try await resourceAndRetryTests(snapshot)
+    try await cachedDateValidationTests(snapshot)
     print("PASS: weather parser, units, missing values, WMO/day/night, wind, UTC/DST, per-site bounded atomic cache, freshness, offline retention, dedupe and retries")
   }
 
@@ -245,6 +258,57 @@ private enum WeatherDataTests {
     let bytes = try Data(contentsOf: boundedDirectory.appendingPathComponent("weather-v1.json"))
     try expect(bytes.count <= 512, "Encoded cache byte budget enforced independently of site count")
     _ = try JSONSerialization.jsonObject(with: bytes)
+  }
+
+  static func cachedDateValidationTests(_ snapshot: MikshatWeatherSnapshot) async throws {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let clock = Clock(now)
+    let client = FixtureClient(snapshot)
+    let repository = MikshatWeatherRepository(cacheDirectory: directory, client: client, now: { clock.read() })
+    let valid = try await repository.refresh(for: coordinate)
+    let diskURL = directory.appendingPathComponent("weather-v1.json")
+    let validDisk = try Data(contentsOf: diskURL)
+
+    for field in ["current", "hourly", "fetchedAt", "lastAccessed"] {
+      var object = try JSONSerialization.jsonObject(with: validDisk) as! [String: Any]
+      var entries = object["entries"] as! [String: Any]
+      var entry = entries[coordinate.cacheKey] as! [String: Any]
+      var stored = entry["snapshot"] as! [String: Any]
+      if field == "lastAccessed" {
+        entry[field] = 1e20
+      } else if field == "fetchedAt" {
+        stored[field] = 1e20
+      } else if field == "current" {
+        var current = stored[field] as! [String: Any]
+        current["time"] = 1e20
+        stored[field] = current
+      } else {
+        var hour = (stored[field] as! [[String: Any]])[0]
+        hour["time"] = 1e20
+        // One hour is already sorted, so date validation must reject it independently of ordering.
+        stored[field] = [hour]
+      }
+      entry["snapshot"] = stored
+      entries[coordinate.cacheKey] = entry
+      object["entries"] = entries
+      try JSONSerialization.data(withJSONObject: object).write(to: diskURL, options: .atomic)
+      let corrupt = MikshatWeatherRepository(cacheDirectory: directory, client: client, now: { clock.read() })
+      try expect(await corrupt.cached(for: coordinate) == nil, "Out-of-range cached \(field) date rejected")
+    }
+    try validDisk.write(to: diskURL, options: .atomic)
+
+    for behavior in [FixtureClient.Behavior.invalidCurrentTime, .invalidHourlyTime, .invalidFetchedAt] {
+      clock.advance(31)
+      await client.set(behavior)
+      do {
+        _ = try await repository.refresh(for: coordinate, force: true)
+        throw TestFailure.assertion("Invalid client date must be rejected")
+      } catch MikshatWeatherError.invalidResponse { }
+      let reloaded = MikshatWeatherRepository(cacheDirectory: directory, client: client, now: { clock.read() })
+      try expect(await reloaded.cached(for: coordinate) == valid, "Invalid client date keeps last valid on disk")
+      try expect(await repository.cached(for: coordinate) == valid, "Invalid client date keeps last valid in memory")
+    }
   }
 
   static func repositoryTests(_ snapshot: MikshatWeatherSnapshot) async throws {
