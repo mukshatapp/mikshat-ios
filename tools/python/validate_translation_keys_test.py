@@ -245,6 +245,99 @@ class IosMatcherTest(unittest.TestCase):
         self.assertEqual(v._ios_source_matcher('let u = URL(string: "https")'), {})
 
 
+class WeatherMatcherTest(unittest.TestCase):
+    def test_condition_assignments_keep_their_source_lines(self):
+        source = (
+            '// Header\n'
+            'struct MikshatWeatherCondition {\n'
+            '  let symbol = "not_a_key"\n'
+            '  init() {\n'
+            '    case 0: name = "clear"; symbol = "sun.max.fill"\n'
+            '    default: name = "unknown"\n'
+            '    localizationKey = "mikshat_weather_condition_" + name\n'
+            '  }\n'
+            '}\n'
+        )
+        self.assertEqual(v._ios_source_matcher(source), {
+            "mikshat_weather_condition_clear": 4,
+            "mikshat_weather_condition_unknown": 5,
+        })
+
+    def test_wind_direct_keys_and_direction_table(self):
+        source = (
+            'struct MikshatWeatherWind {\n'
+            '  init() {\n'
+            '    localizationKey = "mikshat_weather_wind_calm"\n'
+            '    localizationKey = "mikshat_weather_wind_unavailable"\n'
+            '    let directions = ["n",\n'
+            '                      "ne", "e"]\n'
+            '    localizationKey = "mikshat_weather_wind_" + directions[index]\n'
+            '  }\n'
+            '}\n'
+        )
+        self.assertEqual(v._ios_source_matcher(source), {
+            "mikshat_weather_wind_calm": 2,
+            "mikshat_weather_wind_unavailable": 3,
+            "mikshat_weather_wind_n": 4,
+            "mikshat_weather_wind_ne": 5,
+            "mikshat_weather_wind_e": 5,
+        })
+
+    def test_unrelated_types_and_literals_are_ignored(self):
+        source = (
+            'let example = "mikshat_weather_condition_outside"\n'
+            'struct OtherCondition {\n'
+            '  name = "unrelated"\n'
+            '  localizationKey = "mikshat_weather_condition_" + name\n'
+            '}\n'
+            'struct MikshatWeatherCondition {\n'
+            '  let symbol = "mikshat_weather_condition_not_a_name"\n'
+            '  localizationKey = "mikshat_weather_condition_" + name\n'
+            '}\n'
+            'struct OtherWind {\n'
+            '  localizationKey = "mikshat_weather_wind_unrelated"\n'
+            '}\n'
+        )
+        self.assertEqual(v._ios_source_matcher(source), {})
+
+    def test_unconsumed_name_and_direction_tables_are_ignored(self):
+        source = (
+            'struct MikshatWeatherCondition {\n'
+            '  name = "unused"\n'
+            '}\n'
+            'struct MikshatWeatherWind {\n'
+            '  let directions = ["unused"]\n'
+            '}\n'
+        )
+        self.assertEqual(v._ios_source_matcher(source), {})
+
+    def test_weather_references_belong_to_maps_apple_target(self):
+        source = (
+            'struct MikshatWeatherCondition {\n'
+            '  name = "clear"\n'
+            '  localizationKey = "mikshat_weather_condition_" + name\n'
+            '}\n'
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            weather = root / "iphone/Maps/UI/Mikshat/Weather/MikshatWeatherData.swift"
+            weather.parent.mkdir(parents=True)
+            weather.write_text(source, encoding="utf-8")
+            for name in ("libs", "qt", "android", "iphone/CoreApi"):
+                (root / name).mkdir(parents=True, exist_ok=True)
+            with patch.object(v, "_REPO_ROOT", root):
+                apple = v.scan_apple_targets({})
+                strict = v.scan_all(v._STRICT_SCANNERS)
+        key = "mikshat_weather_condition_clear"
+        self.assertEqual(set(apple["apple-maps"]), {key})
+        self.assertEqual(apple["apple-infoplist"], {})
+        self.assertEqual(apple["apple-chart"], {})
+        self.assertIn(key, strict["ios"])
+        self.assertEqual(apple["apple-maps"][key].line_number, 1)
+        self.assertEqual(v.find_overtagged_targets({key: {"apple-maps"}}, apple), [])
+
+
+
 class AndroidMatcherTest(unittest.TestCase):
     def test_r_string_java_kotlin(self):
         match = v._regex_matcher(v._ANDROID_R_RE)

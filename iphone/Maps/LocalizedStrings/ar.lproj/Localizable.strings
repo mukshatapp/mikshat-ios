@@ -476,7 +476,6 @@
 
 /* «Hide» context menu */
 "hide" = "إخفاء";
-"categories" = "التصنيفات";
 "history" = "سجل البحث";
 "search_not_found" = "المعذرة، لم أعثر على أية نتائج.";
 

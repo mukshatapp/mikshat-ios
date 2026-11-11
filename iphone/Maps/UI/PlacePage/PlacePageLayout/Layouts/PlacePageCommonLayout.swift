@@ -63,10 +63,19 @@ class PlacePageCommonLayout: NSObject, IPlacePageLayout {
     let coordinate = placePageData.locationCoordinate
     let name = placePageData.previewData.title
     vc.didTapWeather = { [weak vc] in
-      let weather = MikshatWeatherViewController(name: name,
-                                                latitude: coordinate.latitude,
-                                                longitude: coordinate.longitude)
-      vc?.present(weather, animated: true)
+      Task { @MainActor [weak vc] in
+        guard let vc, vc.viewIfLoaded?.window != nil else { return }
+        var ancestor: UIViewController? = vc
+        while let candidate = ancestor {
+          guard candidate.presentedViewController == nil,
+                !candidate.isBeingDismissed, !candidate.isMovingFromParent else { return }
+          ancestor = candidate.parent
+        }
+        let weather = MikshatWeatherViewController(name: name,
+                                                  latitude: coordinate.latitude,
+                                                  longitude: coordinate.longitude)
+        vc.present(weather, animated: true)
+      }
     }
     return vc
   }()

@@ -476,7 +476,6 @@
 
 /* «Hide» context menu */
 "hide" = "Hide";
-"categories" = "Categories";
 "history" = "History";
 "search_not_found" = "Oops, no results found.";
 

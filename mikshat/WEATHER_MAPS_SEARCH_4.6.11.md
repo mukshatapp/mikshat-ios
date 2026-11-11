@@ -30,7 +30,11 @@ The feature workflow `.github/workflows/mikshat-maps-weather.yml` runs the produ
 
 Native weather images use synthetic injected data rendered by real UIKit views at portrait/landscape viewports, including light/dark and large text. They do not establish physical rotation, active Metal-map navigation, real-device memory or a live forecast screenshot. The simulator ZIP is not a signed iPhone IPA.
 
-The available Linux checks pass nine container tests, standalone source-registry assertions and diff formatting. Native/Swift execution results must be read from the feature workflow before promoting this source.
+The available Linux checks pass nine container tests, standalone source-registry assertions, 71 translation-matcher tests and diff formatting. All 57 shipped locales contain all 63 weather keys and the reused wind-speed unit; Arabic/English values are retained and other missing translations use the canonical English fallback. Only the obsolete native Categories title was removed from those resources.
+
+Production Swift weather regressions and a live public Riyadh request passed on Xcode 26.6 / Swift 6.3.3; the live request returned twelve future slots in Asia/Riyadh. Native iOS execution results must be read from the feature workflow before promoting this source. A separate generic iOS build caught an actor-isolation error in the initial place-page weather presentation bridge; the presentation is now explicitly scheduled on the main actor with guards against a detached or already-presenting controller.
+
+Canonical translation-key validation still reports the exact same pre-existing 22 unused keys and 27 Apple-unreferenced tags as baseline 9689a0b. Independent current/baseline runs use the pinned Twine parser and show no introduced diagnostics, missing definitions or target-tag regressions. The weather-key scanner recognizes the actual condition/wind tables; it does not mark arbitrary string literals as translations or suppress the existing failures.
 
 The supplied Jetsam report records per-process-limit termination around 2,098 MiB for Organic Maps, without a matching application version, stack or search state. The user reports the problem with satellites disabled. Removing an avoidable heading-manager allocation and adding phase measurements does not establish that the physical-device search termination is fixed. Confirm on both affected devices with satellites off, collect matching diagnostics, and profile the active map/search process before claiming that issue resolved.
 

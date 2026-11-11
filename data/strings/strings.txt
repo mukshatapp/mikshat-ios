@@ -14108,7 +14108,7 @@ zh-Hans = 隐藏
 zh-Hant = 隱藏
 
 [categories]
-tags = android-app,android-libs-car,apple-maps,qt
+tags = android-app,android-libs-car,qt
 en = Categories
 af = Kategorieë
 ar = التصنيفات
