@@ -612,9 +612,16 @@ UNIT_CLASS_TEST(StorageDownloadTest, SaudiDriveHtmlPreservesInstalledMap)
   base::ScopedLogAbortLevelChanger const ignoreErrors(LCRITICAL);
   auto const & source = kSaudiMapDownloadSources.front();
   auto const id = std::string(source.m_countryId);
+  // Registration also checks the bundled World maps when their version matches this catalog.
+  auto const makeWorldLeaf = [](std::string const & name)
+  {
+    auto const reader = GetPlatform().GetReader(name + DATA_FILE_EXTENSION, "r");
+    return R"({"id":")" + name + R"(","s":)" + strings::to_string(reader->Size()) + "}";
+  };
   auto const json = R"({"id":"Countries","v":)" + strings::to_string(kSaudiMapDataVersion) +
                     R"(,"g":[{"id":")" + id + R"(","s":)" + strings::to_string(source.m_size) +
-                    R"(,"h":")" + std::string(source.m_hash) + R"("}]})";
+                    R"(,"h":")" + std::string(source.m_hash) + R"("},)" + makeWorldLeaf(WORLD_FILE_NAME) + "," +
+                    makeWorldLeaf(WORLD_COASTS_FILE_NAME) + "]}";
   auto const oldVersion = kSaudiMapDataVersion - 1;
   TEST(!PrepareDirToDownloadCountry(oldVersion, {}).empty(), ());
   auto const installedPath = GetFilePath(oldVersion, {}, id, MapFileType::Map);
@@ -626,6 +633,7 @@ UNIT_CLASS_TEST(StorageDownloadTest, SaudiDriveHtmlPreservesInstalledMap)
   bool didDownload = false;
   Storage storage(json, std::make_unique<TestMapFilesDownloader>());
   InitStorage(storage, [&didDownload](CountryId const &, LocalFilePtr const) { didDownload = true; });
+  TEST_EQUAL(storage.CountryStatusEx(id), Status::OnDiskOutOfDate, ());
   storage.SetEnabledIntegrityValidationForTesting(false);
   TEST(!PrepareDirToDownloadCountry(kSaudiMapDataVersion, {}).empty(), ());
   {
