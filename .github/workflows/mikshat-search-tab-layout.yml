@@ -1,0 +1,53 @@
+name: Mikshat native tab layout probe
+on:
+  push:
+    branches: [diagnostics/search-tab-layout]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record Xcode and simulator versions
+        run: |
+          xcodebuild -version
+          xcrun simctl list devices available
+      - name: Prepare 4.6.9 baseline and iPhone 16 simulator
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin 74b5bf3f38411fca1006ca129e7a388b67e100f4
+          mkdir -p /tmp/mikshat-tab-baseline
+          for path in iphone/Maps/UI/ReusableComponents/TabView/TabView.swift iphone/Maps/UI/ReusableComponents/TabView/TabViewController.swift; do
+            mkdir -p "/tmp/mikshat-tab-baseline/$(dirname "$path")"
+            git show "74b5bf3f38411fca1006ca129e7a388b67e100f4:$path" > "/tmp/mikshat-tab-baseline/$path"
+          done
+          python3 - <<'PY'
+          import json, subprocess
+          from pathlib import Path
+          data = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', 'runtimes', '-j']))
+          runtimes = [r for r in data['runtimes'] if r.get('isAvailable') and r['identifier'].startswith('com.apple.CoreSimulator.SimRuntime.iOS-26')]
+          if not runtimes:
+              raise SystemExit('An iOS 26 simulator runtime is required')
+          runtime = sorted(runtimes, key=lambda r: tuple(map(int, r['version'].split('.'))), reverse=True)[0]
+          udid = subprocess.check_output(['xcrun', 'simctl', 'create', 'Mikshat Tab Probe iPhone 16',
+                                          'com.apple.CoreSimulator.SimDeviceType.iPhone-16', runtime['identifier']], text=True).strip()
+          print('Selected iPhone 16', runtime['version'], udid)
+          subprocess.run(['xcrun', 'simctl', 'boot', udid], check=True)
+          subprocess.run(['xcrun', 'simctl', 'bootstatus', udid, '-b'], check=True)
+          Path('/tmp/mikshat-tab-udid').write_text(udid)
+          PY
+      - name: Trace baseline layout timing and visible-window behavior
+        run: |
+          bash mikshat/tests/tab-layout-probe/run_probe.sh /tmp/mikshat-tab-baseline tab-results/baseline "$(cat /tmp/mikshat-tab-udid)" baseline as-is failed trace
+      - name: Verify current production source without transformation
+        if: ${{ !cancelled() }}
+        run: |
+          bash mikshat/tests/tab-layout-probe/run_probe.sh "$GITHUB_WORKSPACE" tab-results/current "$(cat /tmp/mikshat-tab-udid)" current as-is passed trace
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mikshat-native-tab-layout
+          path: tab-results

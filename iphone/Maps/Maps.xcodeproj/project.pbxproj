@@ -1596,6 +1596,7 @@
 		ED82C71B2F90186300FA103D /* UIWindowRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIWindowRenderer.swift; sourceTree = "<group>"; };
 		ED82C71E2F90186300FA103D /* SwizzleStyle.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SwizzleStyle.h; sourceTree = "<group>"; };
 		ED82C71F2F90186300FA103D /* SwizzleStyle.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = SwizzleStyle.m; sourceTree = "<group>"; };
+		A6B8C0040000000000000001 /* SwizzleRuntime.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SwizzleRuntime.h; sourceTree = "<group>"; };
 		ED82C7212F90186300FA103D /* BookmarksStyleSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarksStyleSheet.swift; sourceTree = "<group>"; };
 		ED82C7222F90186300FA103D /* CornerRadius.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CornerRadius.swift; sourceTree = "<group>"; };
 		ED82C7242F90186300FA103D /* FontStyleSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FontStyleSheet.swift; sourceTree = "<group>"; };
@@ -3924,6 +3925,7 @@
 			isa = PBXGroup;
 			children = (
 				ED82C71E2F90186300FA103D /* SwizzleStyle.h */,
+				A6B8C0040000000000000001 /* SwizzleRuntime.h */,
 				ED82C71F2F90186300FA103D /* SwizzleStyle.m */,
 			);
 			path = Swizzle;
@@ -5447,7 +5449,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 4.6.9;
+				MARKETING_VERSION = 4.6.10;
 				OTHER_SWIFT_FLAGS = "$(inherited)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.mikshat.maps.debug;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -5468,7 +5470,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 4.6.9;
+				MARKETING_VERSION = 4.6.10;
 				OTHER_SWIFT_FLAGS = "$(inherited)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.mikshat.maps;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -5523,7 +5525,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 4.6.9;
+				MARKETING_VERSION = 4.6.10;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mikshat.maps.debug.widgetextension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -5552,7 +5554,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 4.6.9;
+				MARKETING_VERSION = 4.6.10;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mikshat.maps.widgetextension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";

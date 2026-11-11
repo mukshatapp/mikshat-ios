@@ -16,6 +16,8 @@ workflows:
           python3 mikshat/prepare_satellite.py
           swiftc iphone/Maps/UI/Mikshat/MikshatNavigationMath.swift mikshat/tests/NavigationMathTests.swift -o /tmp/mikshat-navigation-tests
           /tmp/mikshat-navigation-tests
+          clang -std=c11 -Wall -Wextra -Wno-cast-function-type mikshat/tests/ThemeSwizzleRuntimeTests.c -lobjc -o /tmp/mikshat-theme-runtime-tests
+          /tmp/mikshat-theme-runtime-tests
       - name: Check Xcode and Metal
         script: |
           set -euo pipefail
@@ -78,7 +80,7 @@ workflows:
         APP_STORE_APPLE_ID: "6828427541"
         XCODE_WORKSPACE: xcode/omim.xcworkspace
         XCODE_SCHEME: OMaps
-        APP_VERSION: "4.6.9"
+        APP_VERSION: "4.6.10"
     scripts:
       - name: Prepare Mikshat branding and check navigation math
         script: |
@@ -87,6 +89,8 @@ workflows:
           python3 mikshat/prepare_satellite.py
           swiftc iphone/Maps/UI/Mikshat/MikshatNavigationMath.swift mikshat/tests/NavigationMathTests.swift -o /tmp/mikshat-navigation-tests
           /tmp/mikshat-navigation-tests
+          clang -std=c11 -Wall -Wextra -Wno-cast-function-type mikshat/tests/ThemeSwizzleRuntimeTests.c -lobjc -o /tmp/mikshat-theme-runtime-tests
+          /tmp/mikshat-theme-runtime-tests
       - name: Check Xcode and Metal
         script: |
           set -euo pipefail

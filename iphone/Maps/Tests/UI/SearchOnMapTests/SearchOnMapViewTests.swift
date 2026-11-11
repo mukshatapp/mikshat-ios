@@ -58,17 +58,42 @@ final class SearchOnMapHeaderViewTests: XCTestCase {
     assertActionsHidden(true)
   }
 
-  func test_CoordinateInputCreatesBothRowsWithActiveFieldWidthConstraints() {
+  func test_CoordinateInputLaysOutBothRowsWithPositiveNonoverlappingFieldWidths() throws {
+    let host = UIView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
     let input = MikshatCoordinateInputView()
+    input.translatesAutoresizingMaskIntoConstraints = false
+    host.addSubview(input)
+    NSLayoutConstraint.activate([
+      input.topAnchor.constraint(equalTo: host.topAnchor, constant: 16),
+      input.leadingAnchor.constraint(equalTo: host.leadingAnchor, constant: 16),
+      input.trailingAnchor.constraint(equalTo: host.trailingAnchor, constant: -16),
+    ])
     let rows = input.arrangedSubviews.compactMap { $0 as? UIStackView }
     XCTAssertEqual(rows.count, 2)
-    for row in rows {
-      let fields = row.arrangedSubviews.compactMap { $0 as? UITextField }
-      XCTAssertEqual(fields.count, 2)
-      XCTAssertTrue(row.constraints.contains { constraint in
-        constraint.isActive && constraint.firstItem === fields[0]
-          && constraint.secondItem === fields[1] && constraint.multiplier == 0.65
-      })
+    let widths: [CGFloat] = [320, 390, 844]
+    for width in widths {
+      host.frame.size.width = width
+      host.setNeedsLayout()
+      host.layoutIfNeeded()
+      for row in rows {
+        let fields = row.arrangedSubviews.compactMap { $0 as? UITextField }
+        XCTAssertEqual(fields.count, 2)
+        let degrees = try XCTUnwrap(fields.first)
+        let minutes = try XCTUnwrap(fields.last)
+        let degreeFrame = degrees.convert(degrees.bounds, to: row)
+        let minuteFrame = minutes.convert(minutes.bounds, to: row)
+        let details = coordinateConstraintDiagnostics(degrees: degrees, minutes: minutes)
+        XCTAssertGreaterThan(degreeFrame.width, 0, details)
+        XCTAssertGreaterThan(minuteFrame.width, degreeFrame.width, details)
+        XCTAssertGreaterThan(degreeFrame.height, 0, details)
+        XCTAssertGreaterThan(minuteFrame.height, 0, details)
+        XCTAssertGreaterThanOrEqual(degreeFrame.minX, -1, details)
+        XCTAssertLessThanOrEqual(minuteFrame.maxX, row.bounds.width + 1, details)
+        XCTAssertLessThanOrEqual(degreeFrame.maxX, minuteFrame.minX, details)
+        // The degree field is intentionally narrower than minutes. Use pixel
+        // tolerance for the desired proportion, not exact multiplier equality.
+        XCTAssertEqual(degreeFrame.width, minuteFrame.width * 0.65, accuracy: 1, details)
+      }
     }
   }
 
@@ -451,7 +476,7 @@ final class MikshatMapControlLayoutTests: XCTestCase {
     let map = try XCTUnwrap(MapViewController.shared())
     map.loadViewIfNeeded()
     let home = try XCTUnwrap(map.view.subviews.compactMap { $0 as? MikshatHomeControls }.first)
-    let buttons = MWMSideButtons.buttons().view!
+    let buttons = MWMSideButtons().view!
     XCTAssertFalse(buttons.superview === home.superview, "Regression covers the actual separate containers")
     defer { MWMSideButtons.updateAvailableArea(map.view.bounds) }
     let heights: [CGFloat] = [map.view.bounds.height, 80, 240, map.view.bounds.height]
@@ -642,4 +667,372 @@ final class MikshatCompassLocationIndependenceTests: XCTestCase {
     XCTAssertTrue(labels.contains { $0.text == L("mikshat_waiting") })
     XCTAssertFalse(labels.contains { $0.text?.contains(L("mikshat_location_unavailable")) == true })
   }
+}
+
+private final class SearchThemeFieldProbe: UITextField {
+  var themeApplications = 0
+  override func applyTheme() {
+    themeApplications += 1
+    super.applyTheme()
+  }
+}
+
+private final class SearchThemeBarProbe: UISearchBar {
+  var themeApplications = 0
+  override func applyTheme() {
+    themeApplications += 1
+    super.applyTheme()
+  }
+}
+
+final class SearchThemeWindowLifecycleTests: XCTestCase {
+  func test_UIKitSearchControlsAttachAndDetachWithTheirThemeHooksActive() throws {
+    _ = StyleManager.shared
+    let window = try XCTUnwrap(MapsAppDelegate.theApp().window)
+    let host = UIView(frame: window.bounds)
+    host.isUserInteractionEnabled = false
+    window.addSubview(host)
+    defer { host.removeFromSuperview() }
+    let field = SearchThemeFieldProbe(frame: CGRect(x: 0, y: 0, width: 200, height: 44))
+    field.setStyle(.background)
+    let search = SearchThemeBarProbe(frame: CGRect(x: 0, y: 50, width: 300, height: 44))
+    search.setStyle(.searchOnMapSearchBar)
+    for _ in 0..<20 {
+      host.addSubview(field)
+      host.addSubview(search)
+      XCTAssertTrue(field.window === window)
+      XCTAssertTrue(search.window === window)
+      XCTAssertTrue(field.isStyleApplied)
+      XCTAssertTrue(search.isStyleApplied)
+      field.removeFromSuperview()
+      search.removeFromSuperview()
+      XCTAssertNil(field.window)
+      XCTAssertNil(search.window)
+    }
+    XCTAssertGreaterThanOrEqual(field.themeApplications, 20)
+    XCTAssertGreaterThanOrEqual(search.themeApplications, 20)
+    XCTAssertLessThan(field.themeApplications, 200, "A window notification must finish without recursively re-entering theming")
+    XCTAssertLessThan(search.themeApplications, 200)
+  }
+
+  func test_ReinstallingThemeHooksDoesNotExchangeThemBackToTheOriginalMethods() throws {
+    _ = StyleManager.shared
+    // A second installation must be harmless. Calling twice here would hide an
+    // exchange-based bug by undoing and then reinstalling the hooks.
+    SwizzleStyle.swizzle()
+    defer { SwizzleStyle.swizzle() }
+    let window = try XCTUnwrap(MapsAppDelegate.theApp().window)
+    let field = SearchThemeFieldProbe(frame: CGRect(x: 0, y: 0, width: 200, height: 44))
+    field.setStyle(.background)
+    window.addSubview(field)
+    defer { field.removeFromSuperview() }
+    XCTAssertGreaterThan(field.themeApplications, 0)
+    XCTAssertTrue(field.isStyleApplied)
+  }
+
+  func test_SearchOpensFocusesAndClosesRepeatedlyInNormalAndRoutingModes() throws {
+    let map = try XCTUnwrap(MapViewController.shared())
+    map.loadViewIfNeeded()
+    let restoreHistory = prepareCoordinateHistoryIfRendererRequested()
+    defer { restoreHistory?() }
+    try requireRenderedArabicMapIfRequested(map)
+    let manager = SearchOnMapManager()
+    defer { manager.close() }
+    for routing in [false, true] {
+      for _ in 0..<20 {
+        manager.startSearching(isRouting: routing)
+        let controller = try XCTUnwrap(manager.viewController)
+        let attached = expectation(description: "Search attachment and deferred keyboard focus completed")
+        DispatchQueue.main.async { attached.fulfill() }
+        wait(for: [attached], timeout: 2)
+        XCTAssertTrue(controller.parent === map)
+        let bar = try XCTUnwrap(findSearchBar(in: controller.view))
+        XCTAssertTrue(bar.searchTextField.isFirstResponder)
+        try requireAttachedCoordinateHistoryIndicatorIfRequested(in: controller.view)
+        manager.close()
+        let detached = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in controller.parent == nil }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [detached], timeout: 3), .completed)
+      }
+    }
+  }
+
+  func test_GlobalSearchManagerOpensWithDashboardObserversInPrepareAndNavigation() throws {
+    let map = try XCTUnwrap(MapViewController.shared())
+    map.loadViewIfNeeded()
+    let restoreHistory = prepareCoordinateHistoryIfRendererRequested()
+    defer { restoreHistory?() }
+    try requireRenderedArabicMapIfRequested(map)
+    let manager = map.searchManager
+    let dashboard = MWMNavigationDashboardManager.shared()
+    if let existing = manager.viewController {
+      manager.close()
+      let detached = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in existing.parent == nil }, object: nil)
+      XCTAssertEqual(XCTWaiter.wait(for: [detached], timeout: 3), .completed)
+    }
+    defer {
+      manager.close()
+      dashboard.onRouteStop()
+    }
+    // This is dashboard/observer integration, not a simulated GPS trip. A local
+    // SearchOnMapManager would skip these real dashboard notifications entirely.
+    for navigation in [false, true] {
+      dashboard.onRoutePrepare()
+      if navigation { dashboard.onRouteStart() }
+      for routing in [false, true] {
+        for _ in 0..<3 {
+          manager.startSearching(isRouting: routing)
+          let controller = try XCTUnwrap(manager.viewController)
+          let focused = expectation(description: "Global search notification and keyboard focus complete")
+          DispatchQueue.main.async { focused.fulfill() }
+          wait(for: [focused], timeout: 2)
+          XCTAssertTrue(controller.parent === map)
+          let bar = try XCTUnwrap(findSearchBar(in: controller.view))
+          XCTAssertTrue(bar.searchTextField.isFirstResponder)
+          try requireAttachedCoordinateHistoryIndicatorIfRequested(in: controller.view)
+          XCTAssertEqual(dashboard.state, navigation ? .navigation : .prepare)
+          manager.close()
+          let detached = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in controller.parent == nil }, object: nil)
+          XCTAssertEqual(XCTWaiter.wait(for: [detached], timeout: 3), .completed)
+        }
+      }
+    }
+  }
+
+  private func findSearchBar(in view: UIView) -> UISearchBar? {
+    if let bar = view as? UISearchBar { return bar }
+    return view.subviews.lazy.compactMap { self.findSearchBar(in: $0) }.first
+  }
+}
+
+// Test-only helpers for SearchThemeWindowLifecycleTests. After loading the map:
+//   let restoreHistory = prepareCoordinateHistoryIfRendererRequested()
+//   defer { restoreHistory?() }
+//   try requireRenderedArabicMapIfRequested(map)
+// After each open has focused its search field:
+//   try requireAttachedCoordinateHistoryIndicatorIfRequested(in: controller.view)
+// Ordinary -IsTests runs are unchanged. Use a fresh simulator: the public native
+// history API restores query text/order, but does not expose each saved locale.
+// The workflow must pregrant location and run:
+//   xcrun simctl location <UDID> set 24.7136,46.6753
+// Only this simulator profile starts the existing native LocationManager and
+// waits for its fresh synthetic position. No hardware heading is required.
+
+private let rendererHistoryQuery = "24.71360000,46.67530000"
+private let rendererHistoryCoordinate = CLLocationCoordinate2D(latitude: 24.7136, longitude: 46.6753)
+
+private func prepareCoordinateHistoryIfRendererRequested() -> (() -> Void)? {
+  guard ProcessInfo.processInfo.arguments.contains("-MikshatRequireRenderer") else { return nil }
+  XCTAssertTrue(Thread.isMainThread)
+  let defaults = UserDefaults.standard
+  let selectedIndexKey = "SearchTabViewController_selectedIndexKey"
+  let locationsKey = "mikshat_search_locations"
+  let previousQueries = MWMSearchFrameworkHelper.lastSearchQueries()
+  let previousEnabled = Settings.searchHistoryEnabled()
+  let previousIndex = defaults.object(forKey: selectedIndexKey)
+  let previousLocations = defaults.object(forKey: locationsKey)
+  Settings.setSearchHistoryEnabled(true)
+  Search.save(SearchQuery(rendererHistoryQuery, source: .typedText))
+  MikshatSearchLocations.remember(rendererHistoryCoordinate, query: rendererHistoryQuery)
+  defaults.set(0, forKey: selectedIndexKey)
+  XCTAssertEqual(MWMSearchFrameworkHelper.lastSearchQueries().first, rendererHistoryQuery)
+  return {
+    Settings.setSearchHistoryEnabled(true)
+    MWMSearchFrameworkHelper.clearSearchHistory()
+    for query in previousQueries.reversed() {
+      Search.save(SearchQuery(query, source: .history))
+    }
+    Settings.setSearchHistoryEnabled(previousEnabled)
+    if let previousIndex { defaults.set(previousIndex, forKey: selectedIndexKey) }
+    else { defaults.removeObject(forKey: selectedIndexKey) }
+    if let previousLocations { defaults.set(previousLocations, forKey: locationsKey) }
+    else { defaults.removeObject(forKey: locationsKey) }
+    XCTAssertEqual(MWMSearchFrameworkHelper.lastSearchQueries(), previousQueries)
+  }
+}
+
+private func requireRenderedArabicMapIfRequested(_ map: MapViewController) throws {
+  guard ProcessInfo.processInfo.arguments.contains("-MikshatRequireRenderer") else { return }
+  guard !MapsAppDelegate.isTestsEnvironment() else {
+    throw NSError(domain: "MikshatSearchRendererSetup", code: 1,
+                  userInfo: [NSLocalizedDescriptionKey: "Remove -IsTests: it disables normal Drape creation."])
+  }
+  XCTAssertTrue(Thread.isMainThread)
+  let language = Locale.preferredLanguages.first ?? ""
+  guard language.hasPrefix("ar") else {
+    throw NSError(domain: "MikshatSearchRendererSetup", code: 2,
+                  userInfo: [NSLocalizedDescriptionKey: "Arabic launch arguments were not applied: \(language)"])
+  }
+  XCTAssertEqual(UIView.userInterfaceLayoutDirection(for: .unspecified), .rightToLeft)
+  // Hosted tests can start while UIKit is still activating the application.
+  // Wait for its real foreground window before requesting normal map layout.
+  let foregroundReady = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+    guard UIApplication.shared.applicationState == .active,
+          let window = map.viewIfLoaded?.window else { return false }
+    return window.isKeyWindow && !window.isHidden && window.alpha > 0 && !window.bounds.isEmpty
+  }, object: nil)
+  let foregroundOutcome = XCTWaiter.wait(for: [foregroundReady], timeout: 20)
+  guard foregroundOutcome == .completed else {
+    let window = map.viewIfLoaded?.window
+    try? appendRendererCoverage(event: "setup-failed", map: map,
+                                extra: ["stage": "application-activation",
+                                        "applicationState": UIApplication.shared.applicationState.rawValue,
+                                        "windowAttached": window != nil,
+                                        "windowKey": window?.isKeyWindow ?? false,
+                                        "windowHidden": window?.isHidden ?? true,
+                                        "waitOutcome": String(describing: foregroundOutcome)])
+    throw NSError(domain: "MikshatSearchRendererSetup", code: 7,
+                  userInfo: [NSLocalizedDescriptionKey: "Application did not become active with a visible key window within 20 seconds; search-rendering coverage was not executed."])
+  }
+  XCTAssertEqual(map.view.effectiveUserInterfaceLayoutDirection, .rightToLeft)
+  let window = try XCTUnwrap(map.view.window)
+  XCTAssertFalse(window.isHidden)
+  XCTAssertTrue(window.isKeyWindow)
+  XCTAssertEqual(UIApplication.shared.applicationState, .active)
+  // Exercise the normal MapViewController layout path; do not explicitly create
+  // a renderer here, as that would conceal an incorrect launch configuration.
+  map.view.setNeedsLayout()
+  map.view.layoutIfNeeded()
+  let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+    map.mapView.drapeEngineCreated && map.mapView.graphicContextInitialized
+  }, object: nil)
+  let outcome = XCTWaiter.wait(for: [ready], timeout: 30)
+  XCTAssertEqual(outcome, .completed, "Normal Drape creation and both graphics contexts must complete before opening search")
+  guard outcome == .completed else {
+    throw NSError(domain: "MikshatSearchRendererSetup", code: 3,
+                  userInfo: [NSLocalizedDescriptionKey: "Renderer did not become ready; this is not an executed search-rendering regression test."])
+  }
+  let layerClass = String(describing: type(of: map.mapView.layer))
+  XCTAssertEqual(layerClass, "CAMetalLayer", "Do not describe an OpenGL fallback as Metal coverage")
+  print("MikshatSearch renderer-ready=true layer=\(layerClass) language=\(language) direction=RTL")
+  try appendRendererCoverage(event: "renderer-ready", map: map, extra: [:])
+  try requireSyntheticSimulatorLocationIfRequested(map)
+}
+
+private func requireSyntheticSimulatorLocationIfRequested(_ map: MapViewController) throws {
+  guard ProcessInfo.processInfo.arguments.contains("-MikshatRequireRenderer") else { return }
+#if targetEnvironment(simulator)
+  XCTAssertTrue(Thread.isMainThread)
+  // Starting the production owner is idempotent; do not inject CLLocation into
+  // Framework or call the heading sensor directly from this diagnostic test.
+  LocationManager.start()
+  let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+    guard let fix = MikshatHeading.currentLocation else { return false }
+    let expected = CLLocation(latitude: rendererHistoryCoordinate.latitude,
+                              longitude: rendererHistoryCoordinate.longitude)
+    return fix.distance(from: expected) <= 100
+  }, object: nil)
+  let outcome = XCTWaiter.wait(for: [ready], timeout: 20)
+  guard outcome == .completed else {
+    try? appendRendererCoverage(event: "gps-setup-failed", map: map,
+                                extra: ["syntheticPosition": true,
+                                        "freshLocationAvailable": MikshatHeading.currentLocation != nil,
+                                        "locationProhibited": LocationManager.isLocationProhibited(),
+                                        "nativeLocationStarted": LocationManager.isStarted()])
+    throw NSError(domain: "MikshatSearchRendererSetup", code: 4,
+                  userInfo: [NSLocalizedDescriptionKey: "Synthetic simulator GPS setup failed before search: verify simctl location and pregranted permission; search history/heading coverage was not executed."])
+  }
+  try appendRendererCoverage(event: "gps-ready", map: map,
+                             extra: ["syntheticPosition": true,
+                                     "freshLocationAvailable": true,
+                                     "sensorHeadingRequired": false])
+#else
+  try? appendRendererCoverage(event: "gps-setup-failed", map: map,
+                              extra: ["syntheticPosition": false,
+                                      "reason": "This diagnostic profile requires an iOS simulator."])
+  throw NSError(domain: "MikshatSearchRendererSetup", code: 5,
+                userInfo: [NSLocalizedDescriptionKey: "Use an iOS simulator for the controlled synthetic GPS profile."])
+#endif
+}
+
+private func requireAttachedCoordinateHistoryIndicatorIfRequested(in view: UIView) throws {
+  guard ProcessInfo.processInfo.arguments.contains("-MikshatRequireRenderer") else { return }
+  let map = try XCTUnwrap(MapViewController.shared())
+  guard MikshatHeading.currentLocation != nil else {
+    try? appendRendererCoverage(event: "gps-setup-failed", map: map,
+                                extra: ["syntheticPosition": true,
+                                        "freshLocationAvailable": false,
+                                        "reason": "The synthetic fix became stale before a history attachment assertion."])
+    throw NSError(domain: "MikshatSearchRendererSetup", code: 6,
+                  userInfo: [NSLocalizedDescriptionKey: "Synthetic GPS became stale; this iteration cannot establish history reading() coverage."])
+  }
+  view.setNeedsLayout()
+  view.layoutIfNeeded()
+  let attached = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+    attachedCoordinateHistoryIndicator(in: view) != nil
+  }, object: nil)
+  let outcome = XCTWaiter.wait(for: [attached], timeout: 5)
+  XCTAssertEqual(outcome, .completed, "Seeded coordinate history must attach its direction indicator in an on-screen history cell")
+  let indicator = try XCTUnwrap(attachedCoordinateHistoryIndicator(in: view))
+  // Without a hardware heading the indicator correctly has alpha == 0. Its
+  // on-screen cell/window attachment proves the history lifecycle was exercised.
+  try appendRendererCoverage(event: "history-indicator-attached", map: map,
+                             extra: ["indicatorAlpha": indicator.alpha,
+                                     "freshLocationAvailable": MikshatHeading.currentLocation != nil])
+}
+
+private func attachedCoordinateHistoryIndicator(in view: UIView) -> MikshatDirectionIndicator? {
+  if let indicator = view as? MikshatDirectionIndicator,
+     let target = indicator.target,
+     abs(target.latitude - rendererHistoryCoordinate.latitude) < 0.00000001,
+     abs(target.longitude - rendererHistoryCoordinate.longitude) < 0.00000001,
+     let window = indicator.window,
+     !indicator.isHidden,
+     !indicator.bounds.isEmpty,
+     indicator.convert(indicator.bounds, to: window).intersects(window.bounds) {
+    var ancestor = indicator.superview
+    var hasVisibleHistoryCell = false
+    while let parent = ancestor {
+      if parent.isHidden || parent.alpha <= 0 { return nil }
+      if parent is SearchHistoryCell { hasVisibleHistoryCell = true }
+      ancestor = parent.superview
+    }
+    if hasVisibleHistoryCell { return indicator }
+  }
+  for subview in view.subviews {
+    if let indicator = attachedCoordinateHistoryIndicator(in: subview) { return indicator }
+  }
+  return nil
+}
+
+private func appendRendererCoverage(event: String, map: MapViewController, extra: [String: Any]) throws {
+  var entry: [String: Any] = [
+    "event": event,
+    "timestamp": ISO8601DateFormatter().string(from: Date()),
+    "layer": String(describing: type(of: map.mapView.layer)),
+    "language": Locale.preferredLanguages.first ?? "",
+    "direction": map.view.effectiveUserInterfaceLayoutDirection == .rightToLeft ? "RTL" : "LTR",
+    "device": UIDevice.current.model,
+    "systemVersion": UIDevice.current.systemVersion,
+    "active": UIApplication.shared.applicationState == .active,
+    "rendererReady": map.mapView.drapeEngineCreated,
+    "graphicsReady": map.mapView.graphicContextInitialized,
+  ]
+  entry.merge(extra) { _, new in new }
+  var data = try JSONSerialization.data(withJSONObject: entry, options: [.sortedKeys])
+  data.append(0x0a)
+  let directory = try FileManager.default.url(for: .documentDirectory, in: .userDomainMask,
+                                              appropriateFor: nil, create: true)
+  let url = directory.appendingPathComponent("mikshat-renderer-coverage.jsonl")
+  if !FileManager.default.fileExists(atPath: url.path) {
+    XCTAssertTrue(FileManager.default.createFile(atPath: url.path, contents: nil))
+  }
+  let file = try FileHandle(forWritingTo: url)
+  defer { try? file.close() }
+  try file.seekToEnd()
+  try file.write(contentsOf: data)
+}
+
+
+private func coordinateConstraintDiagnostics(degrees: UITextField, minutes: UITextField) -> String {
+  var descriptions: [String] = []
+  var ancestor: UIView? = degrees
+  while let owner = ancestor {
+    for constraint in owner.constraints where constraint.firstItem === degrees || constraint.firstItem === minutes
+      || constraint.secondItem === degrees || constraint.secondItem === minutes {
+      let multiplier = String(format: "%.17g", Double(constraint.multiplier))
+      descriptions.append("owner=\(type(of: owner)) active=\(constraint.isActive) multiplier=\(multiplier) \(constraint)")
+    }
+    ancestor = owner.superview
+  }
+  return "degrees=\(degrees.frame) minutes=\(minutes.frame)\n" + descriptions.joined(separator: "\n")
 }

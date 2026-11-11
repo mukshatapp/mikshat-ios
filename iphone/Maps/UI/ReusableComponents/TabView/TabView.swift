@@ -1,3 +1,20 @@
+private class TabContentFlowLayout: UICollectionViewFlowLayout {
+  override func shouldInvalidateLayout(forBoundsChange newBounds: CGRect) -> Bool {
+    let sizeChanged = collectionView.map { $0.bounds.size != newBounds.size } ?? false
+    return sizeChanged || super.shouldInvalidateLayout(forBoundsChange: newBounds)
+  }
+
+  override func invalidationContext(forBoundsChange newBounds: CGRect) -> UICollectionViewLayoutInvalidationContext {
+    let context = super.invalidationContext(forBoundsChange: newBounds)
+    if let collectionView, collectionView.bounds.size != newBounds.size,
+       let flowContext = context as? UICollectionViewFlowLayoutInvalidationContext {
+      flowContext.invalidateFlowLayoutDelegateMetrics = true
+      flowContext.invalidateFlowLayoutAttributes = true
+    }
+    return context
+  }
+}
+
 private class ContentCell: UICollectionViewCell {
   var view: UIView? {
     didSet {
@@ -88,7 +105,7 @@ class TabView: UIView {
   }
 
   private let tabsLayout = UICollectionViewFlowLayout()
-  private let tabsContentLayout = UICollectionViewFlowLayout()
+  private let tabsContentLayout: UICollectionViewFlowLayout = TabContentFlowLayout()
   private let tabsCollectionView: UICollectionView
   private let tabsContentCollectionView: UICollectionView
   private let headerView = UIView()
@@ -329,10 +346,14 @@ class TabView: UIView {
     if contentSize != lastContentSize {
       // Record geometry before scrolling, which may synchronously trigger layout.
       lastContentSize = contentSize
-      tabsContentLayout.invalidateLayout()
+      let invalidation = UICollectionViewFlowLayoutInvalidationContext()
+      invalidation.invalidateFlowLayoutDelegateMetrics = true
+      invalidation.invalidateFlowLayoutAttributes = true
+      tabsContentLayout.invalidateLayout(with: invalidation)
       if contentSize.width > 0, contentSize.height > 0,
          !tabsContentCollectionView.isDragging, !tabsContentCollectionView.isDecelerating,
          let selectedIndex, hasContentItem(at: selectedIndex) {
+        tabsContentCollectionView.layoutIfNeeded()
         tabsContentCollectionView.scrollToItem(at: IndexPath(item: selectedIndex, section: 0),
                                                at: .left,
                                                animated: false)

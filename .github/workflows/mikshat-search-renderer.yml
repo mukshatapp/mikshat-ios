@@ -1,0 +1,524 @@
+name: Mikshat rendered Arabic search regression
+'on':
+  push:
+    branches:
+    - diagnostics/search-full-app
+  workflow_dispatch: null
+permissions:
+  contents: read
+concurrency:
+  group: mikshat-search-renderer-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  rendered-search:
+    name: Normal Metal renderer and Arabic on iPhone 16 / iOS 26
+    if: contains(github.event.head_commit.message, '[renderer-only]') || github.event_name == 'workflow_dispatch'
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+    steps:
+    - name: Check out the diagnostic revision
+      uses: actions/checkout@v4
+    - name: Record toolchain and available simulators
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p build/search-diagnostics
+        xcodebuild -version | tee build/search-diagnostics/toolchain.txt
+        printf 'MIKSHAT_XCODE_CACHE_ID=%s\n' "$(xcodebuild -version | tr -cs '[:alnum:]' '-')" >> "$GITHUB_ENV"
+        xcrun --sdk iphonesimulator --show-sdk-version | tee -a build/search-diagnostics/toolchain.txt
+        uname -m | tee -a build/search-diagnostics/toolchain.txt
+        xcrun simctl list --json runtimes > build/search-diagnostics/runtimes.json
+        xcrun simctl list --json devicetypes > build/search-diagnostics/device-types.json
+    - name: Fetch pinned submodules
+      shell: bash
+      run: |
+        set -euo pipefail
+        git submodule update --init --recursive --depth 1 --jobs 8
+    - name: Prepare app resources
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 mikshat/prepare_branding.py
+        python3 mikshat/prepare_satellite.py
+    - name: Ensure Metal compiler is available
+      shell: bash
+      run: |
+        set -euo pipefail
+        if ! xcrun metal -v >/dev/null 2>&1; then
+          xcodebuild -downloadComponent MetalToolchain
+          xcrun -k
+        fi
+        xcrun metal -v
+    - name: Restore compiled objects for this Xcode toolchain
+      id: derived-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: build/SearchDerivedData
+        key: mikshat-search-derived-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.MIKSHAT_XCODE_CACHE_ID }}-${{ github.sha }}-${{ github.run_id
+          }}-${{ github.run_attempt }}
+        restore-keys: |
+          mikshat-search-derived-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.MIKSHAT_XCODE_CACHE_ID }}-
+    - name: Restore unchanged build input timestamps
+      shell: bash
+      run: |
+        set -euo pipefail
+        cat > build/search-diagnostics/cache-input-mtimes.py <<'PY'
+        from pathlib import Path
+        import hashlib
+        import json
+        import os
+        import sys
+
+        manifest = Path('build/SearchDerivedData/mikshat-input-mtimes.json')
+        roots = ('iphone', 'libs', 'xcode', 'data', '3party', 'private')
+        def inputs():
+            for root in roots:
+                if not Path(root).is_dir():
+                    continue
+                for directory, children, files in os.walk(root):
+                    children[:] = [name for name in children if name not in ('.git', '__pycache__', 'node_modules')]
+                    yield Path(directory)
+                    for name in files:
+                        if name != '.git':
+                            yield Path(directory) / name
+        def digest(path):
+            if path.is_dir():
+                names = sorted(child.name for child in path.iterdir() if child.name != '.git')
+                return hashlib.sha256('\n'.join(names).encode()).hexdigest()
+            result = hashlib.sha256()
+            with path.open('rb') as stream:
+                for block in iter(lambda: stream.read(1024 * 1024), b''):
+                    result.update(block)
+            return result.hexdigest()
+        if sys.argv[1] == 'restore':
+            restored = 0
+            if manifest.exists():
+                for item in json.loads(manifest.read_text()):
+                    path = Path(item['path'])
+                    if path.exists() and not path.is_symlink() and digest(path) == item['sha256']:
+                        os.utime(path, ns=(path.stat().st_atime_ns, item['mtime_ns']))
+                        restored += 1
+            print(f'Restored timestamps for {restored} unchanged build inputs')
+        else:
+            entries = []
+            for path in inputs():
+                if path.exists() and not path.is_symlink():
+                    entries.append(dict(path=str(path), sha256=digest(path), mtime_ns=path.stat().st_mtime_ns))
+            manifest.parent.mkdir(parents=True, exist_ok=True)
+            manifest.write_text(json.dumps(entries))
+            print(f'Recorded {len(entries)} build input timestamps')
+        PY
+        python3 build/search-diagnostics/cache-input-mtimes.py restore
+    - name: Select and boot iPhone 16 with iOS 26
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 - <<'PY'
+        import json
+        import os
+        from pathlib import Path
+        import subprocess
+
+        def simctl(*arguments):
+            return subprocess.run(['xcrun', 'simctl', *arguments], check=True, capture_output=True, text=True).stdout
+
+        runtimes = json.loads(simctl('list', '--json', 'runtimes'))['runtimes']
+        candidates = [runtime for runtime in runtimes
+                      if runtime.get('isAvailable')
+                      and runtime.get('identifier', '').startswith('com.apple.CoreSimulator.SimRuntime.iOS-26-')]
+        if not candidates:
+            raise SystemExit('No available iOS 26 runtime. See build/search-diagnostics/runtimes.json; do not substitute another iOS version silently.')
+        runtime = max(candidates, key=lambda value: tuple(int(part) for part in value['version'].split('.')))
+        device_type = 'com.apple.CoreSimulator.SimDeviceType.iPhone-16'
+        device_types = json.loads(simctl('list', '--json', 'devicetypes'))['devicetypes']
+        if not any(value['identifier'] == device_type for value in device_types):
+            raise SystemExit('This Xcode installation has no iPhone 16 simulator device type.')
+        devices = json.loads(simctl('list', '--json', 'devices', 'available'))['devices']
+        matching = [device for device in devices.get(runtime['identifier'], [])
+                    if device.get('deviceTypeIdentifier') == device_type]
+        if matching:
+            device = matching[0]
+            udid = device['udid']
+            if device['state'] != 'Booted':
+                simctl('boot', udid)
+        else:
+            udid = simctl('create', 'Mikshat Search iPhone 16', device_type, runtime['identifier']).strip()
+            simctl('boot', udid)
+        subprocess.run(['xcrun', 'simctl', 'bootstatus', udid, '-b'], check=True)
+        selection = dict(device='iPhone 16', udid=udid, runtime=runtime['identifier'], version=runtime['version'])
+        Path('build/search-diagnostics/simulator-selection.json').write_text(json.dumps(selection, indent=2) + '\n')
+        with open(os.environ['GITHUB_ENV'], 'a') as stream:
+            stream.write(f'MIKSHAT_SIMULATOR_UDID={udid}\n')
+        print(json.dumps(selection))
+        PY
+    - name: Compile actual app and test bundle without launching the test host
+      id: renderer-build
+      timeout-minutes: 30
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 - <<'PYCODE'
+        from pathlib import Path
+        source = Path('iphone/Maps/Tests/UI/SearchOnMapTests/SearchOnMapViewTests.swift').read_text()
+        if source.count('try requireRenderedArabicMapIfRequested(map)') < 2 or 'renderer-ready=true' not in source:
+            raise SystemExit('Renderer/Arabic precondition helper is not installed in both selected tests; refusing a false coverage run.')
+        PYCODE
+        xcodebuild build-for-testing \
+          -workspace xcode/omim.xcworkspace \
+          -scheme OMaps \
+          -configuration Debug \
+          -sdk iphonesimulator \
+          -destination "id=$MIKSHAT_SIMULATOR_UDID" \
+          -destination-timeout 120 \
+          -derivedDataPath build/SearchDerivedData \
+          -resultBundlePath build/RendererBuild.xcresult \
+          ARCHS="$(uname -m)" \
+          ONLY_ACTIVE_ARCH=YES \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGNING_ALLOWED=NO \
+          2>&1 | tee build/search-diagnostics/xcodebuild-renderer-build.log
+    - name: Locate the original native test plan
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 - <<'PYCODE'
+        from pathlib import Path
+        import os,plistlib
+        products=Path('build/SearchDerivedData/Build/Products').resolve()
+        plans=[p for p in products.glob('*.xctestrun') if p.name!='MikshatRendererArabic.xctestrun']
+        if not plans:
+            raise SystemExit('build-for-testing did not produce an original xctestrun file')
+        original=max(plans,key=lambda path:path.stat().st_mtime_ns)
+        with original.open('rb') as stream:plan=plistlib.load(stream)
+        arguments=[]
+        def inspect(value):
+            if isinstance(value,dict):
+                if value.get('BlueprintName')=='OMapsTests' or str(value.get('TestBundlePath','')).endswith('/OMapsTests.xctest'):
+                    arguments.append(value.get('CommandLineArguments',[]))
+                for child in value.values():inspect(child)
+            elif isinstance(value,list):
+                for child in value:inspect(child)
+        inspect(plan)
+        if not arguments or any('-IsTests' not in args or '-MikshatRequireRenderer' in args for args in arguments):
+            raise SystemExit('The original OMapsTests plan must retain -IsTests and exclude renderer diagnostics')
+        with open(os.environ['GITHUB_ENV'],'a') as stream:
+            stream.write(f'MIKSHAT_NATIVE_XCTESTRUN={original}\n')
+        print(f'Native candidate test plan: {original}; -IsTests retained')
+        PYCODE
+    - name: Recheck all 17 native search regressions with candidate production code
+      id: native-tests
+      timeout-minutes: 8
+      shell: bash
+      run: |
+        set -euo pipefail
+        xcodebuild test-without-building \
+          -xctestrun "$MIKSHAT_NATIVE_XCTESTRUN" \
+          -destination "id=$MIKSHAT_SIMULATOR_UDID" \
+          -destination-timeout 120 \
+          -resultBundlePath build/NativeSearchRecheck.xcresult \
+          -parallel-testing-enabled NO \
+          -maximum-concurrent-test-simulator-destinations 1 \
+          -test-timeouts-enabled YES \
+          -default-test-execution-time-allowance 120 \
+          -maximum-test-execution-time-allowance 180 \
+          -only-testing:OMapsTests/SearchThemeWindowLifecycleTests \
+          -only-testing:OMapsTests/SearchOnMapManagerTests \
+          -only-testing:OMapsTests/SearchOnMapHeaderViewTests \
+          -only-testing:OMapsTests/SearchTabLayoutRegressionTests \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGNING_ALLOWED=NO \
+          2>&1 | tee build/search-diagnostics/xcodebuild-native-search-recheck.log
+    - name: Verify the native regression suite really executed and passed
+      if: always() && steps.native-tests.outcome != 'skipped'
+      shell: bash
+      env:
+        MIKSHAT_NATIVE_OUTCOME: ${{ steps.native-tests.outcome }}
+      run: |
+        python3 - <<'PYCODE'
+        from pathlib import Path
+        import json,os,re
+        path=Path('build/search-diagnostics/xcodebuild-native-search-recheck.log')
+        text=path.read_text(errors='replace') if path.exists() else ''
+        started=re.findall(r'Test Case (.*?) started',text)
+        counts=[dict(tests=int(tests),failures=int(failures))
+                for tests,failures in re.findall(r'Executed (\d+) tests?, with (\d+) failures?',text)]
+        test_failures=[line for line in text.splitlines() if re.search(r'Test Case .* failed|:\d+: error: -\[',line)]
+        passed=os.environ.get('MIKSHAT_NATIVE_OUTCOME')=='success' and len(started)>=17 and any(row['tests']>=17 and row['failures']==0 for row in counts) and not test_failures
+        report=dict(status='test_execution' if started else 'no_test_execution_recorded',testCasesStarted=len(started),
+                    executionSummaries=counts,testFailures=test_failures[-30:],allNativeRegressionsPassed=passed,
+                    requirement='All 17 or more native search regressions must execute successfully before renderer coverage')
+        Path('build/search-diagnostics/native-search-recheck-summary.json').write_text(json.dumps(report,indent=2)+'\n')
+        if os.environ.get('GITHUB_STEP_SUMMARY'):
+            with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as stream:
+                stream.write(f"### Native candidate search recheck\n\nStarted: {len(started)}; all native regressions passed: {passed}.\n\nExecution summaries: {counts}\n\n")
+        print(json.dumps(report))
+        if not passed:
+            raise SystemExit('Native regression validation did not pass. Do not claim the known layout failures are fixed.')
+        PYCODE
+    - name: Configure normal renderer and Arabic launch arguments
+      id: renderer-config
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 - <<'PYCODE'
+        from pathlib import Path
+        import json,math,os,plistlib,subprocess
+        products=Path('build/SearchDerivedData/Build/Products').resolve()
+        plans=[p for p in products.glob('*.xctestrun') if p.name!='MikshatRendererArabic.xctestrun']
+        if not plans:
+            raise SystemExit('build-for-testing did not produce an xctestrun file')
+        original=Path(os.environ['MIKSHAT_NATIVE_XCTESTRUN'])
+        with original.open('rb') as stream:
+            plan=plistlib.load(stream)
+        patched=[]
+        extra=['-MikshatRequireRenderer','-AppleLanguages','(ar)','-AppleLocale','ar_SA',
+               '-AlohalyticsInstallationId','I:MikshatRendererDiagnostics']
+        def patch(value):
+            if isinstance(value,dict):
+                if value.get('BlueprintName')=='OMapsTests' or str(value.get('TestBundlePath','')).endswith('/OMapsTests.xctest'):
+                    args=value.get('CommandLineArguments',[])
+                    if not isinstance(args,list) or not all(isinstance(item,str) for item in args):
+                        raise SystemExit('Unexpected xctestrun argument format')
+                    filtered=[]
+                    skip=False
+                    for arg in args:
+                        if skip:
+                            skip=False
+                            continue
+                        if arg in ('-AppleLanguages','-AppleLocale','-AlohalyticsInstallationId'):
+                            skip=True
+                        elif arg not in ('-IsTests','-MikshatRequireRenderer'):
+                            filtered.append(arg)
+                    value['CommandLineArguments']=filtered+extra
+                    patched.append(dict(target=value.get('BlueprintName','OMapsTests'),arguments=value['CommandLineArguments']))
+                for child in value.values():patch(child)
+            elif isinstance(value,list):
+                for child in value:patch(child)
+        patch(plan)
+        if not patched:
+            raise SystemExit('No OMapsTests target found in generated xctestrun')
+        # __TESTROOT__ paths remain valid because this copy stays beside the original.
+        target=products/'MikshatRendererArabic.xctestrun'
+        with target.open('wb') as stream:plistlib.dump(plan,stream)
+        apps=[]
+        for path in (products/'Debug-iphonesimulator').glob('*.app'):
+            with (path/'Info.plist').open('rb') as stream:info=plistlib.load(stream)
+            if info.get('CFBundleIdentifier')=='com.mikshat.maps.debug':apps.append(path)
+        if len(apps)!=1:
+            raise SystemExit(f'Expected one Debug app, found {len(apps)}')
+        app=apps[0]
+        udid=os.environ['MIKSHAT_SIMULATOR_UDID']
+        bundle='com.mikshat.maps.debug'
+        previous=subprocess.run(['xcrun','simctl','get_app_container',udid,bundle,'data'],capture_output=True,text=True)
+        old_container=previous.stdout.strip() if previous.returncode==0 else None
+        # Native regression fixtures persist screen geometry/settings. Give
+        # normal rendering a fresh sandbox while reusing the same built app.
+        print(json.dumps(dict(event='renderer-isolation-start',bundleIdentifier=bundle,oldContainer=old_container)))
+        subprocess.run(['xcrun','simctl','uninstall',udid,bundle],check=True)
+        subprocess.run(['xcrun','simctl','install',udid,str(app)],check=True)
+        container=subprocess.run(['xcrun','simctl','get_app_container',udid,bundle,'data'],check=True,capture_output=True,text=True).stdout.strip()
+        isolation=dict(bundleIdentifier=bundle,oldContainer=old_container,newContainer=container,
+                       reason='Uninstall/reinstall only the diagnostic Debug app to discard native-test persisted screen geometry and settings before normal rendering; compiled app and test products are reused unchanged.')
+        # AnyRectD serializes global centre x/y, angle, then local min/max x/y.
+        # Keep this search profile near synthetic GPS instead of World overview.
+        latitude,longitude=24.7136,46.6753
+        mercator_y=math.degrees(math.log(math.tan(math.pi/4+math.radians(latitude)/2)))
+        viewport_values=(longitude,mercator_y,0,-0.1,-0.2,0.1,0.2)
+        if not all(math.isfinite(value) for value in viewport_values):
+            raise SystemExit('Controlled search viewport must contain seven finite values')
+        if not (-180<longitude-0.1<longitude+0.1<180 and -180<mercator_y-0.2<mercator_y+0.2<180):
+            raise SystemExit('Controlled search viewport must fit inside the Mercator world')
+        viewport_text=' '.join(format(value,'.12g') for value in viewport_values)
+        settings_path=Path(container)/'Documents/settings.ini'
+        settings_path.parent.mkdir(parents=True,exist_ok=True)
+        settings_lines=settings_path.read_text().splitlines() if settings_path.exists() else []
+        settings_lines=[line for line in settings_lines if not line.startswith('ScreenClipRect=')]
+        settings_lines.append('ScreenClipRect='+viewport_text)
+        settings_path.write_text('\n'.join(settings_lines)+'\n')
+        viewport=dict(settingsPath=str(settings_path),key='ScreenClipRect',text=viewport_text,
+                      syntheticGps=[latitude,longitude],serialization='AnyRectD: centreX centreY angle localMinX localMinY localMaxX localMaxY',
+                      reason='Controlled valid local search viewport around synthetic Riyadh GPS; excludes World overview assertion coverage. Production assertions remain enabled.')
+        (Path(container)/'Documents/mikshat-renderer-coverage.jsonl').unlink(missing_ok=True)
+        privacy=[]
+        for service in ('location','location-always'):
+            result=subprocess.run(['xcrun','simctl','privacy',udid,'grant',service,'com.mikshat.maps.debug'],capture_output=True,text=True)
+            privacy.append(dict(service=service,returncode=result.returncode,output=result.stdout+result.stderr))
+        location=subprocess.run(['xcrun','simctl','location',udid,'set','24.7136,46.6753'],capture_output=True,text=True)
+        synthetic=dict(source='simctl fixed location; not a user GPS reading',coordinate='24.7136,46.6753',returncode=location.returncode,output=location.stdout+location.stderr)
+        Path('build/search-diagnostics/renderer-launch.json').write_text(json.dumps(dict(original=str(original),patched=str(target),targets=patched,privacy=privacy,syntheticLocation=synthetic,containerIsolation=isolation,controlledViewport=viewport,
+            firstSession='Seeded installation ID via launch arguments to match an existing app user'),indent=2)+'\n')
+        with open(os.environ['GITHUB_ENV'],'a') as stream:
+            stream.write(f'MIKSHAT_RENDERER_XCTESTRUN={target}\n')
+            stream.write('MIKSHAT_RENDERER_APP_ID=com.mikshat.maps.debug\n')
+        print(json.dumps(dict(targets=patched,containerIsolation=isolation,controlledViewport=viewport)))
+        PYCODE
+    - name: Run only the normal-renderer Arabic search cases
+      id: renderer-tests
+      timeout-minutes: 8
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Alternate this test simulator's synthetic position by about 11 metres
+        # to pass native 2–5 metre distance filters. Both points stay within the
+        # helper's 100 metre radius; no user GPS reading or heading is asserted.
+        python3 -u - "$MIKSHAT_SIMULATOR_UDID" > build/search-diagnostics/synthetic-location-refresh.jsonl 2>&1 <<'PYCODE' &
+        import datetime,json,subprocess,sys,time
+        udid=sys.argv[1]
+        deadline=time.monotonic()+480
+        iteration=0
+        while time.monotonic()<deadline:
+            latitude=24.7136 if iteration%2==0 else 24.7137
+            coordinate=f'{latitude:.4f},46.6753'
+            attempt=dict(timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                         source='simctl alternating synthetic locations; not user GPS readings',
+                         coordinate=coordinate,latitude=latitude,longitude=46.6753)
+            try:
+                result=subprocess.run(['xcrun','simctl','location',udid,'set',coordinate],
+                                      capture_output=True,text=True,timeout=10)
+                attempt.update(returncode=result.returncode,output=result.stdout+result.stderr)
+            except subprocess.TimeoutExpired:
+                attempt.update(returncode=None,error='simctl location timed out after 10 seconds')
+            print(json.dumps(attempt),flush=True)
+            iteration+=1
+            time.sleep(min(3,max(0,deadline-time.monotonic())))
+        PYCODE
+        location_refresh_pid=$!
+        cleanup_location_refresh() {
+          kill "$location_refresh_pid" 2>/dev/null || true
+          wait "$location_refresh_pid" 2>/dev/null || true
+        }
+        trap cleanup_location_refresh EXIT
+        trap 'exit 130' INT
+        trap 'exit 143' TERM
+        xcodebuild test-without-building \
+          -xctestrun "$MIKSHAT_RENDERER_XCTESTRUN" \
+          -destination "id=$MIKSHAT_SIMULATOR_UDID" \
+          -destination-timeout 120 \
+          -resultBundlePath build/RendererArabicSearch.xcresult \
+          -parallel-testing-enabled NO \
+          -maximum-concurrent-test-simulator-destinations 1 \
+          -test-timeouts-enabled YES \
+          -default-test-execution-time-allowance 120 \
+          -maximum-test-execution-time-allowance 180 \
+          -only-testing:OMapsTests/SearchThemeWindowLifecycleTests/test_SearchOpensFocusesAndClosesRepeatedlyInNormalAndRoutingModes \
+          -only-testing:OMapsTests/SearchThemeWindowLifecycleTests/test_GlobalSearchManagerOpensWithDashboardObserversInPrepareAndNavigation \
+          -only-testing:OMapsTests/SearchOnMapHeaderViewTests/test_CoordinateInputLaysOutBothRowsWithPositiveNonoverlappingFieldWidths \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGNING_ALLOWED=NO \
+          2>&1 | tee build/search-diagnostics/xcodebuild-renderer-arabic-tests.log
+    - name: Verify actual renderer and Arabic coverage
+      if: always()
+      shell: bash
+      run: |
+        mkdir -p build/search-diagnostics
+        python3 - <<'PYCODE'
+        from pathlib import Path
+        import json,os,subprocess
+        udid=os.environ.get('MIKSHAT_SIMULATOR_UDID')
+        bundle=os.environ.get('MIKSHAT_RENDERER_APP_ID')
+        entries=[]
+        if udid and bundle:
+            result=subprocess.run(['xcrun','simctl','get_app_container',udid,bundle,'data'],capture_output=True,text=True)
+            if result.returncode==0:
+                path=Path(result.stdout.strip())/'Documents/mikshat-renderer-coverage.jsonl'
+                if path.exists():
+                    contents=path.read_text()
+                    Path('build/search-diagnostics/renderer-coverage.jsonl').write_text(contents)
+                    entries=[json.loads(line) for line in contents.splitlines() if line.strip()]
+        valid=[item for item in entries if item.get('event')=='renderer-ready' and item.get('layer')=='CAMetalLayer' and str(item.get('language','')).startswith('ar')
+               and item.get('direction')=='RTL' and item.get('rendererReady') and item.get('graphicsReady') and item.get('active')]
+        gps=sum(item.get('event')=='gps-ready' and item.get('syntheticPosition') is True
+                and item.get('freshLocationAvailable') is True for item in entries)
+        gps_failures=sum(item.get('event')=='gps-setup-failed' for item in entries)
+        indicators=sum(item.get('event')=='history-indicator-attached' and item.get('freshLocationAvailable') is True for item in entries)
+        confirmed=len(valid)>=2 and gps>=2 and gps_failures==0 and indicators>0
+        report=dict(entries=len(entries),validatedEntries=len(valid),syntheticGpsReadyEntries=gps,gpsSetupFailures=gps_failures,
+                    historyIndicatorEntries=indicators,coverageConfirmed=confirmed,
+                    requirement='Both tests must confirm active Drape/Metal, Arabic/RTL and fresh synthetic GPS, with attached history indicators and no GPS setup failure')
+        Path('build/search-diagnostics/renderer-coverage-summary.json').write_text(json.dumps(report,indent=2)+'\n')
+        print(json.dumps(report))
+        if not confirmed:
+            raise SystemExit('Normal renderer / Arabic / fresh synthetic GPS coverage not established. This is not proof of a search failure or fix.')
+        PYCODE
+    - name: Collect app crash reports and simulator log
+      if: always()
+      shell: bash
+      run: |
+        mkdir -p build/search-diagnostics/crash-reports
+        python3 - <<'PY'
+        from pathlib import Path
+        import json,shutil
+        source = Path.home() / 'Library/Logs/DiagnosticReports'
+        destination = Path('build/search-diagnostics/crash-reports')
+        summaries=[]
+        if source.exists():
+            for report in source.rglob('*'):
+                if report.is_file() and report.suffix in ('.ips', '.crash', '.hang'):
+                    if any(name in report.name.lower() for name in ('organic', 'omaps')):
+                        shutil.copy2(report, destination / report.name)
+                        summary=dict(file=report.name)
+                        if report.suffix=='.ips':
+                            try:
+                                # .ips commonly contains a metadata JSON object
+                                # followed by a separate crash payload object.
+                                remainder=report.read_text(errors='replace').lstrip()
+                                objects=[]
+                                decoder=json.JSONDecoder()
+                                while remainder:
+                                    value,offset=decoder.raw_decode(remainder)
+                                    objects.append(value)
+                                    remainder=remainder[offset:].lstrip()
+                                payload=next((value for value in reversed(objects) if isinstance(value,dict) and 'threads' in value),{})
+                                index=payload.get('faultingThread')
+                                threads=payload.get('threads',[])
+                                thread=threads[index] if isinstance(index,int) and 0<=index<len(threads) else next((value for value in threads if value.get('triggered')), {})
+                                images=payload.get('usedImages',[])
+                                frames=[]
+                                for frame in thread.get('frames',[])[:30]:
+                                    image_index=frame.get('imageIndex')
+                                    image=images[image_index].get('name') if isinstance(image_index,int) and 0<=image_index<len(images) else None
+                                    frames.append(dict(symbol=frame.get('symbol'),image=image,offset=frame.get('imageOffset')))
+                                summary.update(process=payload.get('procName'),exception=payload.get('exception'),termination=payload.get('termination'),
+                                               faultingThread=index,firstFrames=frames)
+                            except (ValueError,TypeError,KeyError) as error:
+                                summary['parseError']=str(error)
+                        summaries.append(summary)
+        Path('build/search-diagnostics/crash-report-summary.json').write_text(json.dumps(summaries,indent=2)+'\n')
+        for summary in summaries:
+            print('Mikshat crash summary: '+json.dumps(summary))
+        PY
+        if [[ -n "${MIKSHAT_SIMULATOR_UDID:-}" ]]; then
+          xcrun simctl spawn "$MIKSHAT_SIMULATOR_UDID" log show --last 3m --style compact \
+            --predicate 'process CONTAINS[c] "Organic" OR process CONTAINS[c] "OMaps"' \
+            > build/search-diagnostics/simulator-app.log 2>&1 || true
+        fi
+    - name: Upload rendered-search logs and result bundles
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: mikshat-search-renderer-${{ github.run_id }}
+        retention-days: 7
+        if-no-files-found: warn
+        path: |-
+          build/search-diagnostics/
+          build/RendererBuild.xcresult/
+          build/NativeSearchRecheck.xcresult/
+          build/RendererArabicSearch.xcresult/
+    - name: Record current source timestamps for the next incremental build
+      if: always()
+      shell: bash
+      run: |
+        if [[ -f build/search-diagnostics/cache-input-mtimes.py && -d build/SearchDerivedData/Build ]]; then
+          python3 build/search-diagnostics/cache-input-mtimes.py record
+        fi
+    - name: Save compiled objects even when a test or test compilation fails
+      if: always() && hashFiles('build/SearchDerivedData/mikshat-input-mtimes.json') != ''
+      timeout-minutes: 4
+      uses: actions/cache/save@v4
+      with:
+        path: build/SearchDerivedData
+        key: mikshat-search-derived-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.MIKSHAT_XCODE_CACHE_ID }}-${{ github.sha }}-${{ github.run_id
+          }}-${{ github.run_attempt }}
