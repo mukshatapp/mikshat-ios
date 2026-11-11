@@ -1,0 +1,208 @@
+name: Mikshat existing native evidence
+
+'on':
+  push:
+    branches:
+      - diagnostics/mikshat-feature-evidence
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  evidence:
+    name: Read existing native artifact
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Download existing native artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: mikshat-maps-weather-native
+          run-id: '43004753974'
+          repository: ${{ github.repository }}
+          github-token: ${{ github.token }}
+          path: evidence
+
+      - name: Print bounded native evidence and previews
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from collections import Counter, deque
+          from pathlib import Path
+          import base64
+          import json
+          import os
+          import re
+          import sys
+
+          root = Path('evidence')
+          output_bytes = 0
+          output_limit = 1_500_000
+          png_signature = b'\x89PNG\r\n\x1a\n'
+          issues = []
+          ansi = re.compile(r'\x1b\[[0-?]*[ -/]*[@-~]')
+
+          def emit(value, limit=12_000):
+              global output_bytes
+              text = str(value)
+              encoded = text.encode('utf-8')
+              if len(encoded) > limit:
+                  text = encoded[:limit].decode('utf-8', errors='replace') + '\n[bounded excerpt truncated]'
+              payload = (text + '\n').encode('utf-8')
+              if output_bytes + len(payload) > output_limit:
+                  raise SystemExit('Evidence output exceeded its 1.5 MB budget')
+              sys.stdout.write(payload.decode('utf-8'))
+              sys.stdout.flush()
+              output_bytes += len(payload)
+
+          def unique_file(name):
+              paths = sorted(path for path in root.rglob(name) if path.is_file()) if root.exists() else []
+              if len(paths) != 1:
+                  issues.append(f'Expected one {name}; found {len(paths)}')
+                  emit(json.dumps({'requestedFile': name, 'matches': [str(path) for path in paths[:12]]}))
+                  return None
+              return paths[0]
+
+          def print_file(name, title, limit):
+              emit('\n' + title)
+              path = unique_file(name)
+              if path is not None:
+                  emit(path.read_text(errors='replace'), limit=limit)
+              return path
+
+          emit('Source repository: ' + os.environ.get('GITHUB_REPOSITORY', '(unknown)'))
+          emit('Source run: 43004753974; artifact: mikshat-maps-weather-native')
+          emit('Evidence only: existing artifact, synthetic weather fixtures, actual UIKit viewport renders.')
+          emit('These renders do not establish physical-device or actual rotation coverage.')
+
+          summary_path = print_file('xcodebuild-search-tests.summary.json', 'NATIVE SUMMARY', 64_000)
+          summary = {}
+          if summary_path is not None:
+              try:
+                  summary = json.loads(summary_path.read_text())
+                  if not isinstance(summary, dict):
+                      issues.append('Native summary is not a JSON object')
+                      summary = {}
+              except (ValueError, OSError) as error:
+                  issues.append('Unable to parse native summary: ' + str(error))
+          print_file('simulator-selection.json', 'SIMULATOR SELECTION', 8_000)
+          print_file('toolchain.txt', 'RECORDED TOOLCHAIN', 8_000)
+
+          log_path = unique_file('xcodebuild-search-tests.log')
+          case_tail = deque(maxlen=80)
+          first_errors = []
+          last_errors = deque(maxlen=60)
+          markers = deque(maxlen=20)
+          passed_count = failed_count = skipped_count = cancelled_count = 0
+          outcome = re.compile(r"\bTest Case\s+(['\"])(.*?)\1\s+(passed|failed|skipped|cancelled|canceled)\b", re.I)
+          error_line = re.compile(r'\berror:|\bfatal error:|Test Case .* failed\b|Test Suite .* failed\b|'
+                                  r'\*\* TEST (?:FAILED|CANCELLED|CANCELED)\b|Testing (?:failed|cancelled|canceled)|'
+                                  r'The following build commands failed:|Restarting after unexpected exit|'
+                                  r'Test runner .*\bcrashed\b', re.I)
+          marker_line = re.compile(r'\*\* TEST .*\*\*|Executed \d+ tests?|Test session|Testing (?:started|failed|cancelled|canceled)', re.I)
+          if log_path is not None:
+              with log_path.open(errors='replace') as stream:
+                  for number, raw_line in enumerate(stream, 1):
+                      line = ansi.sub('', raw_line.rstrip('\r\n'))
+                      match = outcome.search(line)
+                      if match:
+                          case_tail.append(f'{number}: {line[:1_600]}')
+                          state = match[3].lower()
+                          passed_count += state == 'passed'
+                          failed_count += state == 'failed'
+                          skipped_count += state == 'skipped'
+                          cancelled_count += state in ('cancelled', 'canceled')
+                      if error_line.search(line):
+                          record = (number, line[:2_400])
+                          if len(first_errors) < 20:
+                              first_errors.append(record)
+                          last_errors.append(record)
+                      if marker_line.search(line):
+                          markers.append(f'{number}: {line[:1_000]}')
+          emit('\nACTUAL COMPLETED TEST CASE TAIL (up to 80 lines)')
+          emit('\n'.join(case_tail) or '(No completed testcase outcomes were recorded.)', limit=128_000)
+          errors = sorted(dict(first_errors + list(last_errors)).items())
+          emit('\nEXACT COMPILER / TEST ERRORS (first 20 and last 60 matches, bounded)')
+          emit('\n'.join(f'{number}: {line}' for number, line in errors) or '(No matching compiler/test error lines.)', limit=128_000)
+          emit('\nTEST SESSION AND EXECUTION MARKERS')
+          emit('\n'.join(markers) or '(No test session markers.)', limit=20_000)
+
+          expected = {
+              'weather-light-portrait-fixture.png',
+              'weather-light-portrait-forecast-fixture.png',
+              'weather-dark-portrait-fixture.png',
+              'weather-dark-portrait-forecast-fixture.png',
+              'weather-light-landscape-fixture.png',
+              'weather-light-landscape-forecast-fixture.png',
+              'weather-dark-landscape-fixture.png',
+              'weather-dark-landscape-forecast-fixture.png',
+              'weather-large-type-small-phone-fixture.png',
+              'weather-large-type-small-phone-forecast-fixture.png',
+              'weather-saved-after-failed-refresh-fixture.png',
+              'weather-no-saved-selected-site-fixture.png',
+          }
+          raw_paths = sorted(path for path in root.rglob('weather-*-fixture.png') if path.is_file()) if root.exists() else []
+          names = Counter(path.name for path in raw_paths)
+          invalid_pngs = []
+          for path in raw_paths:
+              with path.open('rb') as stream:
+                  if stream.read(8) != png_signature:
+                      invalid_pngs.append(path.name)
+          manifest = {'count': len(raw_paths), 'expectedCount': 12, 'names': sorted(names),
+                      'missing': sorted(expected - names.keys()), 'unexpected': sorted(names.keys() - expected),
+                      'duplicates': {name: count for name, count in names.items() if count != 1},
+                      'invalidPngFiles': invalid_pngs}
+          manifest_passed = len(raw_paths) == 12 and set(names) == expected and not manifest['duplicates'] and not invalid_pngs
+          emit('\nRAW FIXTURE PNG MANIFEST')
+          emit(json.dumps(manifest, ensure_ascii=False, indent=2))
+
+          previews_printed = 0
+          for name in ['preview-weather-light-portrait-fixture.png',
+                       'preview-weather-dark-landscape-forecast-fixture.png']:
+              path = unique_file(name)
+              if path is None:
+                  continue
+              size = path.stat().st_size
+              if size > 300_000:
+                  emit(json.dumps({'preview': name, 'bytes': size, 'printed': False, 'reason': 'exceeds 300000 byte limit'}))
+                  continue
+              data = path.read_bytes()
+              if not data.startswith(png_signature):
+                  issues.append('Invalid preview PNG: ' + name)
+                  continue
+              encoded = base64.b64encode(data).decode('ascii')
+              chunks = [encoded[index:index + 10_000] for index in range(0, len(encoded), 10_000)]
+              emit('MIKSHAT_WEATHER_PREVIEW_META ' + json.dumps({
+                  'name': name, 'bytes': len(data), 'base64Characters': len(encoded), 'total': len(chunks),
+                  'indexBase': 0, 'maxChunkCharacters': 10_000}))
+              for index, chunk in enumerate(chunks):
+                  emit('MIKSHAT_WEATHER_PREVIEW_CHUNK ' + json.dumps({
+                      'name': name, 'index': index, 'total': len(chunks), 'pngBase64': chunk}), limit=12_000)
+              previews_printed += 1
+
+          summary_passed = summary.get('passed') is True
+          metrics = {'nativeSummaryPassed': summary_passed, 'fixtureManifestPassed': manifest_passed,
+                     'completedPassedCases': passed_count, 'completedFailedCases': failed_count,
+                     'completedSkippedCases': skipped_count, 'completedCancelledCases': cancelled_count,
+                     'rawFixtureImages': len(raw_paths), 'previewsPrinted': previews_printed,
+                     'diagnosticIssues': issues}
+          emit('\nDIAGNOSTIC METRICS')
+          emit(json.dumps(metrics, ensure_ascii=False, indent=2))
+          if os.environ.get('GITHUB_STEP_SUMMARY'):
+              with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as stream:
+                  stream.write('Native artifact evidence from run 43004753974.\n\n')
+                  stream.write(f'- Native summary passed: {summary_passed}\n')
+                  stream.write(f'- Exact 12-image fixture manifest passed: {manifest_passed}\n')
+                  stream.write(f'- Completed cases: {passed_count} passed, {failed_count} failed, {skipped_count} skipped, {cancelled_count} cancelled.\n')
+                  stream.write(f'- Existing previews printed: {previews_printed}.\n')
+                  stream.write('- Images use injected synthetic forecasts and actual UIKit viewport renders; they do not prove device rotation or physical-device behavior.\n')
+
+          # Assertions run last so failed native builds still expose their exact bounded errors above.
+          if not summary_passed or not manifest_passed:
+              emit('EVIDENCE ASSERTION FAILED: native summary must pass and all twelve named raw PNGs must exist exactly once.')
+              raise SystemExit(1)
+          emit('EVIDENCE ASSERTIONS PASSED')
+          PY
