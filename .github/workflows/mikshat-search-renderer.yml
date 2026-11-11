@@ -333,23 +333,28 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
-        # Keep only this test simulator's fixed synthetic position fresh. The
-        # diagnostic app rejects stale fixes before reading history directions.
+        # Alternate this test simulator's synthetic position by about 11 metres
+        # to pass native 2–5 metre distance filters. Both points stay within the
+        # helper's 100 metre radius; no user GPS reading or heading is asserted.
         python3 -u - "$MIKSHAT_SIMULATOR_UDID" > build/search-diagnostics/synthetic-location-refresh.jsonl 2>&1 <<'PYCODE' &
         import datetime,json,subprocess,sys,time
         udid=sys.argv[1]
         deadline=time.monotonic()+480
+        iteration=0
         while time.monotonic()<deadline:
+            latitude=24.7136 if iteration%2==0 else 24.7137
+            coordinate=f'{latitude:.4f},46.6753'
             attempt=dict(timestamp=datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                         source='simctl fixed synthetic location; not a user GPS reading',
-                         latitude=24.7136,longitude=46.6753)
+                         source='simctl alternating synthetic locations; not user GPS readings',
+                         coordinate=coordinate,latitude=latitude,longitude=46.6753)
             try:
-                result=subprocess.run(['xcrun','simctl','location',udid,'set','24.7136,46.6753'],
+                result=subprocess.run(['xcrun','simctl','location',udid,'set',coordinate],
                                       capture_output=True,text=True,timeout=10)
                 attempt.update(returncode=result.returncode,output=result.stdout+result.stderr)
             except subprocess.TimeoutExpired:
                 attempt.update(returncode=None,error='simctl location timed out after 10 seconds')
             print(json.dumps(attempt),flush=True)
+            iteration+=1
             time.sleep(min(3,max(0,deadline-time.monotonic())))
         PYCODE
         location_refresh_pid=$!
