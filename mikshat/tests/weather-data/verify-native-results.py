@@ -15,8 +15,10 @@ EXPECTED_CLASSES = {
     "MikshatHeadingCacheLifecycleTests": 2,
     "MikshatWeatherViewTests": 6,
 }
+# XCTest events may be concatenated directly after a concurrent NSLog message.
+# The quoted class/method and outcome still identify the complete event.
 CASE_EVENT = re.compile(
-    r"\bTest Case\s+(['\"])(.*?)\1\s+(started|passed|failed|skipped|cancelled|canceled)\b", re.IGNORECASE
+    r"Test Case\s+(['\"])(.*?)\1\s+(started|passed|failed|skipped|cancelled|canceled)\b", re.IGNORECASE
 )
 SUMMARY = re.compile(
     r"Executed (\d+) tests?, with (?:(\d+) tests? skipped and )?(\d+) failures?", re.IGNORECASE

@@ -21,7 +21,7 @@ final class MikshatWeatherViewController: UIViewController {
   private let cacheLabel = weatherLabel(style: .caption1, secondary: true)
   private let updatedLabel = weatherLabel(style: .caption1, secondary: true)
   private let hourlySection = UIStackView()
-  private let hourlyScroll = UIScrollView()
+  private let hourlyScroll = WeatherHoursScrollView()
   private let hourlyStack = UIStackView()
   private let hourlyAvailability = weatherLabel(style: .footnote, secondary: true)
   private let refreshButton = UIButton(type: .system)
@@ -37,7 +37,6 @@ final class MikshatWeatherViewController: UIViewController {
   private var requestTask: Task<Void, Never>?
   private var pathMonitor: NWPathMonitor?
   private var displayTimer: Timer?
-  private var shouldStartAtFirstHour = true
   private var lastLayoutWidth: CGFloat = 0
 
   init(name: String?, latitude: Double, longitude: Double,
@@ -88,17 +87,8 @@ final class MikshatWeatherViewController: UIViewController {
     let availableWidth = scrollView.bounds.width
     if abs(lastLayoutWidth - availableWidth) > 1 {
       lastLayoutWidth = availableWidth
-      if let snapshot {
-        rebuildHourly(snapshot)
-        return // Measure the rebuilt cards before choosing the first offset.
-      }
+      if let snapshot { rebuildHourly(snapshot) }
     }
-    // Chronological card one is on the right, including when the system language is LTR.
-    guard shouldStartAtFirstHour, hourlyScroll.bounds.width > 0,
-          hourlyScroll.contentSize.width > 0 else { return }
-    hourlyScroll.setContentOffset(CGPoint(x: max(0, hourlyScroll.contentSize.width - hourlyScroll.bounds.width), y: 0),
-                                 animated: false)
-    shouldStartAtFirstHour = false
   }
 
   override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
@@ -231,6 +221,7 @@ final class MikshatWeatherViewController: UIViewController {
     hourlyStack.spacing = 10
     hourlyStack.semanticContentAttribute = .forceRightToLeft
     hourlyStack.translatesAutoresizingMaskIntoConstraints = false
+    hourlyScroll.cards = hourlyStack
     hourlyScroll.addSubview(hourlyStack)
     NSLayoutConstraint.activate([
       hourlyStack.topAnchor.constraint(equalTo: hourlyScroll.contentLayoutGuide.topAnchor, constant: 2),
@@ -417,9 +408,7 @@ final class MikshatWeatherViewController: UIViewController {
   }
 
   private func rebuildHourly(_ snapshot: MikshatWeatherSnapshot) {
-    let previousOffset = hourlyScroll.contentOffset.x
-    let wasAtFirstHour = shouldStartAtFirstHour || hourlyScroll.contentSize.width <= hourlyScroll.bounds.width
-      || abs(previousOffset - (hourlyScroll.contentSize.width - hourlyScroll.bounds.width)) < 2
+    hourlyScroll.prepareForRebuild()
     removeArrangedViews(from: hourlyStack)
     let hours = snapshot.futureHours()
     hourlyAvailability.text = hours.count < 12 ? String(format: L("mikshat_weather_available_hours"), hours.count) : nil
@@ -480,7 +469,7 @@ final class MikshatWeatherViewController: UIViewController {
       card.accessibilityLabel = accessible.joined(separator: ", ")
       hourlyStack.addArrangedSubview(card)
     }
-    shouldStartAtFirstHour = wasAtFirstHour
+    hourlyScroll.setNeedsLayout()
     view.setNeedsLayout()
   }
 
@@ -558,6 +547,106 @@ final class MikshatWeatherViewController: UIViewController {
     isOnline = nil
     displayTimer?.invalidate()
     displayTimer = nil
+  }
+}
+
+/// Own the position after UIScrollView has measured and clamped its content, rather than in the
+/// controller's earlier layout callback. A timestamp anchor survives rebuilt cards and rotation.
+@MainActor
+private final class WeatherHoursScrollView: UIScrollView, UIScrollViewDelegate {
+  weak var cards: UIStackView?
+  private enum Position {
+    case first
+    case hour(identifier: String, rightFraction: CGFloat)
+  }
+  private var position = Position.first
+  private var awaitingContentLayout = true
+  private var isLayingOutContent = false
+  private var laidOutWidth: CGFloat = 0
+  private var laidOutContentWidth: CGFloat = 0
+
+  override init(frame: CGRect) {
+    super.init(frame: frame)
+    delegate = self
+    // The outer weather page already respects the screen's safe areas.
+    contentInsetAdjustmentBehavior = .never
+  }
+
+  required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+  func prepareForRebuild() {
+    capturePosition()
+    awaitingContentLayout = true
+  }
+
+  override func layoutSubviews() {
+    guard !isLayingOutContent else { return }
+    isLayingOutContent = true
+    defer { isLayingOutContent = false }
+    super.layoutSubviews()
+    guard let cards, !cards.arrangedSubviews.isEmpty else { return }
+    cards.layoutIfNeeded()
+    // Intermediate zero/fit layouts must not consume the initial first-hour position.
+    guard bounds.width > 0, bounds.height > 0, cards.bounds.width > 0,
+          abs(contentSize.width - cards.bounds.width) < 1,
+          cards.arrangedSubviews.allSatisfy({ $0.bounds.width > 0 && $0.bounds.height > 0 }) else { return }
+    laidOutWidth = bounds.width
+    laidOutContentWidth = contentSize.width
+    awaitingContentLayout = false
+    guard !isTracking, !isDragging, !isDecelerating else { return }
+    let minimum = -adjustedContentInset.left
+    let maximum = max(minimum, contentSize.width - bounds.width + adjustedContentInset.right)
+    let target: CGFloat
+    switch position {
+    case .first:
+      target = maximum
+    case let .hour(identifier, fraction):
+      if let card = cards.arrangedSubviews.first(where: { $0.accessibilityIdentifier == identifier }) {
+        let rect = card.convert(card.bounds, to: self)
+        target = min(maximum, max(minimum, rect.maxX - fraction * rect.width - bounds.width + adjustedContentInset.right))
+      } else {
+        // The previously visible hour expired; show the first surviving future hour.
+        position = .first
+        target = maximum
+      }
+    }
+    // The pending flag is already clear: changing bounds may schedule another layout callback.
+    if abs(contentOffset.x - target) > 0.5 {
+      super.setContentOffset(CGPoint(x: target, y: contentOffset.y), animated: false)
+    }
+  }
+
+  func scrollViewDidScroll(_ scrollView: UIScrollView) { capturePosition() }
+
+  func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+    capturePosition()
+    if !decelerate { setNeedsLayout() }
+  }
+
+  func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+    capturePosition()
+    setNeedsLayout()
+  }
+
+  private func capturePosition() {
+    // Only non-owned scrolling of settled geometry represents user/accessibility intent.
+    guard !isLayingOutContent, !awaitingContentLayout, let cards,
+          abs(bounds.width - laidOutWidth) < 0.5,
+          abs(contentSize.width - laidOutContentWidth) < 0.5 else { return }
+    let maximum = max(-adjustedContentInset.left, contentSize.width - bounds.width + adjustedContentInset.right)
+    if abs(contentOffset.x - maximum) < 1 {
+      position = .first
+      return
+    }
+    let right = contentOffset.x + bounds.width - adjustedContentInset.right
+    let left = contentOffset.x + adjustedContentInset.left
+    guard let card = cards.arrangedSubviews.first(where: {
+      let rect = $0.convert($0.bounds, to: self)
+      return rect.minX < right && rect.maxX > left
+    }), let identifier = card.accessibilityIdentifier else { return }
+    let rect = card.convert(card.bounds, to: self)
+    guard rect.width > 0 else { return }
+    position = .hour(identifier: identifier, rightFraction: (rect.maxX - right) / rect.width)
   }
 }
 

@@ -36,6 +36,10 @@ Production Swift weather regressions and a live public Riyadh request passed on 
 
 Canonical translation-key validation still reports the exact same pre-existing 22 unused keys and 27 Apple-unreferenced tags as baseline 9689a0b. Independent current/baseline runs use the pinned Twine parser and show no introduced diagnostics, missing definitions or target-tag regressions. The weather-key scanner recognizes the actual condition/wind tables; it does not mark arbitrary string literals as translations or suppress the existing failures.
 
+The cross-platform matrix also exposed `Classificator_IntermittentWaterwayRules`: its default binary has two canal rules at zoom 10 and no intermittent-canal entry. The style binaries, loaders, classifier and test inputs are byte-identical to baseline 9689a0b; the checked-in text dump already differs from that binary. This is input-level baseline evidence, not a separate baseline executable run. The custom style is retained.
+
+`PrivacyInfo.xcprivacy` declares System Boot Time reason `35F9.1` for the monotonic elapsed-time measurement used by request timing and compass throttling. Raw boot time is not transmitted. The reason follows [Apple's required-reason API documentation](https://developer.apple.com/documentation/bundleresources/app-privacy-configuration/nsprivacyaccessedapitypes/nsprivacyaccessedapitypereasons).
+
 The supplied Jetsam report records per-process-limit termination around 2,098 MiB for Organic Maps, without a matching application version, stack or search state. The user reports the problem with satellites disabled. Removing an avoidable heading-manager allocation and adding phase measurements does not establish that the physical-device search termination is fixed. Confirm on both affected devices with satellites off, collect matching diagnostics, and profile the active map/search process before claiming that issue resolved.
 
 No application identifiers, signing identities, activation data, bookmark files or saved maps are intentionally changed by this feature. Publishing a signed release remains a separate step.

@@ -43,6 +43,7 @@ final class MikshatWeatherViewTests: XCTestCase {
       defer { window.isHidden = true }
       try await waitUntil("Fixture forecast rendered") {
         self.descendants(weather.view).contains { $0.accessibilityIdentifier == "weather.current" }
+          && (try? self.element("weather.refresh", in: weather.view) as? UIButton)?.isEnabled == true
       }
       layout(container)
       let hours = try XCTUnwrap(try element("weather.hours", in: weather.view) as? UIScrollView)
@@ -68,6 +69,30 @@ final class MikshatWeatherViewTests: XCTestCase {
       page.setContentOffset(CGPoint(x: 0, y: max(0, page.contentSize.height - page.bounds.height)), animated: false)
       layout(container)
       try writeScreenshot(container.view, name: name + "-forecast")
+
+      // Keep the same visible hour and fraction when data rebuilds and the viewport resizes.
+      hours.setContentOffset(CGPoint(x: hours.contentSize.width - hours.bounds.width - 300, y: 0), animated: false)
+      layout(container)
+      let right = hours.contentOffset.x + hours.bounds.width
+      let anchor = try XCTUnwrap(cards.first { $0.frame.minX < right && $0.frame.maxX > hours.contentOffset.x })
+      let identifier = try XCTUnwrap(anchor.accessibilityIdentifier)
+      let fraction = (anchor.frame.maxX - right) / anchor.frame.width
+      let refresh = try XCTUnwrap(try element("weather.refresh", in: weather.view) as? UIButton)
+      refresh.sendActions(for: .touchUpInside)
+      try await waitUntil("Refreshed forecast completed") { refresh.isEnabled }
+      layout(container)
+      try assertHourlyAnchor(identifier, fraction: fraction, in: hours)
+      window.frame = CGRect(origin: .zero, size: CGSize(width: size.height, height: size.width))
+      container.view.frame = window.bounds
+      layout(container)
+      try assertHourlyAnchor(identifier, fraction: fraction, in: hours)
+
+      // Returning to the first hour keeps it pinned after resizing back.
+      hours.setContentOffset(CGPoint(x: hours.contentSize.width - hours.bounds.width, y: 0), animated: false)
+      window.frame = CGRect(origin: .zero, size: size)
+      container.view.frame = window.bounds
+      layout(container)
+      XCTAssertEqual(hours.contentOffset.x, max(0, hours.contentSize.width - hours.bounds.width), accuracy: 1)
       window.isHidden = true
     }
   }
@@ -181,6 +206,15 @@ final class MikshatWeatherViewTests: XCTestCase {
 
   @MainActor
   private func descendants(_ root: UIView) -> [UIView] { [root] + root.subviews.flatMap { descendants($0) } }
+
+  @MainActor
+  private func assertHourlyAnchor(_ identifier: String, fraction: CGFloat, in hours: UIScrollView,
+                                  file: StaticString = #filePath, line: UInt = #line) throws {
+    let card = try element(identifier, in: hours, file: file, line: line)
+    let rect = card.convert(card.bounds, to: hours)
+    XCTAssertEqual((rect.maxX - hours.contentOffset.x - hours.bounds.width) / rect.width, fraction,
+                   accuracy: 0.01, file: file, line: line)
+  }
 
   @MainActor
   private func layout(_ container: UIViewController) {

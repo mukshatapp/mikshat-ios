@@ -573,20 +573,104 @@ final class SearchTabLayoutRegressionTests: XCTestCase {
   }
 
   func test_SelectedPageSurvivesResizingWithoutRepeatedLayoutScrolling() throws {
-    let controller = TabViewController()
-    controller.loadViewIfNeeded()
-    controller.viewControllers = [UIViewController(), UIViewController()]
-    let tabs = controller.tabView
-    tabs.selectedIndex = 1
-    let content = try XCTUnwrap(tabs.subviews.compactMap { $0 as? UICollectionView }.first)
-    for size in [CGSize(width: 320, height: 480), CGSize(width: 480, height: 320)] {
-      tabs.frame = CGRect(origin: .zero, size: size)
+    let directions: [UISemanticContentAttribute] = [.forceLeftToRight, .forceRightToLeft]
+    for direction in directions {
+      let controller = TabViewController()
+      controller.loadViewIfNeeded()
+      controller.viewControllers = [UIViewController(), UIViewController()]
+      let tabs = controller.tabView
+      tabs.semanticContentAttribute = direction
+      tabs.selectedIndex = 1
+      let delegate = TabSelectionSpy()
+      tabs.delegate = delegate
+      let content = try XCTUnwrap(tabs.subviews.compactMap { $0 as? UICollectionView }.first)
+      let header = try XCTUnwrap(collections(in: tabs).first { $0 !== content })
+      let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first {
+        $0.activationState == .foregroundActive
+      }
+      let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: .zero)
+      window.frame = CGRect(x: 0, y: 0, width: 320, height: 480)
+      window.rootViewController = controller
+      window.isHidden = false
+      defer { window.isHidden = true }
+
+      for size in [CGSize(width: 320, height: 480), CGSize(width: 480, height: 320)] {
+        window.frame.size = size
+        tabs.frame = CGRect(origin: .zero, size: size)
+        tabs.setNeedsLayout()
+        tabs.layoutIfNeeded()
+        tabs.layoutIfNeeded()
+        let expectedDirection: UIUserInterfaceLayoutDirection = direction == .forceRightToLeft ? .rightToLeft : .leftToRight
+        XCTAssertEqual(content.effectiveUserInterfaceLayoutDirection, expectedDirection)
+        XCTAssertEqual(tabs.selectedIndex, 1)
+        try assertSelectedPage(1, in: controller, content: content, header: header)
+
+        // Ending a drag on the same visible page must retain its logical identity,
+        // even when that page is physically leftmost in RTL.
+        tabs.scrollViewWillBeginDragging(content)
+        tabs.scrollViewDidEndDecelerating(content)
+        XCTAssertEqual(tabs.selectedIndex, 1)
+        XCTAssertTrue(delegate.indices.isEmpty)
+        try assertSelectedPage(1, in: controller, content: content, header: header)
+      }
+
+      let first = try XCTUnwrap(content.layoutAttributesForItem(at: IndexPath(item: 0, section: 0)))
+      let second = try XCTUnwrap(content.layoutAttributesForItem(at: IndexPath(item: 1, section: 0)))
+      let middle = CGPoint(x: (first.frame.midX + second.frame.midX) / 2 - content.bounds.width / 2,
+                           y: content.contentOffset.y)
+      content.setContentOffset(middle, animated: false)
       tabs.setNeedsLayout()
       tabs.layoutIfNeeded()
       tabs.layoutIfNeeded()
+      XCTAssertEqual(content.contentOffset.x, middle.x, accuracy: 1, "Layout without a resize must not snap an in-progress swipe")
+
+      tabs.collectionView(header, didSelectItemAt: IndexPath(item: 0, section: 0))
+      let settled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+        guard let attributes = content.layoutAttributesForItem(at: IndexPath(item: 0, section: 0)) else { return false }
+        return abs(attributes.frame.minX - content.bounds.minX) < 1
+      }, object: nil)
+      XCTAssertEqual(XCTWaiter.wait(for: [settled], timeout: 2), .completed)
+      tabs.layoutIfNeeded()
+      XCTAssertEqual(tabs.selectedIndex, 0)
+      XCTAssertEqual(delegate.indices, [0])
+      try assertSelectedPage(0, in: controller, content: content, header: header)
+
+      tabs.scrollViewWillBeginDragging(content)
+      content.setContentOffset(CGPoint(x: second.frame.minX, y: content.contentOffset.y), animated: false)
+      tabs.scrollViewDidEndDecelerating(content)
+      tabs.layoutIfNeeded()
       XCTAssertEqual(tabs.selectedIndex, 1)
-      XCTAssertEqual(content.contentOffset.x / content.bounds.width, 1, accuracy: 0.01)
+      XCTAssertEqual(delegate.indices, [0, 1])
+      try assertSelectedPage(1, in: controller, content: content, header: header)
     }
+  }
+
+  private func assertSelectedPage(_ index: Int, in controller: TabViewController,
+                                  content: UICollectionView, header: UICollectionView,
+                                  file: StaticString = #filePath, line: UInt = #line) throws {
+    let path = IndexPath(item: index, section: 0)
+    let attributes = try XCTUnwrap(content.layoutAttributesForItem(at: path), file: file, line: line)
+    XCTAssertEqual(attributes.frame.minX, content.bounds.minX, accuracy: 1, file: file, line: line)
+    XCTAssertEqual(attributes.frame.width, content.bounds.width, accuracy: 1, file: file, line: line)
+    let center = CGPoint(x: content.bounds.midX, y: content.bounds.midY)
+    XCTAssertEqual(content.indexPathForItem(at: center), path, file: file, line: line)
+    let cell = try XCTUnwrap(content.cellForItem(at: path), file: file, line: line)
+    XCTAssertTrue(controller.viewControllers[index].view.isDescendant(of: cell.contentView), file: file, line: line)
+    XCTAssertEqual(header.indexPathsForSelectedItems, [path], file: file, line: line)
+
+    let headerAttributes = try XCTUnwrap(header.layoutAttributesForItem(at: path), file: file, line: line)
+    let expected = header.convert(headerAttributes.frame, to: controller.tabView)
+    let indicator = try XCTUnwrap(header.superview?.subviews.first {
+      $0.accessibilityIdentifier == "tab-selection-indicator"
+    }, file: file, line: line)
+    let actual = indicator.convert(indicator.bounds, to: controller.tabView)
+    XCTAssertEqual(actual.minX, expected.minX, accuracy: 1, file: file, line: line)
+    XCTAssertEqual(actual.width, expected.width, accuracy: 1, file: file, line: line)
+  }
+
+  private final class TabSelectionSpy: TabViewDelegate {
+    var indices: [Int] = []
+    func tabView(_: TabView, didSelectTabAt index: Int) { indices.append(index) }
   }
 }
 
