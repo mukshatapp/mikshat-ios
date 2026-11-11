@@ -1,0 +1,194 @@
+name: Mikshat exact iOS 26.0 theme comparison
+'on':
+  push:
+    branches: [diagnostics/search-ios-260]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  exact-ios-260:
+    runs-on: macos-26
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Record toolchain and verify the actual-source probe extractor
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p probe-results/ios260/diagnostics
+          xcodebuild -version | tee probe-results/ios260/diagnostics/toolchain.txt
+          xcrun --sdk iphonesimulator --show-sdk-version | tee -a probe-results/ios260/diagnostics/toolchain.txt
+          python3 -m unittest discover -s mikshat/tests/search-theme-probe -p 'test_*.py'
+      - name: Obtain exact iOS 26.0 runtime and boot iPhone 16
+        id: runtime
+        continue-on-error: true
+        timeout-minutes: 17
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,os,subprocess
+
+          directory=Path('probe-results/ios260/diagnostics')
+          directory.mkdir(parents=True,exist_ok=True)
+          report=dict(status='INFRA',requestedVersion='26.0',requestedDevice='iPhone 16',substitutionAllowed=False)
+          def simctl(*args,timeout=45):
+              return subprocess.run(['xcrun','simctl',*args],check=True,capture_output=True,text=True,timeout=timeout).stdout
+          def exact_runtime():
+              data=json.loads(simctl('list','--json','runtimes'))
+              (directory/'runtimes.json').write_text(json.dumps(data,indent=2)+'\n')
+              return next((item for item in data['runtimes'] if item.get('version')=='26.0'
+                           and '.iOS-' in item.get('identifier','') and item.get('isAvailable')),None)
+          try:
+              runtime=exact_runtime()
+              if runtime is None:
+                  help_result=subprocess.run(['xcodebuild','-help'],capture_output=True,text=True,timeout=30)
+                  help_text=help_result.stdout+help_result.stderr
+                  (directory/'xcodebuild-help.txt').write_text(help_text)
+                  if '-downloadPlatform' not in help_text or '-buildVersion' not in help_text:
+                      raise RuntimeError('This Xcode does not advertise downloadPlatform/buildVersion; exact runtime download is unsupported.')
+                  command=['xcodebuild','-downloadPlatform','iOS','-buildVersion','26.0']
+                  report['downloadCommand']=command
+                  with (directory/'runtime-download.log').open('w') as stream:
+                      result=subprocess.run(command,stdout=stream,stderr=subprocess.STDOUT,text=True,timeout=720)
+                  report['downloadReturnCode']=result.returncode
+                  if result.returncode:
+                      raise RuntimeError('Exact iOS 26.0 runtime download failed; see runtime-download.log for unsupported-version, account or availability details.')
+                  runtime=exact_runtime()
+                  if runtime is None:
+                      raise RuntimeError('No available exact iOS 26.0 runtime after download. A newer patch/runtime will not be substituted.')
+              device_type='com.apple.CoreSimulator.SimDeviceType.iPhone-16'
+              types=json.loads(simctl('list','--json','devicetypes'))['devicetypes']
+              if not any(item.get('identifier')==device_type for item in types):
+                  raise RuntimeError('The installed toolchain has no iPhone 16 device type.')
+              devices=json.loads(simctl('list','--json','devices','available'))['devices'].get(runtime['identifier'],[])
+              device=next((item for item in devices if item.get('deviceTypeIdentifier')==device_type),None)
+              udid=device['udid'] if device else simctl('create','Mikshat exact iOS 26.0 iPhone 16',device_type,runtime['identifier']).strip()
+              if not device or device.get('state')!='Booted':
+                  simctl('boot',udid)
+              simctl('bootstatus',udid,'-b',timeout=180)
+              version_result=subprocess.run(['xcrun','simctl','spawn',udid,'launchctl','getenv','SIMULATOR_RUNTIME_VERSION'],
+                                            capture_output=True,text=True,timeout=30)
+              version=version_result.stdout.strip() if version_result.returncode==0 else ''
+              # Runtime metadata is authoritative; launchctl is supplementary
+              # and may omit this environment variable on some Xcode versions.
+              if version and version!='26.0':
+                  raise RuntimeError(f'Booted simulator reported {version}, expected exactly 26.0.')
+              report.update(status='READY',runtime=runtime['identifier'],runtimeVersion=runtime['version'],
+                            runtimeBuild=runtime.get('buildversion'),udid=udid,deviceType=device_type,reportedVersion=version)
+              with open(os.environ['GITHUB_ENV'],'a') as stream:
+                  stream.write(f'MIKSHAT_IOS260_UDID={udid}\n')
+          except (OSError,ValueError,RuntimeError,subprocess.SubprocessError) as error:
+              report['reason']=str(error)
+          (directory/'infrastructure-status.json').write_text(json.dumps(report,indent=2)+'\n')
+          with open(os.environ['GITHUB_OUTPUT'],'a') as stream:
+              stream.write('ready='+str(report['status']=='READY').lower()+'\n')
+          print(json.dumps(report))
+          if report['status']!='READY':
+              raise SystemExit('INFRA: exact iOS 26.0 was not established. No search failure or fix is inferred.')
+          PY
+      - name: Extract the 4.6.9 baseline source without changing candidate code
+        if: steps.runtime.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth 1 origin 74b5bf3f38411fca1006ca129e7a388b67e100f4
+          mkdir -p /tmp/mikshat-ios260-baseline
+          for path in \
+            iphone/Maps/Extensions/Views/UIView+SetStyle.swift \
+            iphone/Maps/Core/Theme/Renderers/UITextFieldRenderer.swift \
+            iphone/Maps/Core/Theme/Renderers/UISearchBarRenderer.swift \
+            iphone/Maps/Core/Theme/Swizzle/SwizzleStyle.m \
+            iphone/Maps/Core/Theme/Swizzle/SwizzleStyle.h; do
+            mkdir -p "/tmp/mikshat-ios260-baseline/$(dirname "$path")"
+            git show "74b5bf3f38411fca1006ca129e7a388b67e100f4:$path" > "/tmp/mikshat-ios260-baseline/$path"
+          done
+      - name: Baseline Debug hooks on exact iOS 26.0
+        if: steps.runtime.outputs.ready == 'true'
+        continue-on-error: true
+        timeout-minutes: 3
+        shell: bash
+        run: bash mikshat/tests/search-theme-probe/run_probe.sh /tmp/mikshat-ios260-baseline probe-results/ios260/baselinedebug "$MIKSHAT_IOS260_UDID" baselinedebug
+      - name: Candidate Debug hooks on exact iOS 26.0
+        if: steps.runtime.outputs.ready == 'true'
+        continue-on-error: true
+        timeout-minutes: 3
+        shell: bash
+        run: bash mikshat/tests/search-theme-probe/run_probe.sh "$GITHUB_WORKSPACE" probe-results/ios260/candidatedebug "$MIKSHAT_IOS260_UDID" candidatedebug
+      - name: Baseline optimized Release hooks on exact iOS 26.0
+        if: steps.runtime.outputs.ready == 'true'
+        continue-on-error: true
+        timeout-minutes: 3
+        shell: bash
+        env:
+          MIKSHAT_PROBE_OPTIMIZATION: release
+        run: bash mikshat/tests/search-theme-probe/run_probe.sh /tmp/mikshat-ios260-baseline probe-results/ios260/baselinerelease "$MIKSHAT_IOS260_UDID" baselinerelease
+      - name: Candidate optimized Release hooks on exact iOS 26.0
+        if: steps.runtime.outputs.ready == 'true'
+        continue-on-error: true
+        timeout-minutes: 3
+        shell: bash
+        env:
+          MIKSHAT_PROBE_OPTIMIZATION: release
+        run: bash mikshat/tests/search-theme-probe/run_probe.sh "$GITHUB_WORKSPACE" probe-results/ios260/candidaterelease "$MIKSHAT_IOS260_UDID" candidaterelease
+      - name: Classify exact-runtime comparison without claiming a device root cause
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,os
+          root=Path('probe-results/ios260')
+          root.mkdir(parents=True,exist_ok=True)
+          infrastructure=root/'diagnostics/infrastructure-status.json'
+          setup=json.loads(infrastructure.read_text()) if infrastructure.exists() else dict(status='INFRA',reason='Runtime setup did not complete.')
+          labels=('baselinedebug','candidatedebug','baselinerelease','candidaterelease')
+          reports={label:json.loads((root/label/'probe-outcome.json').read_text())
+                   if (root/label/'probe-outcome.json').exists() else dict(result='no_probe_outcome') for label in labels}
+          if setup.get('status')!='READY' or setup.get('runtimeVersion')!='26.0':
+              status='INFRA'
+          elif any(report['result']=='no_probe_outcome' for report in reports.values()):
+              status='INFRA_OR_PROBE_BUILD_FAILURE'
+          elif any(report.get('iOS') not in (None,'26.0') or (report['result']=='passed' and report.get('iOS')!='26.0') for report in reports.values()):
+              status='INFRA_RUNTIME_MISMATCH'
+          elif any(reports[label]['result']!='passed' for label in ('candidatedebug','candidaterelease')):
+              status='CANDIDATE_UIKIT_PROBE_FAILURE'
+          elif any(reports[label]['result']!='passed' for label in ('baselinedebug','baselinerelease')):
+              status='BASELINE_ONLY_UIKIT_PROBE_FAILURE'
+          else:
+              status='BOTH_UIKIT_PROBES_PASS_SEARCH_ISSUE_NOT_REPRODUCED'
+          report=dict(status=status,infrastructure=setup,probes=reports,
+                      scope='Isolated real UIKit hook/dispatch lifecycle, Debug and optimized Release; not the full app, history or device crash reproduction.')
+          (root/'comparison-summary.json').write_text(json.dumps(report,indent=2)+'\n')
+          markdown=f'### Exact iOS 26.0 comparison\n\nStatus: {status}\n\n'+report['scope']+'\n\n'
+          if setup.get('reason'):markdown+='Infrastructure detail: '+setup['reason']+'\n\n'
+          for label in labels:markdown+=f"- {label}: {reports[label]['result']}\n"
+          if os.environ.get('GITHUB_STEP_SUMMARY'):
+              with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as stream:stream.write(markdown)
+          print(json.dumps(report))
+          if status not in ('BASELINE_ONLY_UIKIT_PROBE_FAILURE','BOTH_UIKIT_PROBES_PASS_SEARCH_ISSUE_NOT_REPRODUCED'):
+              raise SystemExit(1)
+          PY
+      - name: Collect isolated probe crash reports
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p probe-results/ios260/diagnostics/crash-reports
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil
+          source=Path.home()/'Library/Logs/DiagnosticReports'
+          if source.exists():
+              for path in source.rglob('*'):
+                  if path.is_file() and 'themeprobe' in path.name.lower() and path.suffix in ('.ips','.crash','.hang'):
+                      shutil.copy2(path,Path('probe-results/ios260/diagnostics/crash-reports')/path.name)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mikshat-exact-ios260-${{ github.run_id }}
+          path: probe-results/ios260
+          retention-days: 7
+          if-no-files-found: warn
