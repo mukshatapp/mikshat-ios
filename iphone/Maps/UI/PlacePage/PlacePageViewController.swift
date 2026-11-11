@@ -143,7 +143,7 @@ final class PlacePageScrollView: UIScrollView {
       guard let first = scrollSteps.first else { return .closed(-scrollView.height) }
       result = first
       for item in scrollSteps.suffix(from: 1) {
-        if offset > item.offset {
+        if offset > boundedOffset(for: item) {
           result = item
         }
       }
@@ -151,7 +151,7 @@ final class PlacePageScrollView: UIScrollView {
       guard let last = scrollSteps.last else { return .closed(-scrollView.height) }
       result = last
       for item in scrollSteps.reversed().suffix(from: 1) {
-        if offset < item.offset {
+        if offset < boundedOffset(for: item) {
           result = item
         }
       }
@@ -250,11 +250,15 @@ final class PlacePageScrollView: UIScrollView {
   private func findNearestStop(_ offset: CGFloat) -> PlacePageState {
     var result = scrollSteps[0]
     for ppState in scrollSteps.suffix(from: 1) {
-      if abs(result.offset - offset) > abs(ppState.offset - offset) {
+      if abs(boundedOffset(for: result) - offset) > abs(boundedOffset(for: ppState) - offset) {
         result = ppState
       }
     }
     return result
+  }
+
+  private func boundedOffset(for step: PlacePageState) -> CGFloat {
+    min(scrollView.contentSize.height - scrollView.height, step.offset)
   }
 
   private func addActionBar(_ actionBarViewController: UIViewController) {
@@ -380,7 +384,7 @@ extension PlacePageViewController: PlacePageViewProtocol {
 
   func showNextStop() {
     guard scrollView.isScrollEnabled else { return }
-    if let nextStop = scrollSteps.last(where: { $0.offset > scrollView.contentOffset.y }) {
+    if let nextStop = scrollSteps.last(where: { boundedOffset(for: $0) > scrollView.contentOffset.y }) {
       scrollTo(CGPoint(x: 0, y: nextStop.offset), forced: true)
     }
   }
@@ -457,7 +461,9 @@ extension PlacePageViewController: UIScrollViewDelegate {
     }
 
     guard let lastStop = scrollSteps.last else { return }
-    let isFullyExpanded = isNavigationBarVisible || scrollView.contentOffset.y >= lastStop.offset
+    targetContentOffset.pointee.y = min(scrollView.contentSize.height - scrollView.height,
+                                      targetContentOffset.pointee.y)
+    let isFullyExpanded = isNavigationBarVisible || scrollView.contentOffset.y >= boundedOffset(for: lastStop)
 
     if velocity.y > Constants.fastSwipeUpVelocity, !isFullyExpanded {
       showLastStop()
@@ -474,7 +480,7 @@ extension PlacePageViewController: UIScrollViewDelegate {
       interactor?.close()
       return
     }
-    targetContentOffset.pointee = CGPoint(x: 0, y: nextStep.offset)
+    targetContentOffset.pointee = CGPoint(x: 0, y: boundedOffset(for: nextStep))
     userDefinedStep = nextStep
   }
 

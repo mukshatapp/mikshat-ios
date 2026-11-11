@@ -31,6 +31,7 @@ final class SearchHistoryViewController: MWMViewController {
     super.viewDidLoad()
     setupTableView()
     setupNoResultsView()
+    reload()
   }
 
   override func viewDidAppear(_ animated: Bool) {
@@ -88,7 +89,7 @@ final class SearchHistoryViewController: MWMViewController {
 
   func reload() {
     guard isViewLoaded else { return }
-    lastQueries = frameworkHelper.lastSearchQueries()
+    lastQueries = Settings.searchHistoryEnabled() ? frameworkHelper.lastSearchQueries() : []
     showEmptyHistoryView(lastQueries.isEmpty ? true : false)
     tableView.reloadData()
   }
@@ -123,6 +124,10 @@ extension SearchHistoryViewController: UITableViewDelegate {
 
   func scrollViewDidScroll(_ scrollView: UIScrollView) {
     delegate?.scrollViewDidScroll?(scrollView)
+  }
+
+  func scrollViewWillEndDragging(_ scrollView: UIScrollView, withVelocity velocity: CGPoint, targetContentOffset: UnsafeMutablePointer<CGPoint>) {
+    delegate?.scrollViewWillEndDragging?(scrollView, withVelocity: velocity, targetContentOffset: targetContentOffset)
   }
 }
 

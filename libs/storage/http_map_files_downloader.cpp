@@ -47,13 +47,13 @@ void HttpMapFilesDownloader::Download()
   auto const queuedCountry = m_queue.GetFirstCountry();
   auto const generation = ++m_downloadGeneration;
 
-  auto const urls = MakeUrlList(queuedCountry.GetRelativeUrl());
+  auto const urls = MakeUrlList(queuedCountry);
   auto const path = queuedCountry.GetFileDownloadPath();
   auto const size = queuedCountry.GetDownloadSize();
 
   m_request.reset();
 
-  if (IsDownloadingAllowed())
+  if (IsDownloadingAllowed() && !urls.empty())
   {
     queuedCountry.OnStartDownloading();
     // Subscribers can cancel or replace this attempt, even with the same country ID.

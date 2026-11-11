@@ -655,7 +655,9 @@ enum MikshatHeading {
                                                 accuracy: heading.headingAccuracy, age: heading.timestamp.timeIntervalSinceNow,
                                                 activeSensor: activeSensor)
     }
-    let sensor = degrees(MikshatHeadingSensor.shared.lastHeading, activeSensor: true)
+    // Reading a history/coordinate row must not create a compass CLLocationManager.
+    // Only a visible compass's begin() call needs to initialize the sensor owner.
+    let sensor = degrees(MikshatHeadingSensor.cachedHeading, activeSensor: true)
       ?? degrees(LocationManager.lastHeading(), activeSensor: false)
     return MikshatNavigationMath.selectHeading(mode: mode, speed: fix?.speed ?? -1, sensor: sensor, course: course)
   }
@@ -666,10 +668,32 @@ enum MikshatHeading {
 final class MikshatHeadingSensor: NSObject, CLLocationManagerDelegate {
   static let shared = MikshatHeadingSensor()
   static let changed = Notification.Name("MikshatHeadingSensorChanged")
+  private final class HeadingCache {
+    private let lock = NSLock()
+    private var value: CLHeading?
+    var heading: CLHeading? {
+      get {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
+      }
+      set {
+        lock.lock()
+        defer { lock.unlock() }
+        value = newValue
+      }
+    }
+  }
+  private static let headingCache = HeadingCache()
+  // This accessor initializes only the small cache, never shared or its manager.
+  static var cachedHeading: CLHeading? { headingCache.heading }
   private let manager = CLLocationManager()
   private var clients = 0
   private var suspended = false
-  private(set) var lastHeading: CLHeading?
+  private(set) var lastHeading: CLHeading? {
+    get { Self.cachedHeading }
+    set { Self.headingCache.heading = newValue }
+  }
 
   private override init() {
     super.init()

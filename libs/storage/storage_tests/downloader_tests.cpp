@@ -1,6 +1,7 @@
 #include "testing/testing.hpp"
 
 #include "storage/map_files_downloader_with_ping.hpp"
+#include "storage/saudi_map_download_source.hpp"
 #include "storage/storage_tests/test_map_files_downloader.hpp"
 
 #include "platform/local_country_file_utils.hpp"
@@ -60,6 +61,37 @@ UNIT_TEST(MapFilesDownloader_DebugServerList)
 
   downloader.ResetServersList();
   TEST(downloader.MakeUrlList("maps/1/Germany.mwm").empty(), ());
+}
+
+UNIT_TEST(MapFilesDownloader_SaudiDriveSources)
+{
+  DownloaderStub downloader;
+  downloader.SetServersList({"https://example.com/base/"});
+  auto const diffs = std::make_shared<storage::diffs::DiffsDataSource>();
+  for (auto const & source : storage::kSaudiMapDownloadSources)
+  {
+    auto const id = std::string(source.m_countryId);
+    platform::CountryFile const file(id, source.m_size, std::string(source.m_hash));
+    storage::QueuedCountry country(file, id, MapFileType::Map, storage::kSaudiMapDataVersion, {}, diffs);
+    auto const urls = downloader.MakeUrlList(country);
+    TEST_EQUAL(urls.size(), 1, (id));
+    TEST_EQUAL(urls.front(), source.GetUrl(), (id));
+    TEST_EQUAL(country.GetDownloadSize(), source.m_size, (id));
+
+    storage::QueuedCountry newer(file, id, MapFileType::Map, storage::kSaudiMapDataVersion + 1, {}, diffs);
+    TEST(downloader.MakeUrlList(newer).empty(), ("Unsupported data version must not use a CDN fallback", id));
+    country.SetFileType(MapFileType::Diff);
+    TEST(downloader.MakeUrlList(country).empty(), ("Drive has no diff sidecars", id));
+  }
+
+  for (auto const & id : {"World", "WorldCoasts", "Germany_Berlin"})
+  {
+    storage::QueuedCountry country(platform::CountryFile(id), id, MapFileType::Map, storage::kSaudiMapDataVersion,
+                                   {}, diffs);
+    auto const urls = downloader.MakeUrlList(country);
+    TEST_EQUAL(urls.size(), 1, (id));
+    TEST_EQUAL(urls.front(), "https://example.com/base/maps/260714/" + std::string(id) + ".mwm", (id));
+  }
 }
 
 UNIT_TEST(GetMetaConfig)

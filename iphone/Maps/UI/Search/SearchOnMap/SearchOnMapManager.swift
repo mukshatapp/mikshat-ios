@@ -18,10 +18,15 @@ final class SearchOnMapManager: NSObject {
   var isSearching: Bool { viewController != nil }
   private var mode: SearchOnMapMode = .normal
   private var isStarting = false
+  private var didRecordMemoryWarning = false
 
   override init() {
     super.init()
+    NotificationCenter.default.addObserver(self, selector: #selector(didReceiveMemoryWarning),
+                                           name: UIApplication.didReceiveMemoryWarningNotification, object: nil)
   }
+
+  deinit { NotificationCenter.default.removeObserver(self) }
 
   // MARK: - Public methods
 
@@ -39,20 +44,23 @@ final class SearchOnMapManager: NSObject {
     }
     if viewController != nil {
       if self.mode == mode {
+        MikshatMemoryDiagnostics.logSearchPhase(.reuseScreen)
         interactor?.handle(.openSearch)
+        MikshatMemoryDiagnostics.logSearchPhase(.openReturned)
         return
       }
       interactor?.closeForReplacement()
       viewController = nil
     }
     self.mode = mode
-    LOG(.info, "MikshatSearch phase=deactivate-selection")
+    didRecordMemoryWarning = false
+    MikshatMemoryDiagnostics.logSearchPhase(.deactivateSelection)
     FrameworkHelper.deactivateMapSelection()
-    LOG(.info, "MikshatSearch phase=construct-screen")
+    MikshatMemoryDiagnostics.logSearchPhase(.constructScreen)
     let viewController = SearchOnMapViewControllerBuilder.build(mode: mode,
                                                                 didChangeState: notifyObservers)
     self.viewController = viewController
-    LOG(.info, "MikshatSearch phase=open-returned")
+    MikshatMemoryDiagnostics.logSearchPhase(.openReturned)
   }
 
   func hide() {
@@ -60,6 +68,7 @@ final class SearchOnMapManager: NSObject {
   }
 
   func close() {
+    if isSearching { MikshatMemoryDiagnostics.logSearchPhase(.closeRequested) }
     interactor?.handle(.closeSearch)
   }
 
@@ -85,9 +94,16 @@ final class SearchOnMapManager: NSObject {
 
   private func notifyObservers(_ state: SearchOnMapState) {
     if state == .closed {
+      MikshatMemoryDiagnostics.logSearchPhase(.closedState)
       viewController = nil
     }
     observers.forEach { observer in observer.searchManager(didChangeState: state) }
+  }
+
+  @objc private func didReceiveMemoryWarning() {
+    guard isStarting || isSearching, !didRecordMemoryWarning else { return }
+    didRecordMemoryWarning = true
+    MikshatMemoryDiagnostics.logSearchPhase(.memoryWarning)
   }
 }
 
@@ -100,19 +116,19 @@ private enum SearchOnMapViewControllerBuilder {
                                               canSelectCurrentLocation: $0.canSelectCurrentLocation)
     }
     let viewController = SearchOnMapViewController()
-    LOG(.info, "MikshatSearch phase=screen-constructed")
+    MikshatMemoryDiagnostics.logSearchPhase(.screenConstructed)
     let presenter = SearchOnMapPresenter(shouldHideForRouting: mode == .routing,
                                          routePointActions: routePointActions,
                                          didChangeState: didChangeState)
     let interactor = SearchOnMapInteractor(presenter: presenter,
                                            routePointSelector: routePointSelector,
                                            mapViewController: MapViewController.shared())
-    LOG(.info, "MikshatSearch phase=observers-registered")
+    MikshatMemoryDiagnostics.logSearchPhase(.observersRegistered)
     presenter.view = viewController
     viewController.interactor = interactor
-    LOG(.info, "MikshatSearch phase=show-screen")
+    MikshatMemoryDiagnostics.logSearchPhase(.showScreen)
     viewController.show()
-    LOG(.info, "MikshatSearch phase=show-returned")
+    MikshatMemoryDiagnostics.logSearchPhase(.showReturned)
     return viewController
   }
 }

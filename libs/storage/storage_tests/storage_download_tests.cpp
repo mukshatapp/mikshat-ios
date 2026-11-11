@@ -3,6 +3,7 @@
 #include "storage/storage_tests/test_map_files_downloader.hpp"
 
 #include "storage/queued_country.hpp"
+#include "storage/saudi_map_download_source.hpp"
 #include "storage/storage.hpp"
 
 #include "platform/chunks_download_strategy.hpp"
@@ -604,5 +605,42 @@ UNIT_CLASS_TEST(StorageDownloadTest, FailedIntegrityCheck)
   // to be dropped instead of being registered as a map.
   TEST(!storage.GetLatestLocalFile(kCorrupted), ());
   TEST(!Platform::IsFileExistsByFullPath(DownloadPath(storage, kCorrupted)), ());
+}
+
+UNIT_CLASS_TEST(StorageDownloadTest, SaudiDriveHtmlPreservesInstalledMap)
+{
+  base::ScopedLogAbortLevelChanger const ignoreErrors(LCRITICAL);
+  auto const & source = kSaudiMapDownloadSources.front();
+  auto const id = std::string(source.m_countryId);
+  auto const json = R"({"id":"Countries","v":)" + strings::to_string(kSaudiMapDataVersion) +
+                    R"(,"g":[{"id":")" + id + R"(","s":)" + strings::to_string(source.m_size) +
+                    R"(,"h":")" + std::string(source.m_hash) + R"("}]})";
+  auto const oldVersion = kSaudiMapDataVersion - 1;
+  TEST(!PrepareDirToDownloadCountry(oldVersion, {}).empty(), ());
+  auto const installedPath = GetFilePath(oldVersion, {}, id, MapFileType::Map);
+  {
+    FileWriter writer(installedPath);
+    writer.Write("installed-map", 13);
+  }
+  auto const installedHash = coding::Blake3::CalculateMwmBase64(installedPath);
+  bool didDownload = false;
+  Storage storage(json, std::make_unique<TestMapFilesDownloader>());
+  InitStorage(storage, [&didDownload](CountryId const &, LocalFilePtr const) { didDownload = true; });
+  storage.SetEnabledIntegrityValidationForTesting(false);
+  TEST(!PrepareDirToDownloadCountry(kSaudiMapDataVersion, {}).empty(), ());
+  {
+    FileWriter writer(DownloadPath(storage, id));
+    std::string const html = "<!doctype html><html>Download quota exceeded</html>";
+    writer.Write(html.data(), html.size());
+  }
+
+  // A cached HTTP-200 HTML response must also fail after a retry or relaunch.
+  storage.DownloadNode(id);
+  DrainFileAndGui();
+  TEST(!didDownload, ());
+  TEST_EQUAL(storage.CountryStatusEx(id), Status::DownloadFailed, ());
+  TEST(!Platform::IsFileExistsByFullPath(DownloadPath(storage, id)), ());
+  TEST_EQUAL(coding::Blake3::CalculateMwmBase64(installedPath), installedHash, ());
+  TEST_EQUAL(storage.GetLatestLocalFile(id)->GetVersion(), oldVersion, ());
 }
 }  // namespace storage_download_tests

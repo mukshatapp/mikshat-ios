@@ -180,12 +180,15 @@ final class SearchOnMapManagerTests: XCTestCase {
     }
     searchController.view.layoutIfNeeded()
     let tabs = try XCTUnwrap(searchController.children.compactMap { $0 as? SearchTabViewController }.first)
-    let contentCollection = try XCTUnwrap(tabs.view.subviews.compactMap { $0 as? UICollectionView }.first)
+    let history = try XCTUnwrap(tabs.children.compactMap { $0 as? SearchHistoryViewController }.first)
+    let historyTable = try XCTUnwrap(history.view.subviews.compactMap { $0 as? UITableView }.first)
     XCTAssertEqual(searchController.view.safeAreaInsets.left, expectedLeadingInset, accuracy: 1)
     XCTAssertEqual(searchController.availableAreaView.frame.minX,
                    searchController.view.safeAreaInsets.left, accuracy: 1)
     XCTAssertEqual(tabs.view.safeAreaInsets.left, 0, accuracy: 1)
-    XCTAssertEqual(contentCollection.adjustedContentInset.left, 0, accuracy: 1)
+    XCTAssertEqual(historyTable.adjustedContentInset.left, 0, accuracy: 1)
+    XCTAssertEqual(history.view.frame, tabs.view.bounds)
+    XCTAssertEqual(historyTable.frame, history.view.bounds)
   }
 
   func test_GivenSearchModes_WhenStartedRepeatedly_ThenReusesOnlyMatchingMode() throws {

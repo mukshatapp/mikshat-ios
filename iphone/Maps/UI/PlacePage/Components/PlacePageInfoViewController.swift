@@ -40,6 +40,7 @@ class PlacePageInfoViewController: UIViewController {
 
   weak var placePageInfoData: PlacePageInfoData!
   weak var delegate: PlacePageInfoViewControllerDelegate?
+  var didTapWeather: (() -> Void)?
 
   var coordinatesFormatId: Int {
     get { UserDefaults.standard.integer(forKey: Constants.coordFormatIdKey) }
@@ -199,7 +200,7 @@ class PlacePageInfoViewController: UIViewController {
     }
 
     setupCoordinatesView()
-
+    setupWeatherView()
   }
 
   private func setupCoordinatesView() {
@@ -210,10 +211,22 @@ class PlacePageInfoViewController: UIViewController {
       }
       addToStack(row)
     }
-    // Absorb any surplus height here instead of stretching the first coordinate row.
-    let spacer = UIView()
-    spacer.setContentHuggingPriority(.defaultLow, for: .vertical)
-    stackView.addArrangedSubview(spacer)
+  }
+
+  private func setupWeatherView() {
+    guard didTapWeather != nil else { return }
+    let showWeather: TapHandler = { [weak self] in self?.didTapWeather?() }
+    let weatherView = createInfoItem(L("mikshat_weather_title"),
+                                     icon: UIImage(systemName: "cloud.sun"),
+                                     tapIconHandler: showWeather,
+                                     style: .link,
+                                     accessoryImage: UIImage(systemName: "chevron.forward"),
+                                     tapHandler: showWeather,
+                                     accessoryImageTapHandler: showWeather)
+    weatherView.accessibilityIdentifier = "placePage.weather"
+    weatherView.isAccessibilityElement = true
+    weatherView.accessibilityLabel = L("mikshat_weather_title")
+    weatherView.accessibilityTraits = .button
   }
 
   /// The format index actually shown: the saved one if available here, otherwise the next available.
