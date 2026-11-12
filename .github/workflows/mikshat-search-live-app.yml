@@ -163,7 +163,10 @@ jobs:
         with open(os.environ['GITHUB_ENV'], 'a') as stream:
             stream.write(f'MIKSHAT_SIMULATOR_UDID={udid}\n')
         subprocess.run(['defaults', 'write', 'com.apple.iphonesimulator', 'ConnectHardwareKeyboard', '-bool', 'NO'], check=True)
-        subprocess.run(['open', '-a', 'Simulator', '--args', '-CurrentDeviceUDID', udid], check=True)
+        simulator_app = Path(os.environ['DEVELOPER_DIR']) / 'Applications/Simulator.app'
+        if not simulator_app.is_dir():
+            raise SystemExit(f'Simulator UI application is missing at the selected Xcode path: {simulator_app}')
+        subprocess.run(['open', '-a', str(simulator_app), '--args', '-CurrentDeviceUDID', udid], check=True)
         print(json.dumps(selection))
         PY
     - name: Build the ordinary Debug simulator application
