@@ -188,7 +188,9 @@ private final class LiveSearchSession {
 
   private func makeReadiness(map: MapViewController?, window: UIWindow?) -> [String: Bool] {
     let root = map?.viewIfLoaded
-    let registered = Set(Storage.shared().downloadedCountries())
+    // The downloaded-country list contains parent groups, so verify each leaf directly.
+    let north = Storage.shared().attributes(forCountry: "Saudi Arabia_North")
+    let south = Storage.shared().attributes(forCountry: "Saudi Arabia_South")
     let fix = MikshatHeading.currentLocation
     let reference = CLLocation(latitude: 24.7136, longitude: 46.6753)
     let synthetic = fix.map { $0.distance(from: reference) <= 100 } ?? false
@@ -205,8 +207,8 @@ private final class LiveSearchSession {
       "rtl": root?.effectiveUserInterfaceLayoutDirection == .rightToLeft,
       "arabic": Locale.preferredLanguages.first?.hasPrefix("ar") == true,
       "satelliteDisabled": !UserDefaults.standard.bool(forKey: "mikshat_satellite_enabled") && !Settings.backgroundTilesEnabled(),
-      "saudiNorthRegistered": registered.contains("Saudi Arabia_North"),
-      "saudiSouthRegistered": registered.contains("Saudi Arabia_South"),
+      "saudiNorthRegistered": north.nodeStatus == .onDisk && north.downloadedMwmCount == 1,
+      "saudiSouthRegistered": south.nodeStatus == .onDisk && south.downloadedMwmCount == 1,
       "freshSyntheticLocation": synthetic,
       "noPresentedController": map != nil && map?.presentedViewController == nil,
     ]
