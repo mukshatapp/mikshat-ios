@@ -842,22 +842,42 @@ private final class MikshatSaveShareViewController: UIViewController {
   }
 }
 
-final class MikshatDirectionIndicator: UIImageView {
+final class MikshatDirectionIndicator: UIView {
   var target: CLLocationCoordinate2D? { didSet { updateDirection() } }
+  private static let indicatorSize = CGSize(width: 28, height: 28)
+  private let arrowImageView = UIImageView(image: UIImage(systemName: "location.north.fill"))
   private static let attachedIndicators = NSHashTable<MikshatDirectionIndicator>.weakObjects()
   private static var refreshTimer: Timer?
 
   init() {
-    super.init(image: UIImage(systemName: "location.north.fill"))
-    contentMode = .scaleAspectFit
+    super.init(frame: CGRect(origin: .zero, size: Self.indicatorSize))
     tintColor = MikshatStyle.green
+    isUserInteractionEnabled = false
     isAccessibilityElement = true
     accessibilityLabel = L("mikshat_arrow_to_point")
-    widthAnchor.constraint(equalToConstant: 28).isActive = true
-    heightAnchor.constraint(equalToConstant: 28).isActive = true
+    arrowImageView.contentMode = .scaleAspectFit
+    arrowImageView.isAccessibilityElement = false
+    arrowImageView.bounds = CGRect(origin: .zero, size: Self.indicatorSize)
+    arrowImageView.center = CGPoint(x: bounds.midX, y: bounds.midY)
+    addSubview(arrowImageView)
+    widthAnchor.constraint(equalToConstant: Self.indicatorSize.width).isActive = true
+    heightAnchor.constraint(equalToConstant: Self.indicatorSize.height).isActive = true
+    resetDirection()
   }
   @available(*, unavailable)
   required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+  override var intrinsicContentSize: CGSize { Self.indicatorSize }
+
+  override func sizeThatFits(_ size: CGSize) -> CGSize { Self.indicatorSize }
+
+  override func layoutSubviews() {
+    super.layoutSubviews()
+    // UIKit sizes the accessory using the untransformed container. Never set
+    // the frame of the rotated symbol: its raster size must stay at 28 points.
+    arrowImageView.bounds = CGRect(origin: .zero, size: Self.indicatorSize)
+    arrowImageView.center = CGPoint(x: bounds.midX, y: bounds.midY)
+  }
 
   override func didMoveToWindow() {
     super.didMoveToWindow()
@@ -894,15 +914,36 @@ final class MikshatDirectionIndicator: UIImageView {
     guard window != nil, let target, CLLocationCoordinate2DIsValid(target),
           let fix = MikshatHeading.currentLocation, let heading = MikshatHeading.reading().degrees,
           fix.distance(from: CLLocation(latitude: target.latitude, longitude: target.longitude)) > max(1, fix.horizontalAccuracy) else {
-      alpha = 0
-      accessibilityElementsHidden = true
+      resetDirection()
       return
     }
     let bearing = MikshatNavigationMath.bearing(latitude: fix.coordinate.latitude, longitude: fix.coordinate.longitude, targetLatitude: target.latitude, targetLongitude: target.longitude)
-    transform = CGAffineTransform(rotationAngle: CGFloat(MikshatNavigationMath.relativeBearing(bearing: bearing, heading: heading) * .pi / 180))
+    renderDirection(bearing: bearing, heading: heading)
+  }
+
+  // Rendering is separate from sensor acquisition so all callers share the
+  // same finite-angle check and fixed accessory geometry.
+  func renderDirection(bearing: Double, heading: Double) {
+    guard bearing.isFinite, heading.isFinite else {
+      resetDirection()
+      return
+    }
+    let angle = MikshatNavigationMath.relativeBearing(bearing: bearing, heading: heading) * .pi / 180
+    guard angle.isFinite else {
+      resetDirection()
+      return
+    }
+    arrowImageView.transform = CGAffineTransform(rotationAngle: CGFloat(angle))
     alpha = 1
     accessibilityElementsHidden = false
     accessibilityValue = String(format: "%.0f°", bearing)
+  }
+
+  private func resetDirection() {
+    arrowImageView.transform = .identity
+    alpha = 0
+    accessibilityElementsHidden = true
+    accessibilityValue = nil
   }
 }
 

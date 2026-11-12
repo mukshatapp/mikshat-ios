@@ -1,9 +1,10 @@
 # Search investigation: verified logging race in 4.6.12
 
 The user reports a search hang or process exit in 4.6.11, both on the first press
-before typing and when reopening search. No fresh matching crash report has
-arrived yet. This change fixes a separately reproduced defect; it does not
-establish that the physical-device search termination has the same cause.
+before typing and when reopening search. This change fixes a separately
+reproduced defect; it does not establish that the physical-device search
+termination has the same cause. Fresh matching UI watchdog reports arrived
+after this correction; see `SEARCH_ARROW_4.6.13.md` for their distinct evidence.
 
 ## Verified defect and change
 

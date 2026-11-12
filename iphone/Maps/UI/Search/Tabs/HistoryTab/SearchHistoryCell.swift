@@ -18,6 +18,12 @@ final class SearchHistoryCell: MWMTableViewCell {
     fatalError("init(coder:) has not been implemented")
   }
 
+  override func prepareForReuse() {
+    super.prepareForReuse()
+    directionIndicator.target = nil
+    accessoryView = nil
+  }
+
   func configure(for content: Content) {
     directionIndicator.target = nil
     accessoryView = nil

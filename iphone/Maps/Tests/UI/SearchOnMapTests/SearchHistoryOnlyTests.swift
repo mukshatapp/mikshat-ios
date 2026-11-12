@@ -81,6 +81,90 @@ final class SearchHistoryOnlyTests: XCTestCase {
     XCTAssertEqual(delegate.query?.source, .history)
   }
 
+  func test_RotatedHistoryAccessoryKeepsFixedGeometryThroughTableLayoutAndReuse() throws {
+    let query = "24.7136, 46.6753"
+    HistoryOnlyFrameworkStub.queries = [query, "Text query"]
+    let controller = makeController()
+    let history = try historyController(in: controller)
+    let table = try historyTable(in: history)
+    let scene = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first {
+      $0.activationState == .foregroundActive
+    }
+    let window = scene.map { UIWindow(windowScene: $0) } ?? UIWindow(frame: .zero)
+    window.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+    window.rootViewController = controller
+    window.isHidden = false
+    defer { window.isHidden = true }
+    window.layoutIfNeeded()
+    table.layoutIfNeeded()
+    let row = try XCTUnwrap(table.cellForRow(at: IndexPath(row: 0, section: 0)) as? SearchHistoryCell)
+    let arrow = try XCTUnwrap(row.accessoryView as? MikshatDirectionIndicator)
+    let image = try XCTUnwrap(arrow.subviews.compactMap { $0 as? UIImageView }.first)
+    XCTAssertNotNil(arrow.window, "Exercise UIKit's attached table accessory layout")
+
+    for direction in [UISemanticContentAttribute.forceLeftToRight, .forceRightToLeft] {
+      table.semanticContentAttribute = direction
+      row.semanticContentAttribute = direction
+      for width in [CGFloat(320), 390, 844] {
+        window.frame.size.width = width
+        window.layoutIfNeeded()
+        for bearing in [Double(45), 135, 225, 315] {
+          arrow.renderDirection(bearing: bearing, heading: 0)
+          for _ in 0..<12 {
+            table.setNeedsLayout()
+            row.setNeedsLayout()
+            table.layoutIfNeeded()
+            row.layoutIfNeeded()
+            arrow.layoutIfNeeded()
+            XCTAssertEqual(arrow.transform, .identity)
+            XCTAssertEqual(arrow.frame.size, CGSize(width: 28, height: 28))
+            XCTAssertEqual(arrow.bounds.size, CGSize(width: 28, height: 28))
+            XCTAssertEqual(image.bounds.size, CGSize(width: 28, height: 28))
+            XCTAssertEqual(image.center, CGPoint(x: 14, y: 14))
+            XCTAssertEqual(image.transform.a, CGFloat(cos(bearing * .pi / 180)), accuracy: 0.0001)
+            XCTAssertEqual(image.transform.b, CGFloat(sin(bearing * .pi / 180)), accuracy: 0.0001)
+            XCTAssertLessThanOrEqual(image.frame.width, 40)
+            XCTAssertLessThanOrEqual(image.frame.height, 40)
+            for value in [arrow.frame.minX, arrow.frame.minY, image.frame.minX, image.frame.minY,
+                          image.frame.width, image.frame.height] {
+              XCTAssertTrue(value.isFinite)
+            }
+          }
+          XCTAssertEqual(arrow.alpha, 1)
+          XCTAssertFalse(arrow.accessibilityElementsHidden)
+          XCTAssertEqual(arrow.accessibilityValue, String(format: "%.0f°", bearing))
+        }
+      }
+    }
+
+    // Reset a genuinely rotated accessory before it is configured for another
+    // row; both clear and text-only rows must drop its target and VoiceOver value.
+    row.prepareForReuse()
+    XCTAssertNil(row.accessoryView)
+    XCTAssertNil(arrow.target)
+    XCTAssertEqual(image.transform, .identity)
+    XCTAssertEqual(arrow.alpha, 0)
+    XCTAssertTrue(arrow.accessibilityElementsHidden)
+    XCTAssertNil(arrow.accessibilityValue)
+    for content in [SearchHistoryCell.Content.clear, .query("Text query")] {
+      row.configure(for: content)
+      XCTAssertNil(row.accessoryView)
+      XCTAssertNil(arrow.target)
+    }
+    row.configure(for: .query("25, 47"))
+    XCTAssertTrue(row.accessoryView === arrow)
+    XCTAssertEqual(try XCTUnwrap(arrow.target).latitude, 25)
+    XCTAssertEqual(try XCTUnwrap(arrow.target).longitude, 47)
+    arrow.renderDirection(bearing: 135, heading: 0)
+    row.setNeedsLayout()
+    row.layoutIfNeeded()
+    XCTAssertEqual(arrow.transform, .identity)
+    XCTAssertEqual(arrow.frame.size, CGSize(width: 28, height: 28))
+    XCTAssertEqual(image.bounds.size, CGSize(width: 28, height: 28))
+    XCTAssertEqual(arrow.alpha, 1)
+    XCTAssertFalse(arrow.accessibilityElementsHidden)
+  }
+
   func test_EmptyAndDisabledHistoryStayEmptyWithoutFallingBackToCategories() throws {
     let controller = makeController()
     let history = try historyController(in: controller)
