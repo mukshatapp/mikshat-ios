@@ -1,0 +1,67 @@
+name: Mikshat Apple logging concurrency validation
+
+'on':
+  push:
+    branches:
+      - diagnostics/logging-apple-tsan
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mikshat-logging-apple-tsan
+  cancel-in-progress: true
+
+jobs:
+  logging-tsan:
+    name: Actual logger sources with Apple Clang ThreadSanitizer
+    runs-on: xcode-27
+    timeout-minutes: 10
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+      CXX: clang++
+      MIKSHAT_LOG_TEST_OUTPUT: ${{ github.workspace }}/build/logging-concurrency
+    steps:
+      - name: Check out the fixed source and its baseline parent
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 3
+
+      - name: Record the actual Apple toolchain and source revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$MIKSHAT_LOG_TEST_OUTPUT"
+          {
+            xcodebuild -version
+            xcrun clang++ --version
+            uname -m
+            git rev-parse HEAD
+            git rev-parse HEAD^
+            git rev-parse --verify eb1bf79b03d51bb70c3ed40ebf9f7bcf3c77ba1f^{commit}
+          } | tee "$MIKSHAT_LOG_TEST_OUTPUT/toolchain.log"
+          git diff --exit-code 4e7819b01bc4b862e97372bf0519b7e6a0711e2c -- \
+            libs/base/logging.cpp libs/base/logging.hpp libs/base/thread.cpp \
+            mikshat/tests/logging/run.sh mikshat/tests/logging/LogHelperConcurrencyTests.cpp
+
+      - name: Compare baseline race, serialized control and fixed production logger
+        timeout-minutes: 7
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash mikshat/tests/logging/run.sh \
+            --baseline-ref eb1bf79b03d51bb70c3ed40ebf9f7bcf3c77ba1f \
+            2>&1 | tee "$MIKSHAT_LOG_TEST_OUTPUT/runner.log"
+
+      - name: Preserve Apple sanitizer evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mikshat-logging-apple-tsan
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            build/logging-concurrency/summary.json
+            build/logging-concurrency/*.log
