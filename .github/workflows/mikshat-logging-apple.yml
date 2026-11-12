@@ -27,19 +27,20 @@ jobs:
       - name: Check out the fixed source and its baseline parent
         uses: actions/checkout@v4
         with:
-          fetch-depth: 3
+          fetch-depth: 1
 
       - name: Record the actual Apple toolchain and source revisions
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p "$MIKSHAT_LOG_TEST_OUTPUT"
+          git fetch --no-tags --depth=1 origin eb1bf79b03d51bb70c3ed40ebf9f7bcf3c77ba1f 4e7819b01bc4b862e97372bf0519b7e6a0711e2c
           {
             xcodebuild -version
             xcrun clang++ --version
             uname -m
             git rev-parse HEAD
-            git rev-parse HEAD^
+            git rev-parse --verify 4e7819b01bc4b862e97372bf0519b7e6a0711e2c^{commit}
             git rev-parse --verify eb1bf79b03d51bb70c3ed40ebf9f7bcf3c77ba1f^{commit}
           } | tee "$MIKSHAT_LOG_TEST_OUTPUT/toolchain.log"
           git diff --exit-code 4e7819b01bc4b862e97372bf0519b7e6a0711e2c -- \
