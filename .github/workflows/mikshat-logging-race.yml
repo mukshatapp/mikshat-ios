@@ -1,0 +1,46 @@
+name: Mikshat production logging concurrency regression
+on:
+  push:
+    branches:
+      - fix/search-logging-race
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: mikshat-logging-race
+  cancel-in-progress: true
+jobs:
+  logging:
+    name: Actual production logger baseline and fixed ThreadSanitizer comparison
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Fetch the pinned published comparison baseline
+        run: git fetch --no-tags --depth=1 origin eb1bf79b03d51bb70c3ed40ebf9f7bcf3c77ba1f
+      - name: Select and record the installed C++ compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v g++-14 >/dev/null 2>&1; then
+            echo 'CXX=g++-14' >> "$GITHUB_ENV"
+            g++-14 --version
+          else
+            echo 'CXX=g++' >> "$GITHUB_ENV"
+            g++ --version
+          fi
+      - name: Reproduce the published race and verify the fixed production source
+        env:
+          MIKSHAT_LOG_TEST_OUTPUT: ${{ github.workspace }}/build/logging-concurrency
+        run: bash mikshat/tests/logging/run.sh --baseline-ref eb1bf79b03d51bb70c3ed40ebf9f7bcf3c77ba1f
+      - name: Preserve race and control evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mikshat-logging-race
+          retention-days: 7
+          path: |
+            build/logging-concurrency/summary.json
+            build/logging-concurrency/*.log
