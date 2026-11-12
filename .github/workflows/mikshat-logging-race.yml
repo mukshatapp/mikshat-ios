@@ -17,7 +17,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 1
+      - name: Fetch the pinned published comparison baseline
+        run: git fetch --no-tags --depth=1 origin eb1bf79b03d51bb70c3ed40ebf9f7bcf3c77ba1f
       - name: Select and record the installed C++ compiler
         shell: bash
         run: |

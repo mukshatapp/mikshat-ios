@@ -15,7 +15,7 @@ MIKSHAT_LOG_TEST_OUTPUT=/tmp/mikshat-log-comparison \
 ```
 
 Use a locally available baseline commit; this script fetches nothing. A shallow
-CI checkout must include the parent baseline. The local proof also used
+CI checkout must include or explicitly fetch the pinned baseline. The local proof also used
 `3e42f10`, whose source tree equals the published 4.6.11 commit above.
 The comparison extracts the baseline's actual `libs/base` and `libs/std` sources
 from Git. It does not mirror the thread-ID algorithm or edit either source.
