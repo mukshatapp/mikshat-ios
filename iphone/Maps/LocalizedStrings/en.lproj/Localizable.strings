@@ -476,7 +476,6 @@
 
 /* «Hide» context menu */
 "hide" = "Hide";
-"categories" = "Categories";
 "history" = "History";
 "search_not_found" = "Oops, no results found.";
 
@@ -1222,3 +1221,266 @@
 
 /* Accessibility label for the button that reverses the complete planned route, including intermediate stops. */
 "reverse_route" = "Reverse route";
+
+/* Mikshat navigation tools */
+"mikshat_tools" = "Mikshat tools";
+
+/* Mikshat navigation tools */
+"mikshat_coordinates" = "Coordinates";
+
+/* Mikshat navigation tools */
+"mikshat_qibla" = "Qibla";
+
+/* Mikshat navigation tools */
+"mikshat_heading" = "Compass";
+
+/* Mikshat navigation tools */
+"mikshat_lat_degrees" = "Latitude degrees";
+
+/* Mikshat navigation tools */
+"mikshat_lat_minutes" = "Latitude minutes";
+
+/* Mikshat navigation tools */
+"mikshat_lon_degrees" = "Longitude degrees";
+
+/* Mikshat navigation tools */
+"mikshat_lon_minutes" = "Longitude minutes";
+
+/* Mikshat navigation tools */
+"mikshat_coordinate_hint" = "Enter degrees and decimal minutes, for example N 24° 42.810′, E 046° 40.518′. Arabic and English digits are supported.";
+
+/* Mikshat navigation tools */
+"mikshat_latitude" = "Latitude: degrees / minutes / direction";
+
+/* Mikshat navigation tools */
+"mikshat_longitude" = "Longitude: degrees / minutes / direction";
+
+/* Mikshat navigation tools */
+"mikshat_show_map" = "Show on map";
+
+/* Mikshat navigation tools */
+"mikshat_coordinate_error" = "Check the degrees and minutes. Minutes must be below 60, with two digits before the decimal point and up to three after it. Latitude is at most 90° and longitude 180°; minutes must be zero at these limits.";
+
+/* Mikshat navigation tools */
+"mikshat_qibla_hint" = "Hold your phone flat and turn until the gold arrow points forward. Qibla uses the phone compass and is independent of the destination heading setting.";
+
+/* Mikshat navigation tools */
+"mikshat_heading_hint" = "Choose the heading used by destination arrows. Automatic mode uses GPS course at 10 km/h or faster, and the phone compass below that speed. This does not change Qibla.";
+
+/* Mikshat navigation tools */
+"mikshat_heading_sensor" = "Phone compass";
+
+/* Mikshat navigation tools */
+"mikshat_heading_gps" = "GPS direction of travel";
+
+/* Mikshat navigation tools */
+"mikshat_heading_auto" = "Automatic GPS / compass";
+
+/* Mikshat navigation tools */
+"mikshat_location_unavailable" = "A recent location is required. Enable location access and wait for a GPS fix.";
+
+/* Mikshat navigation tools */
+"mikshat_heading_unavailable" = "The compass is unavailable or inaccurate. Keep away from magnets and metal, and calibrate your phone.";
+
+/* Mikshat navigation tools */
+"mikshat_qibla_bearing" = "Qibla: %.0f° from true north";
+
+/* Mikshat navigation tools */
+"mikshat_my_location" = "My location";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_kmh" = "km/h";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_speed" = "Speed";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_remaining_distance" = "Distance remaining";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_remaining_time" = "Time remaining";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_arrival" = "Estimated arrival";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_waiting" = "Waiting for movement";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_north" = "North";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_south" = "South";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_east" = "East";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_west" = "West";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_qibla_title" = "Mikshat • Qibla compass";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_location_settings" = "Location settings";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_arrow_to_point" = "Arrow points to the destination";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_heading_source" = "Compass direction source";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_record_track" = "Record track";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_enter_coordinates" = "Enter coordinates";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_go_to" = "Go to";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_copy" = "Copy";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_navigation_modes" = "Direct guidance, car, compass";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_direct" = "Direct";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_car" = "Car";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_stop" = "Stop";
+
+/* Mikshat Android-equivalent navigation interface */
+"mikshat_direct_notice" = "Direct guidance • straight-line distance • arrival time is an estimate";
+
+/* Mikshat location and compass interface */
+"mikshat_save_share" = "Save and share";
+
+/* Mikshat location and compass interface */
+"mikshat_save_location" = "Save location";
+
+/* Mikshat location and compass interface */
+"mikshat_share_location" = "Share location";
+
+/* Mikshat location and compass interface */
+"mikshat_current_location" = "Current location";
+
+/* Mikshat location and compass interface */
+"mikshat_location_saved" = "Location saved to favorites";
+
+/* Mikshat location and compass interface */
+"mikshat_fixed_arrow" = "Arrow fixed upwards";
+
+/* Mikshat navigation and location sharing */
+"mikshat_finish_trip_first" = "Finish the current trip before changing its destination.";
+
+/* Mikshat navigation and location sharing */
+"mikshat_stop_navigation" = "Stop";
+
+/* Mikshat navigation and location sharing */
+"mikshat_show_stop" = "Show stop button";
+
+/* Mikshat navigation and location sharing */
+"mikshat_app_name" = "Mikshat";
+
+/* Mikshat navigation and location sharing */
+"mikshat_map_point" = "Map point";
+
+/* Mikshat navigation and location sharing */
+"mikshat_share_message" = "📍 %@ via Mikshat\nFor navigation and outdoor maps\n\nCoordinates:\n%@\n\nOpen in Mikshat:\n%@";
+
+/* Mikshat map controls and compass settings */
+"mikshat_compass_settings" = "Compass settings";
+
+/* Mikshat map controls and compass settings */
+"mikshat_compass_transparency_title" = "Compass transparency";
+
+/* Mikshat map controls and compass settings */
+"mikshat_compass_transparency_enable" = "Enable background transparency";
+
+/* Mikshat map controls and compass settings */
+"mikshat_compass_transparency_amount" = "Background transparency";
+
+/* Mikshat map controls and compass settings */
+"mikshat_compass_transparency_hint" = "Show the map behind the general and navigation compasses. 0% opaque, 100% transparent.";
+
+/* Mikshat map controls and compass settings */
+"mikshat_satellite_enable" = "Enable satellite imagery";
+
+/* Mikshat map controls and compass settings */
+"mikshat_satellite_disable" = "Disable satellite imagery";
+
+/* Mikshat map controls and compass settings */
+"mikshat_toggle_time" = "Switch remaining time and arrival time";
+
+/* Navigation can use the known map-arrow position while GPS is stale; do not imply live speed or location. */
+"mikshat_cached_location" = "Last known map position — waiting for a location update";
+
+/* Mikshat selected-location weather */
+"mikshat_weather_available_hours" = "%d of the next 12 hours available";
+"mikshat_weather_condition_clear" = "Clear";
+"mikshat_weather_condition_drizzle_dense" = "Dense drizzle";
+"mikshat_weather_condition_drizzle_light" = "Light drizzle";
+"mikshat_weather_condition_drizzle_moderate" = "Moderate drizzle";
+"mikshat_weather_condition_fog" = "Fog";
+"mikshat_weather_condition_freezing_drizzle_dense" = "Dense freezing drizzle";
+"mikshat_weather_condition_freezing_drizzle_light" = "Light freezing drizzle";
+"mikshat_weather_condition_freezing_rain_heavy" = "Heavy freezing rain";
+"mikshat_weather_condition_freezing_rain_light" = "Light freezing rain";
+"mikshat_weather_condition_mainly_clear" = "Mainly clear";
+"mikshat_weather_condition_overcast" = "Overcast";
+"mikshat_weather_condition_partly_cloudy" = "Partly cloudy";
+"mikshat_weather_condition_rain_heavy" = "Heavy rain";
+"mikshat_weather_condition_rain_light" = "Slight rain";
+"mikshat_weather_condition_rain_moderate" = "Moderate rain";
+"mikshat_weather_condition_rain_showers_light" = "Slight rain showers";
+"mikshat_weather_condition_rain_showers_moderate" = "Moderate rain showers";
+"mikshat_weather_condition_rain_showers_violent" = "Violent rain showers";
+"mikshat_weather_condition_rime_fog" = "Depositing rime fog";
+"mikshat_weather_condition_snow_grains" = "Snow grains";
+"mikshat_weather_condition_snow_heavy" = "Heavy snowfall";
+"mikshat_weather_condition_snow_light" = "Slight snowfall";
+"mikshat_weather_condition_snow_moderate" = "Moderate snowfall";
+"mikshat_weather_condition_snow_showers_heavy" = "Heavy snow showers";
+"mikshat_weather_condition_snow_showers_light" = "Slight snow showers";
+"mikshat_weather_condition_thunderstorm" = "Thunderstorm";
+"mikshat_weather_condition_thunderstorm_hail_heavy" = "Thunderstorm with heavy hail";
+"mikshat_weather_condition_thunderstorm_hail_slight" = "Thunderstorm with slight hail";
+"mikshat_weather_condition_unknown" = "Weather unavailable";
+"mikshat_weather_coordinates" = "Coordinates: %@";
+"mikshat_weather_current" = "Current conditions";
+"mikshat_weather_gusts" = "Gusts";
+"mikshat_weather_hour_gusts" = "Gusts: %@";
+"mikshat_weather_hour_wind" = "Wind: %@";
+"mikshat_weather_invalid_location" = "The selected coordinates are invalid.";
+"mikshat_weather_last_updated" = "Last updated: %@";
+"mikshat_weather_loading" = "Loading forecast…";
+"mikshat_weather_model_notice" = "Values are model estimates and may differ from direct weather station observations.";
+"mikshat_weather_next_12_hours" = "Next 12 hours";
+"mikshat_weather_no_saved_forecast" = "No saved forecast for this location";
+"mikshat_weather_no_saved_retry" = "No saved forecast for this location. Unable to connect; try again.";
+"mikshat_weather_offline_saved" = "Offline — showing saved data.";
+"mikshat_weather_refresh" = "Refresh forecast";
+"mikshat_weather_refresh_failed_saved" = "Unable to update; showing saved data with its last update time.";
+"mikshat_weather_saved_data" = "Saved data";
+"mikshat_weather_selected_location" = "Selected map location";
+"mikshat_weather_temperature_accessibility" = "Temperature: %@ degrees Celsius";
+"mikshat_weather_title" = "Weather";
+"mikshat_weather_unavailable" = "Unavailable";
+"mikshat_weather_updating" = "Updating forecast…";
+"mikshat_weather_wind_calm" = "Calm wind";
+"mikshat_weather_wind_e" = "east";
+"mikshat_weather_wind_from" = "From %@";
+"mikshat_weather_wind_n" = "north";
+"mikshat_weather_wind_ne" = "northeast";
+"mikshat_weather_wind_nw" = "northwest";
+"mikshat_weather_wind_s" = "south";
+"mikshat_weather_wind_se" = "southeast";
+"mikshat_weather_wind_speed" = "Wind speed";
+"mikshat_weather_wind_sw" = "southwest";
+"mikshat_weather_wind_unavailable" = "Wind direction unavailable";
+"mikshat_weather_wind_w" = "west";

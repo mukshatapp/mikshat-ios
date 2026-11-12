@@ -34,6 +34,7 @@ extension NavigationDashboard {
         return .show(points: router.points(), routerType: router.type())
 
       case .selectRouterType(let routerType):
+        MikshatNavigationCoordinator.stopDirectNavigation(stopRouter: false)
         router.setType(routerType)
         router.rebuild(withBestRouter: false)
         return .none
@@ -44,16 +45,7 @@ extension NavigationDashboard {
         return .setHidden(true)
 
       case .addRoutePointButtonDidTap:
-        guard !router.isRoutePointsLimitReached() else {
-          Toast.show(withText: L("routing_max_stops_reached"))
-          return .none
-        }
-        let selection = MWMRoutePointSelection(point: nil,
-                                               type: .intermediate,
-                                               shouldAppend: true)
-        delegate?.routePreviewDidSelect(selection)
-        searchManager.startSearching(isRouting: true)
-        return .setHidden(true)
+        return .none
 
       case .deleteRoutePoint(let point):
         router.removePointAndRebuild(point)
@@ -71,6 +63,15 @@ extension NavigationDashboard {
         return .showError(errorMessage)
 
       case .startButtonDidTap:
+        if router.type() == .ruler {
+          let started = MikshatNavigationCoordinator.startCustomNavigation()
+          return started && !MikshatNavigationCoordinator.compassSelected ? .setHidden(true) : .none
+        }
+        guard let fix = LocationManager.lastLocation(), fix.horizontalAccuracy >= 0,
+              abs(fix.timestamp.timeIntervalSinceNow) < 15 else {
+          Toast.show(withText: L("mikshat_location_unavailable"))
+          return .none
+        }
         delegate?.routingStartButtonDidTap()
         return .none
 

@@ -1,6 +1,7 @@
 #include "storage/storage_helpers.hpp"
 
 #include "storage/country_info_getter.hpp"
+#include "storage/saudi_map_download_source.hpp"
 #include "storage/storage.hpp"
 
 #include "platform/platform.hpp"
@@ -80,7 +81,7 @@ m2::RectD CalcLimitRect(CountryId const & countryId, Storage const & storage,
 MwmSize GetRemoteSize(diffs::DiffsDataSource const & diffsDataSource, platform::CountryFile const & file)
 {
   uint64_t size;
-  if (diffsDataSource.SizeFor(file.GetName(), size))
+  if (!FindSaudiMapDownloadSource(file.GetName()) && diffsDataSource.SizeFor(file.GetName(), size))
     return size;
   return file.GetRemoteSize();
 }

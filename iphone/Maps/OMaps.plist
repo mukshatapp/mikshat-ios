@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>${PRODUCT_NAME}</string>
+	<string>مكشات</string>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
@@ -115,6 +115,7 @@
 				<string>ge0</string>
 				<string>geo</string>
 				<string>om</string>
+				<string>mikshat-maps</string>
 				<string>mapswithmepro</string>
 				<string>geo-navigation</string>
 			</array>

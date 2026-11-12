@@ -53,7 +53,11 @@ DrapeEngine::DrapeEngine(Params && params)
   using namespace settings;
 
   EMyPositionMode mode = PendingPosition;
-  if (Get(kLocationStateMode, mode) && mode == FollowAndRotate)
+  Get(kLocationStateMode, mode);
+  EMyPositionMode preferred;
+  if (Get("MikshatPreferredCameraMode", preferred) && (preferred == Follow || preferred == FollowAndRotate || preferred == NotFollow))
+    mode = preferred;
+  if (mode == FollowAndRotate)
   {
     // If the screen rect setting in follow and rotate mode is missing or invalid, it could cause
     // invalid animations, so the follow and rotate mode should be discarded.

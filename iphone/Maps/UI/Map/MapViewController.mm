@@ -493,6 +493,7 @@ NSString * const kCategorySelectorSegue = @"MapToCategorySelectorSegue";
 - (void)viewDidLoad
 {
   [super viewDidLoad];
+  [MikshatHomeControls installInView:self.view];
   [self setupPlacePageContainer];
   [self setupSearchContainer];
 
@@ -678,6 +679,7 @@ NSString * const kCategorySelectorSegue = @"MapToCategorySelectorSegue";
   self.listeners = [NSHashTable<id<MWMLocationModeListener>> weakObjectsHashTable];
   self.availableAreaInsetsMap = [NSMapTable weakToStrongObjectsMapTable];
   Framework & f = GetFramework();
+  f.SetRulerDestinationPolicy(true, false);
   // TODO: Review and improve this code.
   f.SetPlacePageListeners([self]() { [self onMapObjectSelected]; }, [self]() { [self onMapObjectDeselected]; },
                           [self]() { [self onMapObjectUpdated]; }, [self]() { [self onSwitchFullScreen]; });

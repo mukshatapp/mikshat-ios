@@ -20,6 +20,8 @@ CGFloat const kButtonsBottomOffset = 6;
 @property(weak, nonatomic) IBOutlet MWMButton * location;
 
 @property(nonatomic) CGRect availableArea;
+@property(nonatomic, strong) NSLayoutConstraint * widthConstraint;
+@property(nonatomic, strong) NSLayoutConstraint * heightConstraint;
 
 @end
 
@@ -28,52 +30,49 @@ CGFloat const kButtonsBottomOffset = 6;
 - (void)awakeFromNib
 {
   [super awakeFromNib];
-  self.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+  self.autoresizingMask = UIViewAutoresizingNone;
+  self.translatesAutoresizingMaskIntoConstraints = NO;
+  self.widthConstraint = [self.widthAnchor constraintEqualToConstant:52];
+  self.heightConstraint = [self.heightAnchor constraintEqualToConstant:172];
+  [NSLayoutConstraint activateConstraints:@[self.widthConstraint, self.heightConstraint]];
+  NSArray<UIButton *> * buttons = @[self.zoomIn, self.zoomOut, self.location];
+  NSArray<NSString *> * symbols = @[@"plus", @"minus", @"scope"];
+  UIColor * green = [UIColor colorWithRed:22.0/255 green:78.0/255 blue:63.0/255 alpha:1];
+  for (NSUInteger index = 0; index < buttons.count; ++index)
+  {
+    UIButton * button = buttons[index];
+    [button setImage:[UIImage systemImageNamed:symbols[index]] forState:UIControlStateNormal];
+    button.tintColor = green;
+    button.backgroundColor = UIColor.whiteColor;
+    button.layer.cornerRadius = button.bounds.size.width / 2;
+  }
+}
+
+- (void)didMoveToSuperview
+{
+  [super didMoveToSuperview];
+  if (self.superview)
+    [MikshatHomeControls attachMapControls:self];
 }
 
 - (void)layoutSubviews
 {
-  CGFloat spacing = self.availableHeight - self.zoomOut.maxY - self.location.height;
-  spacing = math::Clamp(spacing, kLocationButtonSpacingMin, kLocationButtonSpacingMax);
-
-  self.location.minY = self.zoomOut.maxY + spacing;
-  self.bounds = {{}, {self.zoomOut.width, self.location.maxY}};
-  if (self.zoomHidden)
-    self.height = self.location.height;
-  self.location.maxY = self.height;
-
-  [self animate];
   [super layoutSubviews];
-}
-
-- (void)layoutXPosition:(BOOL)hidden
-{
-  if (UIApplication.sharedApplication.userInterfaceLayoutDirection == UIUserInterfaceLayoutDirectionRightToLeft)
-  {
-    if (hidden)
-      self.maxX = 0;
-    else
-      self.minX = self.availableArea.origin.x + kViewControlsOffsetToBounds;
-  }
-  else
-  {
-    auto const availableAreaMaxX = self.availableArea.origin.x + self.availableArea.size.width;
-    if (hidden)
-      self.minX = self.superview.width;
-    else
-      self.maxX = availableAreaMaxX - kViewControlsOffsetToBounds;
-  }
-}
-
-- (void)layoutYPosition
-{
-  CGFloat const centerShift = (self.height - self.zoomIn.midY - self.zoomOut.midY) / 2;
-  [UIView animateWithDuration:AppConstants.defaultAnimationDuration
-                   animations:^{
-                     self.midY = centerShift + self.superview.height / 2;
-                     if (self.maxY > self.bottomBound)
-                       self.maxY = self.bottomBound;
-                   }];
+  if (!self.superview)
+    return;
+  CGSize const viewport = self.window ? self.window.bounds.size : self.superview.bounds.size;
+  CGFloat const size = viewport.width > viewport.height ? 44 : 52;
+  CGFloat const gap = 8;
+  CGFloat const height = self.zoomHidden ? size : 3 * size + 2 * gap;
+  if (self.widthConstraint.constant != size)
+    self.widthConstraint.constant = size;
+  if (self.heightConstraint.constant != height)
+    self.heightConstraint.constant = height;
+  self.zoomIn.frame = CGRectMake(0, 0, size, size);
+  self.zoomOut.frame = CGRectMake(0, size + gap, size, size);
+  self.location.frame = CGRectMake(0, self.zoomHidden ? 0 : 2 * (size + gap), size, size);
+  for (UIButton * button in @[self.zoomIn, self.zoomOut, self.location])
+    button.layer.cornerRadius = size / 2;
 }
 
 - (void)fadeZoomButtonsShow:(BOOL)show
@@ -95,17 +94,7 @@ CGFloat const kButtonsBottomOffset = 6;
 // Show/hide zoom and location buttons depending on available vertical space.
 - (void)animate
 {
-  [self layoutYPosition];
-
-  BOOL const isZoomHidden = self.zoomIn.alpha == 0.0;
-  BOOL const willZoomHide = (self.location.maxY > self.availableHeight);
-  if (willZoomHide != isZoomHidden)
-    [self fadeZoomButtonsShow:!willZoomHide];
-
-  BOOL const isLocationHidden = self.location.alpha == 0.0;
-  BOOL const willLocationHide = (self.location.height > self.availableHeight);
-  if (willLocationHide != isLocationHidden)
-    [self fadeLocationButtonShow:!willLocationHide];
+  [self setNeedsLayout];
 }
 
 #pragma mark - Properties
@@ -130,7 +119,7 @@ CGFloat const kButtonsBottomOffset = 6;
     [UIView animateWithDuration:AppConstants.defaultAnimationDuration
         animations:^{
           self.alpha = hidden ? 0.0 : 1.0;
-          [self layoutXPosition:hidden];
+
         }
         completion:^(BOOL finished) { self.hidden = hidden; }];
   }
@@ -146,20 +135,8 @@ CGFloat const kButtonsBottomOffset = 6;
     return;
   if (CGRectEqualToRect(self.availableArea, frame))
     return;
-  // If during our show/hide animation position is changed it is corrupted.
-  // Such kind of animation has 2 keys (opacity and position).
-  // But there are other animation cases like change of orientation.
-  // So we can use condition below:
-  // if (self.layer.animationKeys.count != 2)
-  // More elegant way is to check if x values are changed.
-  // If no - there is no need to update self x values.
-  if (self.availableArea.origin.x != frame.origin.x || self.availableArea.size.width != frame.size.width)
-  {
-    self.availableArea = frame;
-    [self layoutXPosition:self.hidden];
-  }
-  else
-    self.availableArea = frame;
+  // Sheet movement must not change the anchors below the Qibla button.
+  self.availableArea = frame;
   [self setNeedsLayout];
 }
 

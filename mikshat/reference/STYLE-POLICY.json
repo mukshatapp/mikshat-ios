@@ -1,0 +1,23 @@
+[
+  {
+    "file": "drules_default.bin",
+    "removed_draw9_urban_records": 992,
+    "all_other_scales_raw_identical": true,
+    "geography_draw9_raw_identical": true,
+    "color_palettes_identical": true
+  },
+  {
+    "file": "drules_outdoors.bin",
+    "removed_draw9_urban_records": 1003,
+    "all_other_scales_raw_identical": true,
+    "geography_draw9_raw_identical": true,
+    "color_palettes_identical": true
+  },
+  {
+    "file": "drules_vehicle.bin",
+    "removed_draw9_urban_records": 522,
+    "all_other_scales_raw_identical": true,
+    "geography_draw9_raw_identical": true,
+    "color_palettes_identical": true
+  }
+]

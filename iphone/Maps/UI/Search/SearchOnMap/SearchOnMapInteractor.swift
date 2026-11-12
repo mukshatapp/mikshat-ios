@@ -140,6 +140,7 @@ final class SearchOnMapInteractor: NSObject {
     switch result.itemType {
     case .regular:
       searchManager.save(query)
+      MikshatSearchLocations.remember(result.coordinate, query: query.text)
       if let routePointSelector, routePointSelector.isActive {
         guard routePointSelector.select(searchResult: result) else { return .none }
         return closeSearch()

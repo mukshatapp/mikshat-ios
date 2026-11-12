@@ -1,0 +1,333 @@
+name: Mikshat full-app search regression
+
+on:
+  push:
+    branches:
+      - diagnostics/search-full-app
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mikshat-search-full-app-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  search-regression:
+    if: "!contains(github.event.head_commit.message, '[renderer-only]')"
+    name: Real app on iPhone 16 / iOS 26
+    runs-on: macos-26
+    timeout-minutes: 60
+    env:
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+
+    steps:
+      - name: Check out the diagnostic revision
+        uses: actions/checkout@v4
+
+      - name: Record toolchain and available simulators
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/search-diagnostics
+          xcodebuild -version | tee build/search-diagnostics/toolchain.txt
+          printf 'MIKSHAT_XCODE_CACHE_ID=%s\n' "$(xcodebuild -version | tr -cs '[:alnum:]' '-')" >> "$GITHUB_ENV"
+          xcrun --sdk iphonesimulator --show-sdk-version | tee -a build/search-diagnostics/toolchain.txt
+          uname -m | tee -a build/search-diagnostics/toolchain.txt
+          xcrun simctl list --json runtimes > build/search-diagnostics/runtimes.json
+          xcrun simctl list --json devicetypes > build/search-diagnostics/device-types.json
+
+      - name: Fetch pinned submodules
+        shell: bash
+        run: |
+          set -euo pipefail
+          git submodule update --init --recursive --depth 1 --jobs 8
+
+      - name: Prepare app resources
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 mikshat/prepare_branding.py
+          python3 mikshat/prepare_satellite.py
+
+      - name: Ensure Metal compiler is available
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! xcrun metal -v >/dev/null 2>&1; then
+            xcodebuild -downloadComponent MetalToolchain
+            xcrun -k
+          fi
+          xcrun metal -v
+
+      - name: Restore compiled objects for this Xcode toolchain
+        id: derived-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: build/SearchDerivedData
+          key: mikshat-search-derived-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.MIKSHAT_XCODE_CACHE_ID }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            mikshat-search-derived-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.MIKSHAT_XCODE_CACHE_ID }}-
+
+      - name: Restore unchanged build input timestamps
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > build/search-diagnostics/cache-input-mtimes.py <<'PY'
+          from pathlib import Path
+          import hashlib
+          import json
+          import os
+          import sys
+
+          manifest = Path('build/SearchDerivedData/mikshat-input-mtimes.json')
+          roots = ('iphone', 'libs', 'xcode', 'data', '3party', 'private')
+          def inputs():
+              for root in roots:
+                  if not Path(root).is_dir():
+                      continue
+                  for directory, children, files in os.walk(root):
+                      children[:] = [name for name in children if name not in ('.git', '__pycache__', 'node_modules')]
+                      yield Path(directory)
+                      for name in files:
+                          if name != '.git':
+                              yield Path(directory) / name
+          def digest(path):
+              if path.is_dir():
+                  names = sorted(child.name for child in path.iterdir() if child.name != '.git')
+                  return hashlib.sha256('\n'.join(names).encode()).hexdigest()
+              result = hashlib.sha256()
+              with path.open('rb') as stream:
+                  for block in iter(lambda: stream.read(1024 * 1024), b''):
+                      result.update(block)
+              return result.hexdigest()
+          if sys.argv[1] == 'restore':
+              restored = 0
+              if manifest.exists():
+                  for item in json.loads(manifest.read_text()):
+                      path = Path(item['path'])
+                      if path.exists() and not path.is_symlink() and digest(path) == item['sha256']:
+                          os.utime(path, ns=(path.stat().st_atime_ns, item['mtime_ns']))
+                          restored += 1
+              print(f'Restored timestamps for {restored} unchanged build inputs')
+          else:
+              entries = []
+              for path in inputs():
+                  if path.exists() and not path.is_symlink():
+                      entries.append(dict(path=str(path), sha256=digest(path), mtime_ns=path.stat().st_mtime_ns))
+              manifest.parent.mkdir(parents=True, exist_ok=True)
+              manifest.write_text(json.dumps(entries))
+              print(f'Recorded {len(entries)} build input timestamps')
+          PY
+          python3 build/search-diagnostics/cache-input-mtimes.py restore
+
+      - name: Select and boot iPhone 16 with iOS 26
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+
+          def simctl(*arguments):
+              return subprocess.run(['xcrun', 'simctl', *arguments], check=True, capture_output=True, text=True).stdout
+
+          runtimes = json.loads(simctl('list', '--json', 'runtimes'))['runtimes']
+          candidates = [runtime for runtime in runtimes
+                        if runtime.get('isAvailable')
+                        and runtime.get('identifier', '').startswith('com.apple.CoreSimulator.SimRuntime.iOS-26-')]
+          if not candidates:
+              raise SystemExit('No available iOS 26 runtime. See build/search-diagnostics/runtimes.json; do not substitute another iOS version silently.')
+          runtime = max(candidates, key=lambda value: tuple(int(part) for part in value['version'].split('.')))
+          device_type = 'com.apple.CoreSimulator.SimDeviceType.iPhone-16'
+          device_types = json.loads(simctl('list', '--json', 'devicetypes'))['devicetypes']
+          if not any(value['identifier'] == device_type for value in device_types):
+              raise SystemExit('This Xcode installation has no iPhone 16 simulator device type.')
+          devices = json.loads(simctl('list', '--json', 'devices', 'available'))['devices']
+          matching = [device for device in devices.get(runtime['identifier'], [])
+                      if device.get('deviceTypeIdentifier') == device_type]
+          if matching:
+              device = matching[0]
+              udid = device['udid']
+              if device['state'] != 'Booted':
+                  simctl('boot', udid)
+          else:
+              udid = simctl('create', 'Mikshat Search iPhone 16', device_type, runtime['identifier']).strip()
+              simctl('boot', udid)
+          subprocess.run(['xcrun', 'simctl', 'bootstatus', udid, '-b'], check=True)
+          selection = dict(device='iPhone 16', udid=udid, runtime=runtime['identifier'], version=runtime['version'])
+          Path('build/search-diagnostics/simulator-selection.json').write_text(json.dumps(selection, indent=2) + '\n')
+          with open(os.environ['GITHUB_ENV'], 'a') as stream:
+              stream.write(f'MIKSHAT_SIMULATOR_UDID={udid}\n')
+          print(json.dumps(selection))
+          PY
+
+      - name: Build and run the real app search tests
+        id: search-tests
+        timeout-minutes: 45
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild test \
+            -workspace xcode/omim.xcworkspace \
+            -scheme OMaps \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "id=$MIKSHAT_SIMULATOR_UDID" \
+            -destination-timeout 120 \
+            -derivedDataPath build/SearchDerivedData \
+            -resultBundlePath build/SearchRegressions.xcresult \
+            -parallel-testing-enabled NO \
+            -maximum-concurrent-test-simulator-destinations 1 \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 120 \
+            -maximum-test-execution-time-allowance 180 \
+            -only-testing:OMapsTests/SearchThemeWindowLifecycleTests \
+            -only-testing:OMapsTests/SearchOnMapManagerTests \
+            -only-testing:OMapsTests/SearchOnMapHeaderViewTests \
+            -only-testing:OMapsTests/SearchTabLayoutRegressionTests \
+            ARCHS="$(uname -m)" \
+            ONLY_ACTIVE_ARCH=YES \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee build/search-diagnostics/xcodebuild-search-tests.log
+
+      - name: Compare the same open-search tests with 4.6.9 theme hooks
+        if: always() && steps.search-tests.outcome != 'skipped'
+        continue-on-error: true
+        timeout-minutes: 8
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth 1 origin 74b5bf3f38411fca1006ca129e7a388b67e100f4
+          for path in \
+            iphone/Maps/Extensions/Views/UIView+SetStyle.swift \
+            iphone/Maps/Core/Theme/Renderers/UITextFieldRenderer.swift \
+            iphone/Maps/Core/Theme/Renderers/UISearchBarRenderer.swift \
+            iphone/Maps/Core/Theme/Swizzle/SwizzleStyle.m \
+            iphone/Maps/Core/Theme/Swizzle/SwizzleStyle.h; do
+            git show "74b5bf3f38411fca1006ca129e7a388b67e100f4:$path" > "$path"
+          done
+          xcodebuild test \
+            -workspace xcode/omim.xcworkspace \
+            -scheme OMaps \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "id=$MIKSHAT_SIMULATOR_UDID" \
+            -destination-timeout 120 \
+            -derivedDataPath build/SearchDerivedData \
+            -resultBundlePath build/SearchBaselineRegressions.xcresult \
+            -parallel-testing-enabled NO \
+            -maximum-concurrent-test-simulator-destinations 1 \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 120 \
+            -maximum-test-execution-time-allowance 180 \
+            -only-testing:OMapsTests/SearchThemeWindowLifecycleTests/test_SearchOpensFocusesAndClosesRepeatedlyInNormalAndRoutingModes \
+            -only-testing:OMapsTests/SearchThemeWindowLifecycleTests/test_GlobalSearchManagerOpensWithDashboardObserversInPrepareAndNavigation \
+            ARCHS="$(uname -m)" \
+            ONLY_ACTIVE_ARCH=YES \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee build/search-diagnostics/xcodebuild-search-baseline-tests.log
+
+      - name: Summarize executed tests and compiler failures
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p build/search-diagnostics
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          import os
+          import re
+
+          rows = []
+          for label, filename in [('candidate', 'xcodebuild-search-tests.log'),
+                                  ('4.6.9-theme-baseline', 'xcodebuild-search-baseline-tests.log')]:
+              path = Path('build/search-diagnostics') / filename
+              text = path.read_text(errors='replace') if path.exists() else ''
+              # XCTest assertions use "file:line: error:" and some runtime
+              # symbols contain "error:". Neither is a compiler diagnostic.
+              compiler_pattern = r'(?:^|\s)(?:/[^:\n]+|[^:\s]+\.(?:swift|m|mm|h|c|cc|cpp|hpp)):\d+:\d+:\s+(?:fatal\s+)?error:'
+              errors = [line for line in text.splitlines() if re.search(compiler_pattern, line)]
+              failures = [line for line in text.splitlines()
+                          if re.search(r'Test Case .* failed|:\d+: error: -\[', line)]
+              counts = [dict(tests=int(tests), failures=int(failures))
+                        for tests, failures in re.findall(r'Executed (\d+) tests?, with (\d+) failures?', text)]
+              started = len(re.findall(r'Test Case .* started', text))
+              rows.append(dict(label=label, log=filename, testCasesStarted=started,
+                               executionSummaries=counts, compilerErrors=errors[-30:], testFailures=failures[-30:],
+                               status='test_execution' if started or any(row['tests'] for row in counts)
+                               else ('compile_failure' if errors else 'no_test_execution_recorded')))
+          destination = Path('build/search-diagnostics/test-summary.json')
+          destination.write_text(json.dumps(rows, indent=2) + '\n')
+          summary = ['## Search diagnostic results', '',
+                     'A build failure or zero executed tests is not a search runtime result.', '']
+          for row in rows:
+              summary += [f"### {row['label']}", '', f"Status: {row['status']}; test cases started: {row['testCasesStarted']}",
+                          f"Execution summaries: {row['executionSummaries']}", '']
+              if row['compilerErrors']:
+                  summary += ['```text', '\n'.join(row['compilerErrors']), '```', '']
+              if row['testFailures']:
+                  summary += ['Test failures:', '', '```text', '\n'.join(row['testFailures']), '```', '']
+          markdown = '\n'.join(summary) + '\n'
+          Path('build/search-diagnostics/test-summary.md').write_text(markdown)
+          if os.environ.get('GITHUB_STEP_SUMMARY'):
+              with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as stream:
+                  stream.write(markdown)
+          print(json.dumps(rows))
+          PY
+
+      - name: Collect app crash reports and simulator log
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p build/search-diagnostics/crash-reports
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil
+          source = Path.home() / 'Library/Logs/DiagnosticReports'
+          destination = Path('build/search-diagnostics/crash-reports')
+          if source.exists():
+              for report in source.rglob('*'):
+                  if report.is_file() and report.suffix in ('.ips', '.crash', '.hang'):
+                      if any(name in report.name.lower() for name in ('organic', 'omaps')):
+                          shutil.copy2(report, destination / report.name)
+          PY
+          if [[ -n "${MIKSHAT_SIMULATOR_UDID:-}" ]]; then
+            xcrun simctl spawn "$MIKSHAT_SIMULATOR_UDID" log show --last 3m --style compact \
+              --predicate 'process CONTAINS[c] "Organic" OR process CONTAINS[c] "OMaps"' \
+              > build/search-diagnostics/simulator-app.log 2>&1 || true
+          fi
+
+      - name: Upload raw logs and test result bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mikshat-search-full-app-${{ github.run_id }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            build/search-diagnostics/
+            build/SearchRegressions.xcresult/
+            build/SearchBaselineRegressions.xcresult/
+
+      - name: Record current source timestamps for the next incremental build
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f build/search-diagnostics/cache-input-mtimes.py && -d build/SearchDerivedData/Build ]]; then
+            python3 build/search-diagnostics/cache-input-mtimes.py record
+          fi
+
+      - name: Save compiled objects even when a test or test compilation fails
+        if: always() && hashFiles('build/SearchDerivedData/mikshat-input-mtimes.json') != ''
+        timeout-minutes: 4
+        uses: actions/cache/save@v4
+        with:
+          path: build/SearchDerivedData
+          key: mikshat-search-derived-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.MIKSHAT_XCODE_CACHE_ID }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}

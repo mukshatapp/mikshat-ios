@@ -716,6 +716,8 @@ public:
   static void Load3dMode(bool & allow3d, bool & allow3dBuildings);
 
 private:
+  bool m_singleRulerDestination = false;
+  bool m_rulerDestinationLocked = false;
   void ApplyMapLanguageCode(std::string const & langCode);
 
 public:
@@ -732,6 +734,12 @@ public:
   static uint32_t constexpr kBackgroundTilesMaxCacheSizeMB = 1000;
   static uint32_t constexpr kBackgroundTilesMinAreaOpacityPct = 0;
   static uint32_t constexpr kBackgroundTilesMaxAreaOpacityPct = 100;
+
+  void SetRulerDestinationPolicy(bool singleDestination, bool locked)
+  {
+    m_singleRulerDestination = singleDestination;
+    m_rulerDestinationLocked = locked;
+  }
 
   void SetBackgroundTiles(bool enabled, std::string url, uint32_t cacheSizeMB, uint32_t areaOpacityPct);
   // Flips only the on/off flag, keeping the configured URL / cache size / area opacity. Lighter than

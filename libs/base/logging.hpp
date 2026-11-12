@@ -8,6 +8,7 @@
 #include <array>
 #include <atomic>
 #include <map>
+#include <mutex>
 #include <optional>
 #include <string>
 
@@ -34,6 +35,7 @@ public:
   static void WriteLog(std::ostream & s, SrcPoint const & srcPoint, std::string const & msg);
 
 private:
+  std::mutex m_threadIDMutex;
   int m_threadsCount{0};
   std::map<threads::ThreadID, int> m_threadID;
 

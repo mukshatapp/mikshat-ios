@@ -2240,7 +2240,7 @@ comment = Add Bookmark list dialog - hint when the list name is empty
 tags = android-app,apple-maps
 en = Bookmark List Name
 af = Boekmerklysnaam
-ar = اسم قائمة الإشارات المرجعية
+ar = اسم قائمة المفضلة
 az = Əlfəcin siyahı adı
 be = Назва спісу закладак
 bg = Име на група
@@ -2299,7 +2299,7 @@ comment = Should be used in the bookmarks-only context, see bookmarks_and_tracks
 tags = android-app,android-libs-car,apple-maps,qt
 en = Bookmarks
 af = Boekmerke
-ar = الإشارات المرجعية
+ar = المفضلة
 ast = Marcadores
 az = Əlfəcinlər
 be = Закладкі
@@ -2358,7 +2358,7 @@ comment = "Bookmarks and Tracks" dialog title. Also used in iPhone home screen q
 tags = android-app,apple-infoplist,apple-maps,qt
 en = Bookmarks and Tracks
 af = Boekmerke en paaie
-ar = الإشارات المرجعية والمسارات
+ar = المفضلة والمسارات
 ast = Marcadores y trayeutos
 az = Əlfəcinlər və Qeydlər
 be = Закладкі і трэкі
@@ -3407,7 +3407,7 @@ comment = "Bookmark Lists" dialog title
 tags = apple-maps
 en = Bookmark Lists
 af = Boekmerklyste
-ar = قائمة الإشارات المرجعية
+ar = قائمة المفضلة
 ast = Llistes de marcadores
 az = Əlfəcin siyahıları
 be = Спісы закладак
@@ -4879,7 +4879,7 @@ comment = message title of loading file
 tags = android-app,apple-maps
 en = Loading Bookmarks
 af = Laai tans boekmerke
-ar = يتم تحميل الإشارات المرجعية
+ar = يتم تحميل المفضلة
 az = Əlfəcinlər yüklənir
 be = Загрузка закладак
 bg = Зареждане на отметки
@@ -4937,7 +4937,7 @@ comment = Kmz file successful loading
 tags = android-app,apple-maps
 en = Bookmarks loaded successfully! You can find them on the map or on the Bookmarks Manager screen.
 af = Boekmerke is suksesvol gelaai! U kan dit op die kaart of op die boekmerkbestuurderskerm vind.
-ar = تم تحميل الإشارات المرجعية بنجاح! يمكنك العثور عليها على الخريطة أو على شاشة إدارة الإشارات المرجعية.
+ar = تم تحميل المفضلة بنجاح! يمكنك العثور عليها على الخريطة أو على شاشة إدارة المفضلة.
 az = Əlfəcinlər uğurla yükləndi! Siz onları Xəritədə və ya Əlfəcin Menecer ekranında tapa bilərsiniz.
 be = Закладкі паспяхова загружаны! Вы можаце іх убачыць на карце або ў захаваных закладках.
 bg = Отметките са заредени успешно! Можете да ги откриете на картата или при секцията с отметки.
@@ -4995,7 +4995,7 @@ comment = Kml file loading failed
 tags = android-app,apple-maps
 en = Failed to load bookmarks. The file may be corrupted or defective.
 af = Kon nie boekmerke laai nie. Die lêer is dalk gekorrupteer of defektief.
-ar = فشلت عملية تحميل الإشارات المرجعية. قد يكون الملف تالف أو غير صالح.
+ar = فشلت عملية تحميل المفضلة. قد يكون الملف تالف أو غير صالح.
 az = Əlfəcinlərin quraşdırılması uğursuz oldu. Fayl zədələnmiş və ya qüsurlu ola bilər.
 be = Не ўдалося загрузіць закладкі. Файл можа быць пашкоджаны або няспраўны.
 bg = Качването на отметките се провали. Файлът може да бъде повреден или дефектен.
@@ -12110,7 +12110,7 @@ comment = bookmark button text
 tags = apple-maps,qt
 en = bookmark
 af = boekmerk
-ar = إشارة مرجعية
+ar = موقع مفضل
 az = əlfəcin
 be = закладка
 bg = отметка
@@ -14108,7 +14108,7 @@ zh-Hans = 隐藏
 zh-Hant = 隱藏
 
 [categories]
-tags = android-app,android-libs-car,apple-maps,qt
+tags = android-app,android-libs-car,qt
 en = Categories
 af = Kategorieë
 ar = التصنيفات
@@ -14457,7 +14457,7 @@ comment = Tracks are recorded or imported GPS paths.
 tags = android-app
 en = Bookmarks and tracks can be included in Android system backups when backup is enabled on this device and they fit within its size limit.
 af = Boekmerke en paaie kan by Android-stelselrugsteune ingesluit word wanneer rugsteun op hierdie toestel geaktiveer is en hulle binne die groottelimiet daarvan pas.
-ar = يمكن تضمين الإشارات المرجعية والمسارات في النسخ الاحتياطية لنظام Android عندما يكون النسخ الاحتياطي مفعّلًا على هذا الجهاز ولا تتجاوز حدّ الحجم المسموح به.
+ar = يمكن تضمين المفضلة والمسارات في النسخ الاحتياطية لنظام Android عندما يكون النسخ الاحتياطي مفعّلًا على هذا الجهاز ولا تتجاوز حدّ الحجم المسموح به.
 ast = Los marcadores y trayeutos puen incluyise nes copies de seguranza del sistema Android cuando la copia de seguranza ta activada nesti preséu y nun superen la so llende de tamañu.
 az = Bu cihazda ehtiyat nüsxə aktivdirsə və əlfəcinlərlə treklər onun ölçü limitini aşmırsa, onlar Android sistem ehtiyat nüsxələrinə daxil edilə bilər.
 be = Закладкі і трэкі могуць трапляць у сістэмныя рэзервовыя копіі Android, калі на прыладзе ўключана рэзервовае капіраванне і яны не перавышаюць яго ліміт памеру.
@@ -22716,7 +22716,7 @@ comment = NOTE to translators: please synchronize your translation with the Engl
 tags = android-app,apple-maps
 en = Mobile internet is required for map update notifications and uploading edits.
 af = Mobiele internet is nodig vir kaartbywerkkennisgewings en om wysigings op te laai.
-ar = إننا نحتاج بيانات الجوال لعرض معلومات تفصيلية عن الأماكن والإشارات المرجعية.
+ar = إننا نحتاج بيانات الجوال لعرض معلومات تفصيلية عن الأماكن والمفضلة.
 az = Xəritə yeniləmə bildirişləri və redaktələrin yüklənməsi üçün mobil internet tələb olunur.
 be = Мабільны інтэрнэт патрабуецца для апавяшчэнняў пра абнаўленне мапы і каб запампоўваць праўкі.
 bg = Мобилните данни са необходими за показване на подробна информация за местата, като например снимки, цени и отзиви.
@@ -24370,7 +24370,7 @@ comment = Bookmark categories screen, button that opens folder selection dialog 
 tags = android-app,apple-maps,qt
 en = Import Bookmarks and Tracks
 af = Voer leidrade en snitte in
-ar = استيراد الإشارات المرجعية والمسارات
+ar = استيراد المفضلة والمسارات
 ast = Importar marcadores y trayeutos
 az = Əlfəcinləri və fraqmentləri idxal edin
 be = Імпартаваць закладкі і маршруты
@@ -26160,7 +26160,7 @@ zh-Hant = 該列表為空
 tags = android-app
 en = To add a bookmark, tap a place on the map and then tap the star icon
 af = Tik op ’n plek op die kaart en dan op die sterikoon om ’n boekmerk toe te voeg
-ar = لإضافة إشارة مرجعية ، اضغط على مكان على الخريطة ثم انقر على رمز النجمة
+ar = لإضافة موقع مفضل ، اضغط على مكان على الخريطة ثم انقر على رمز النجمة
 az = Əlfəcin əlavə etmək üçün xəritədə yerə və sonra ulduz işarəsinə toxunun
 be = Каб дадаць закладку, дакраніцеся да месца на карце, а затым націсніце значок зорачкі
 bg = За да добавите отметка, докоснете място на картата, след което докоснете звездообразната икона.
@@ -26218,7 +26218,7 @@ comment = Button to change the color of all bookmarks in the current list
 tags = android-app,apple-maps
 en = Change color of all bookmarks
 af = Verander die kleur van alle boekmerke
-ar = تغيير لون جميع الإشارات المرجعية
+ar = تغيير لون جميع المفضلة
 az = Bütün əlfəcinlərin rəngini dəyişdir
 be = Змяніць колер усіх закладак
 bg = Промяна на цвета на всички отметки
@@ -27248,7 +27248,7 @@ comment = Settings/Bookmark Text Placement
 tags = android-app,apple-maps,qt
 en = Bookmark names on the map
 af = Boekmerkname op die kaart
-ar = أسماء الإشارات المرجعية على الخريطة
+ar = أسماء المفضلة على الخريطة
 az = Xəritədə nişan adları
 be = Назвы закладак на карце
 bg = Имената на отметките в картата
@@ -27304,7 +27304,7 @@ zh-Hant = 將地圖上的名稱加入書籤
 tags = android-app,apple-maps
 en = If there are too many bookmarks, displaying their names on the map may slow down the app.
 af = As daar te veel boekmerke is, kan die vertoning van hul name op die kaart die app vertraag.
-ar = إذا كان هناك عدد كبير جدًا من الإشارات المرجعية، فقد يؤدي عرض أسمائها على الخريطة إلى إبطاء التطبيق.
+ar = إذا كان هناك عدد كبير جدًا من المفضلة، فقد يؤدي عرض أسمائها على الخريطة إلى إبطاء التطبيق.
 az = Əgər çoxlu nişanlar varsa, onların adlarını xəritədə göstərmək tətbiqin işini ləngidə bilər.
 be = Паказ назваў вялікай колькасці закладак на карце можа замарудзіць працу праграмы.
 bg = Ако има твърде много отметки, показването на имената им на картата може да забави работата на приложението.
@@ -34281,7 +34281,7 @@ zh-Hant = 路線將轉換為汽車路線
 tags = apple-maps
 en = Not all bookmarks are shown
 af = Nie alle boekmerke word gewys nie
-ar = لا يتم عرض جميع الإشارات المرجعية
+ar = لا يتم عرض جميع المفضلة
 az = Bütün əlfəcinlər göstərilmir
 be = Не ўсе закладкі паказаны
 bg = Не всички отметки се показват
@@ -34337,7 +34337,7 @@ zh-Hant = 未顯示所有書籤
 tags = apple-maps
 en = Switch to the phone to see all bookmarks
 af = Skakel oor na die foon om alle boekmerke te sien
-ar = قم بالتبديل إلى الهاتف لرؤية جميع الإشارات المرجعية
+ar = قم بالتبديل إلى الهاتف لرؤية جميع المفضلة
 az = Bütün əlfəcinləri görmək üçün telefona keçin
 be = Пераключыцеся на тэлефон, каб убачыць усе закладкі
 bg = Превключване към телефона, за да видите всички отметки
@@ -39026,7 +39026,7 @@ comment = Bookmark categories screen, button that opens share dialog to export a
 tags = android-app,apple-maps
 en = Export all Bookmarks and Tracks
 af = Voer alle boekmerke en snitte uit
-ar = تصدير كافة الإشارات المرجعية والمسارات
+ar = تصدير كافة المفضلة والمسارات
 ast = Esportar tolos marcadores y trayeutos
 az = Bütün Əlfəcinləri və Parçaları ixrac edin
 be = Экспартаваць усе закладкі і маршруты
@@ -41623,7 +41623,7 @@ comment = Message for the "Enable iCloud Syncronization" alert.
 tags = apple-maps
 en = iCloud synchronization is an experimental feature under development. Make sure that you have made a backup of all your bookmarks and tracks.
 af = iCloud-sinchronisasie is 'n eksperimentele kenmerk wat ontwikkel word. Maak seker dat jy 'n rugsteun van al jou boekmerke en snitte gemaak het.
-ar = تعد مزامنة iCloud ميزة تجريبية قيد التطوير. تأكد من عمل نسخة احتياطية لجميع الإشارات المرجعية والمسارات الخاصة بك.
+ar = تعد مزامنة iCloud ميزة تجريبية قيد التطوير. تأكد من عمل نسخة احتياطية لجميع المفضلة والمسارات الخاصة بك.
 az = iCloud sinxronizasiyası inkişaf mərhələsində olan eksperimental xüsusiyyətdir. Bütün əlfəcinlərinizin və treklərinizin ehtiyat nüsxəsini yaratdığınızdan əmin olun.
 be = Сінхранізацыя з iCloud - гэта эксперыментальная функцыя, якая знаходзіцца ў стадыі распрацоўкі. Пераканайцеся, што вы зрабілі рэзервовую копію ўсіх сваіх закладак і трэкаў.
 bg = Синхронизацията в iCloud е експериментална функция в процес на разработка. Уверете се, че сте направили резервно копие на всичките си отметки и песни.
@@ -44649,7 +44649,7 @@ comment = Toast message shown when bookmark colors are changed in category setti
 tags = android-app,apple-maps
 en = Bookmarks color changed
 af = Boekmerkkleur is verander
-ar = تم تغيير لون الإشارات المرجعية
+ar = تم تغيير لون المفضلة
 az = Əlfəcinlərin rəngi dəyişdirildi
 be = Колер закладак зменены
 bg = Цветът на отметките е променен
@@ -46439,3 +46439,777 @@ uk = Трамвай
 vi = Xe điện
 zh-Hans = 有轨电车
 zh-Hant = 路面電車
+
+[mikshat_tools]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Mikshat tools
+ar = أدوات مكشات
+
+[mikshat_coordinates]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Coordinates
+ar = الإحداثيات
+
+[mikshat_qibla]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Qibla
+ar = القبلة
+
+[mikshat_heading]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Compass
+ar = البوصلة
+
+[mikshat_lat_degrees]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Latitude degrees
+ar = درجات خط العرض
+
+[mikshat_lat_minutes]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Latitude minutes
+ar = دقائق خط العرض
+
+[mikshat_lon_degrees]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Longitude degrees
+ar = درجات خط الطول
+
+[mikshat_lon_minutes]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Longitude minutes
+ar = دقائق خط الطول
+
+[mikshat_coordinate_hint]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Enter degrees and decimal minutes, for example N 24° 42.810′, E 046° 40.518′. Arabic and English digits are supported.
+ar = أدخل الدرجات والدقائق العشرية، مثل N 24° 42.810′ وE 046° 40.518′. يدعم الأرقام العربية والإنجليزية.
+
+[mikshat_latitude]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Latitude: degrees / minutes / direction
+ar = خط العرض: الدرجات / الدقائق / الاتجاه
+
+[mikshat_longitude]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Longitude: degrees / minutes / direction
+ar = خط الطول: الدرجات / الدقائق / الاتجاه
+
+[mikshat_show_map]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Show on map
+ar = عرض على الخريطة
+
+[mikshat_coordinate_error]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Check the degrees and minutes. Minutes must be below 60, with two digits before the decimal point and up to three after it. Latitude is at most 90° and longitude 180°; minutes must be zero at these limits.
+ar = تحقق من الدرجات والدقائق. الدقائق أقل من ٦٠، برقمين قبل الفاصلة وحتى ثلاثة بعدها. الحد الأقصى لخط العرض ٩٠° ولخط الطول ١٨٠°، والدقائق صفر عند هذين الحدين.
+
+[mikshat_qibla_hint]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Hold your phone flat and turn until the gold arrow points forward. Qibla uses the phone compass and is independent of the destination heading setting.
+ar = ضع الهاتف بشكل أفقي واستدر حتى يشير السهم الذهبي إلى الأمام. تستخدم القبلة بوصلة الهاتف ولا تتأثر بإعداد اتجاه الوجهة.
+
+[mikshat_heading_hint]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Choose the heading used by destination arrows. Automatic mode uses GPS course at 10 km/h or faster, and the phone compass below that speed. This does not change Qibla.
+ar = اختر مصدر الاتجاه لمؤشرات الوجهة. الوضع التلقائي يستخدم GPS عند سرعة ١٠ كم/س فأكثر، وبوصلة الهاتف عند انخفاض السرعة. لا يؤثر هذا الإعداد على القبلة.
+
+[mikshat_heading_sensor]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Phone compass
+ar = حساس بوصلة الهاتف
+
+[mikshat_heading_gps]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = GPS direction of travel
+ar = اتجاه الحركة من GPS
+
+[mikshat_heading_auto]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Automatic GPS / compass
+ar = تبديل تلقائي بين GPS والحساس
+
+[mikshat_location_unavailable]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = A recent location is required. Enable location access and wait for a GPS fix.
+ar = نحتاج موقعًا حديثًا للهاتف. فعّل إذن الموقع وانتظر وصول قراءة GPS.
+
+[mikshat_heading_unavailable]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = The compass is unavailable or inaccurate. Keep away from magnets and metal, and calibrate your phone.
+ar = البوصلة غير متاحة أو غير دقيقة. ابتعد عن المغناطيس والمعادن وعاير بوصلة الهاتف.
+
+[mikshat_qibla_bearing]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = Qibla: %.0f° from true north
+ar = اتجاه القبلة: %.0f° من الشمال الحقيقي
+
+[mikshat_my_location]
+comment = Mikshat navigation tools
+tags = apple-maps
+en = My location
+ar = موقعي
+
+[mikshat_kmh]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = km/h
+ar = كم/س
+
+[mikshat_speed]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Speed
+ar = السرعة
+
+[mikshat_remaining_distance]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Distance remaining
+ar = المسافة المتبقية
+
+[mikshat_remaining_time]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Time remaining
+ar = الزمن المتبقي
+
+[mikshat_arrival]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Estimated arrival
+ar = وقت الوصول المتوقع
+
+[mikshat_waiting]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Waiting for movement
+ar = بانتظار الحركة
+
+[mikshat_north]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = North
+ar = شمال
+
+[mikshat_south]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = South
+ar = جنوب
+
+[mikshat_east]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = East
+ar = شرق
+
+[mikshat_west]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = West
+ar = غرب
+
+[mikshat_qibla_title]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Mikshat • Qibla compass
+ar = مكشات • بوصلة القبلة
+
+[mikshat_location_settings]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Location settings
+ar = إعدادات الموقع
+
+[mikshat_arrow_to_point]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Arrow points to the destination
+ar = السهم نحو النقطة
+
+[mikshat_heading_source]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Compass direction source
+ar = مصدر اتجاه البوصلة
+
+[mikshat_record_track]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Record track
+ar = تسجيل المسار
+
+[mikshat_enter_coordinates]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Enter coordinates
+ar = إدخال الإحداثيات
+
+[mikshat_go_to]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Go to
+ar = اذهب إلى
+
+[mikshat_copy]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Copy
+ar = نسخ
+
+[mikshat_navigation_modes]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Direct guidance, car, compass
+ar = توجيه مباشر، سيارة، بوصلة
+
+[mikshat_direct]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Direct
+ar = توجيه مباشر
+
+[mikshat_car]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Car
+ar = سيارة
+
+[mikshat_stop]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Stop
+ar = إنهاء
+
+[mikshat_direct_notice]
+comment = Mikshat Android-equivalent navigation interface
+tags = apple-maps
+en = Direct guidance • straight-line distance • arrival time is an estimate
+ar = توجيه مباشر • المسافة بخط مستقيم • وقت الوصول تقديري
+
+[mikshat_save_share]
+comment = Mikshat location and compass interface
+tags = apple-maps
+en = Save and share
+ar = حفظ ومشاركة
+
+[mikshat_save_location]
+comment = Mikshat location and compass interface
+tags = apple-maps
+en = Save location
+ar = حفظ الموقع
+
+[mikshat_share_location]
+comment = Mikshat location and compass interface
+tags = apple-maps
+en = Share location
+ar = مشاركة الموقع
+
+[mikshat_current_location]
+comment = Mikshat location and compass interface
+tags = apple-maps
+en = Current location
+ar = الموقع الحالي
+
+[mikshat_location_saved]
+comment = Mikshat location and compass interface
+tags = apple-maps
+en = Location saved to favorites
+ar = تم حفظ الموقع في المفضلة
+
+[mikshat_fixed_arrow]
+comment = Mikshat location and compass interface
+tags = apple-maps
+en = Arrow fixed upwards
+ar = السهم ثابت للأعلى
+
+[mikshat_finish_trip_first]
+comment = Mikshat navigation and location sharing
+tags = apple-maps
+en = Finish the current trip before changing its destination.
+ar = أنهِ الرحلة الحالية قبل تغيير الوجهة.
+
+[mikshat_stop_navigation]
+comment = Mikshat navigation and location sharing
+tags = apple-maps
+en = Stop
+ar = توقف
+
+[mikshat_show_stop]
+comment = Mikshat navigation and location sharing
+tags = apple-maps
+en = Show stop button
+ar = إظهار زر التوقف
+
+[mikshat_app_name]
+comment = Mikshat navigation and location sharing
+tags = apple-maps
+en = Mikshat
+ar = مكشات
+
+[mikshat_map_point]
+comment = Mikshat navigation and location sharing
+tags = apple-maps
+en = Map point
+ar = نقطة الخريطة
+
+[mikshat_share_message]
+comment = Mikshat navigation and location sharing
+tags = apple-maps
+en = 📍 %@ via Mikshat\nFor navigation and outdoor maps\n\nCoordinates:\n%@\n\nOpen in Mikshat:\n%@
+ar = 📍 %@ عبر مكشات\nللملاحة والخرائط البرية\n\nالإحداثيات:\n%@\n\nافتح الموقع في تطبيق مكشات:\n%@
+
+[mikshat_compass_settings]
+comment = Mikshat map controls and compass settings
+tags = apple-maps
+en = Compass settings
+ar = إعدادات البوصلة
+
+[mikshat_compass_transparency_title]
+comment = Mikshat map controls and compass settings
+tags = apple-maps
+en = Compass transparency
+ar = شفافية البوصلة
+
+[mikshat_compass_transparency_enable]
+comment = Mikshat map controls and compass settings
+tags = apple-maps
+en = Enable background transparency
+ar = تفعيل شفافية الخلفية
+
+[mikshat_compass_transparency_amount]
+comment = Mikshat map controls and compass settings
+tags = apple-maps
+en = Background transparency
+ar = درجة شفافية الخلفية
+
+[mikshat_compass_transparency_hint]
+comment = Mikshat map controls and compass settings
+tags = apple-maps
+en = Show the map behind the general and navigation compasses. 0% opaque, 100% transparent.
+ar = إظهار الخريطة خلف البوصلة العامة وبوصلة التوجيه. 0% معتمة، 100% شفافة.
+
+[mikshat_satellite_enable]
+comment = Mikshat map controls and compass settings
+tags = apple-maps
+en = Enable satellite imagery
+ar = تشغيل صور الأقمار الصناعية
+
+[mikshat_satellite_disable]
+comment = Mikshat map controls and compass settings
+tags = apple-maps
+en = Disable satellite imagery
+ar = إيقاف صور الأقمار الصناعية
+
+[mikshat_toggle_time]
+comment = Mikshat map controls and compass settings
+tags = apple-maps
+en = Switch remaining time and arrival time
+ar = تبديل الوقت المتبقي ووقت الوصول
+
+[mikshat_cached_location]
+comment = Navigation can use the known map-arrow position while GPS is stale; do not imply live speed or location.
+tags = apple-maps
+en = Last known map position — waiting for a location update
+ar = آخر موقع معروف على الخريطة — بانتظار تحديث الموقع
+
+[mikshat_weather_available_hours]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = %d of the next 12 hours available
+ar = المتاح %d من أصل 12 ساعة مستقبلية
+
+[mikshat_weather_condition_clear]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Clear
+ar = صافٍ
+
+[mikshat_weather_condition_drizzle_dense]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Dense drizzle
+ar = رذاذ كثيف
+
+[mikshat_weather_condition_drizzle_light]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Light drizzle
+ar = رذاذ خفيف
+
+[mikshat_weather_condition_drizzle_moderate]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Moderate drizzle
+ar = رذاذ متوسط
+
+[mikshat_weather_condition_fog]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Fog
+ar = ضباب
+
+[mikshat_weather_condition_freezing_drizzle_dense]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Dense freezing drizzle
+ar = رذاذ متجمّد كثيف
+
+[mikshat_weather_condition_freezing_drizzle_light]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Light freezing drizzle
+ar = رذاذ متجمّد خفيف
+
+[mikshat_weather_condition_freezing_rain_heavy]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Heavy freezing rain
+ar = أمطار متجمّدة غزيرة
+
+[mikshat_weather_condition_freezing_rain_light]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Light freezing rain
+ar = أمطار متجمّدة خفيفة
+
+[mikshat_weather_condition_mainly_clear]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Mainly clear
+ar = صافٍ غالبًا
+
+[mikshat_weather_condition_overcast]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Overcast
+ar = غائم
+
+[mikshat_weather_condition_partly_cloudy]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Partly cloudy
+ar = غائم جزئيًا
+
+[mikshat_weather_condition_rain_heavy]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Heavy rain
+ar = أمطار غزيرة
+
+[mikshat_weather_condition_rain_light]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Slight rain
+ar = أمطار خفيفة
+
+[mikshat_weather_condition_rain_moderate]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Moderate rain
+ar = أمطار متوسطة
+
+[mikshat_weather_condition_rain_showers_light]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Slight rain showers
+ar = زخات مطر خفيفة
+
+[mikshat_weather_condition_rain_showers_moderate]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Moderate rain showers
+ar = زخات مطر متوسطة
+
+[mikshat_weather_condition_rain_showers_violent]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Violent rain showers
+ar = زخات مطر شديدة
+
+[mikshat_weather_condition_rime_fog]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Depositing rime fog
+ar = ضباب مع صقيع
+
+[mikshat_weather_condition_snow_grains]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Snow grains
+ar = حبيبات ثلج
+
+[mikshat_weather_condition_snow_heavy]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Heavy snowfall
+ar = ثلوج كثيفة
+
+[mikshat_weather_condition_snow_light]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Slight snowfall
+ar = ثلوج خفيفة
+
+[mikshat_weather_condition_snow_moderate]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Moderate snowfall
+ar = ثلوج متوسطة
+
+[mikshat_weather_condition_snow_showers_heavy]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Heavy snow showers
+ar = زخات ثلج كثيفة
+
+[mikshat_weather_condition_snow_showers_light]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Slight snow showers
+ar = زخات ثلج خفيفة
+
+[mikshat_weather_condition_thunderstorm]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Thunderstorm
+ar = عاصفة رعدية
+
+[mikshat_weather_condition_thunderstorm_hail_heavy]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Thunderstorm with heavy hail
+ar = عاصفة رعدية مع بَرَد شديد
+
+[mikshat_weather_condition_thunderstorm_hail_slight]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Thunderstorm with slight hail
+ar = عاصفة رعدية مع بَرَد خفيف
+
+[mikshat_weather_condition_unknown]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Weather unavailable
+ar = حالة الجو غير متوفرة
+
+[mikshat_weather_coordinates]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Coordinates: %@
+ar = الإحداثيات: %@
+
+[mikshat_weather_current]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Current conditions
+ar = الحالة الحالية
+
+[mikshat_weather_gusts]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Gusts
+ar = الهبات
+
+[mikshat_weather_hour_gusts]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Gusts: %@
+ar = الهبات: %@
+
+[mikshat_weather_hour_wind]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Wind: %@
+ar = الرياح: %@
+
+[mikshat_weather_invalid_location]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = The selected coordinates are invalid.
+ar = إحداثيات الموقع غير صالحة.
+
+[mikshat_weather_last_updated]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Last updated: %@
+ar = آخر تحديث: %@
+
+[mikshat_weather_loading]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Loading forecast…
+ar = جارٍ تحميل التوقعات…
+
+[mikshat_weather_model_notice]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Values are model estimates and may differ from direct weather station observations.
+ar = القيم تقديرات نموذجية وليست بالضرورة قراءات مباشرة من محطة رصد.
+
+[mikshat_weather_next_12_hours]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Next 12 hours
+ar = الساعات الـ12 القادمة
+
+[mikshat_weather_no_saved_forecast]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = No saved forecast for this location
+ar = لا توجد توقعات محفوظة لهذا الموقع
+
+[mikshat_weather_no_saved_retry]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = No saved forecast for this location. Unable to connect; try again.
+ar = لا توجد توقعات محفوظة لهذا الموقع. تعذر الاتصال؛ أعد المحاولة.
+
+[mikshat_weather_offline_saved]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Offline — showing saved data.
+ar = دون اتصال — تُعرض بيانات محفوظة.
+
+[mikshat_weather_refresh]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Refresh forecast
+ar = تحديث التوقعات
+
+[mikshat_weather_refresh_failed_saved]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Unable to update; showing saved data with its last update time.
+ar = تعذر تحديث التوقعات؛ تُعرض بيانات محفوظة مع وقت آخر تحديث.
+
+[mikshat_weather_saved_data]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Saved data
+ar = بيانات محفوظة
+
+[mikshat_weather_selected_location]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Selected map location
+ar = الموقع المحدد على الخريطة
+
+[mikshat_weather_temperature_accessibility]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Temperature: %@ degrees Celsius
+ar = الحرارة: %@ درجة مئوية
+
+[mikshat_weather_title]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Weather
+ar = أحوال الطقس
+
+[mikshat_weather_unavailable]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Unavailable
+ar = غير متوفرة
+
+[mikshat_weather_updating]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Updating forecast…
+ar = جارٍ تحديث التوقعات…
+
+[mikshat_weather_wind_calm]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Calm wind
+ar = رياح ساكنة
+
+[mikshat_weather_wind_e]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = east
+ar = الشرق
+
+[mikshat_weather_wind_from]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = From %@
+ar = قادمة من %@
+
+[mikshat_weather_wind_n]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = north
+ar = الشمال
+
+[mikshat_weather_wind_ne]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = northeast
+ar = الشمال الشرقي
+
+[mikshat_weather_wind_nw]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = northwest
+ar = الشمال الغربي
+
+[mikshat_weather_wind_s]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = south
+ar = الجنوب
+
+[mikshat_weather_wind_se]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = southeast
+ar = الجنوب الشرقي
+
+[mikshat_weather_wind_speed]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Wind speed
+ar = سرعة الرياح
+
+[mikshat_weather_wind_sw]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = southwest
+ar = الجنوب الغربي
+
+[mikshat_weather_wind_unavailable]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = Wind direction unavailable
+ar = اتجاه الرياح غير متوفر
+
+[mikshat_weather_wind_w]
+comment = Mikshat selected-location weather
+tags = apple-maps
+en = west
+ar = الغرب

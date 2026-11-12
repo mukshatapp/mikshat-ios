@@ -12,6 +12,7 @@
 #include "map/bookmarks_search_params.hpp"
 
 #include "coding/internal/file_data.hpp"
+#include "coding/string_utf8_multilang.hpp"
 
 #include "base/stl_helpers.hpp"
 #include "base/string_utils.hpp"
@@ -330,6 +331,17 @@ static void DeleteTemporaryBookmarksFile(std::string const & filePath)
 {
   auto const description = GetPreferredBookmarkStr(self.bm.GetCategoryData(groupId).m_description);
   return strings::IsHTML(description);
+}
+
+- (MWMMarkID)saveLocation:(CLLocationCoordinate2D)coordinate name:(NSString *)name
+{
+  auto & framework = GetFramework();
+  kml::BookmarkData data;
+  data.m_name[StringUtf8Multilang::kDefaultCode] = name.UTF8String;
+  data.m_point = mercator::FromLatLon(coordinate.latitude, coordinate.longitude);
+  data.m_color = framework.LastEditedBMColor();
+  auto session = self.bm.GetEditSession();
+  return session.CreateBookmark(std::move(data), framework.LastEditedBMCategory())->GetId();
 }
 
 - (MWMMarkGroupID)createCategoryWithName:(NSString *)name

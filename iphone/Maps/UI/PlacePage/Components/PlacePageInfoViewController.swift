@@ -40,6 +40,7 @@ class PlacePageInfoViewController: UIViewController {
 
   weak var placePageInfoData: PlacePageInfoData!
   weak var delegate: PlacePageInfoViewControllerDelegate?
+  var didTapWeather: (() -> Void)?
 
   var coordinatesFormatId: Int {
     get { UserDefaults.standard.integer(forKey: Constants.coordFormatIdKey) }
@@ -199,34 +200,33 @@ class PlacePageInfoViewController: UIViewController {
     }
 
     setupCoordinatesView()
-    setupOpenWithAppView()
+    setupWeatherView()
   }
 
   private func setupCoordinatesView() {
-    guard let coordFormats = placePageInfoData.coordFormats as? [String] else { return }
-    // The saved format may be unavailable here (e.g. OS Grid outside Great Britain); its entry is
-    // empty. Show the next available format without overwriting the saved preference, so it is
-    // restored when the user returns to a supported area.
-    let displayId = effectiveFormatId(in: coordFormats)
-    coordinatesView = createInfoItem(coordFormats[displayId],
-                                     icon: UIImage(resource: .icPlacepageCoordinate),
+    let formats = MikshatNavigationMath.coordinatePairs(latitude: placePageInfoData.latitude, longitude: placePageInfoData.longitude)
+    for (index, text) in formats.prefix(2).enumerated() {
+      let row = MikshatCoordinateRow(text: text, format: ["DD", "DDM", "DMS"][index]) { [weak self] in
+        self?.delegate?.didCopy(text)
+      }
+      addToStack(row)
+    }
+  }
+
+  private func setupWeatherView() {
+    guard didTapWeather != nil else { return }
+    let showWeather: TapHandler = { [weak self] in self?.didTapWeather?() }
+    let weatherView = createInfoItem(L("mikshat_weather_title"),
+                                     icon: UIImage(systemName: "cloud.sun"),
+                                     tapIconHandler: showWeather,
                                      style: .link,
-                                     accessoryImage: UIImage(resource: .icPlacepageChange),
-                                     tapHandler: { [weak self] in
-                                       guard let self else { return }
-                                       let formatId = self.nextAvailableFormatId(after: self.effectiveFormatId(in: coordFormats), in: coordFormats)
-                                       self.setCoordinatesSelected(formatId: formatId)
-                                     },
-                                     longPressHandler: { [weak self] in
-                                       self?.copyCoordinatesToPasteboard()
-                                     })
-    let menu = UIMenu(children: coordFormats.enumerated().compactMap { index, format in
-      format.isEmpty ? nil : UIAction(title: format, handler: { [weak self] _ in
-        self?.setCoordinatesSelected(formatId: index)
-        self?.copyCoordinatesToPasteboard()
-      })
-    })
-    coordinatesView?.setAccessoryMenu(menu)
+                                     accessoryImage: UIImage(systemName: "chevron.forward"),
+                                     tapHandler: showWeather,
+                                     accessoryImageTapHandler: showWeather)
+    weatherView.accessibilityIdentifier = "placePage.weather"
+    weatherView.isAccessibilityElement = true
+    weatherView.accessibilityLabel = L("mikshat_weather_title")
+    weatherView.accessibilityTraits = .button
   }
 
   /// The format index actually shown: the saved one if available here, otherwise the next available.

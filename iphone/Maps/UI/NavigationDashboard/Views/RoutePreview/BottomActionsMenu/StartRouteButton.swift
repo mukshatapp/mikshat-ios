@@ -34,7 +34,7 @@ final class StartRouteButton: UIView {
   }
 
   private func setupView() {
-    backgroundView.backgroundColor = .linkBlue
+    backgroundView.backgroundColor = MikshatStyle.green
     backgroundView.layer.cornerRadius = CornerRadius.buttonDefaultBig.value
     backgroundView.layer.cornerCurve = .continuous
     backgroundView.clipsToBounds = true
@@ -104,20 +104,20 @@ final class StartRouteButton: UIView {
                           switch newState {
                           case .enabled:
                             self.button.setTitle(Constants.buttonTitle, for: .normal)
-                            self.backgroundView.backgroundColor = .linkBlue
+                            self.backgroundView.backgroundColor = MikshatStyle.green
                             self.progressView.isHidden = true
                             self.setLoadingProgress(0, animated: false)
                             self.button.isEnabled = true
                           case .loading(let progress):
                             self.button.setTitle(Constants.buttonTitle, for: .normal)
                             self.backgroundView.backgroundColor = .pressBackground
-                            self.progressView.backgroundColor = .linkBlueHighlighted
+                            self.progressView.backgroundColor = MikshatStyle.green.withAlphaComponent(0.3)
                             self.progressView.isHidden = false
                             self.setLoadingProgress(progress, animated: false)
                             self.button.isEnabled = false
                           case .disabled:
                             self.button.setTitle(Constants.buttonTitle, for: .normal)
-                            self.backgroundView.backgroundColor = .linkBlueHighlighted
+                            self.backgroundView.backgroundColor = MikshatStyle.green.withAlphaComponent(0.3)
                             self.progressView.isHidden = true
                             self.setLoadingProgress(0, animated: false)
                             self.button.isEnabled = false
@@ -143,11 +143,11 @@ final class StartRouteButton: UIView {
 
   @objc private func highlightButton() {
     guard state == .enabled else { return }
-    backgroundView.backgroundColor = .linkBlueHighlighted
+    backgroundView.backgroundColor = MikshatStyle.green.withAlphaComponent(0.3)
   }
 
   @objc private func unhighlightButton() {
     guard state == .enabled else { return }
-    backgroundView.backgroundColor = .linkBlue
+    backgroundView.backgroundColor = MikshatStyle.green
   }
 }

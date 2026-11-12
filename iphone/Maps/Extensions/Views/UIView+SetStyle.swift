@@ -4,16 +4,16 @@ private enum AssociatedKeys {
 }
 
 @objc extension UIView: StyleApplicable {
-  func sw_didMoveToWindow() {
+  dynamic func sw_viewDidMoveToWindow() {
     // A nil app window (a CarPlay-first launch, or a disconnected phone scene) must not match a
     // view that is leaving the hierarchy: nil === nil is true.
     guard let appWindow = MapsAppDelegate.theApp().window, appWindow === window else {
-      sw_didMoveToWindow()
+      sw_viewDidMoveToWindow()
       return
     }
     applyTheme()
     isStyleApplied = true
-    sw_didMoveToWindow()
+    sw_viewDidMoveToWindow()
   }
 
   var styleName: String {

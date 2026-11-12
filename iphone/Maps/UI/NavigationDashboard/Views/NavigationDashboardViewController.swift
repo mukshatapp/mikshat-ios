@@ -100,6 +100,14 @@ final class NavigationDashboardViewController: UIViewController {
     super.viewDidLoad()
     setupView()
     layout()
+    NotificationCenter.default.addObserver(self, selector: #selector(mikshatVisibilityChanged), name: MikshatNavigationCoordinator.visibilityChanged, object: nil)
+  }
+
+  @objc private func mikshatVisibilityChanged() {
+    let active = MikshatNavigationCoordinator.isDirectActive
+    availableAreaView.isHidden = active
+    bottomActionsMenu.isHidden = active
+    if active { navigationControlView.isVisible = false; updatePresentationStep(.hidden) }
   }
 
   override func viewDidLayoutSubviews() {
@@ -269,13 +277,14 @@ final class NavigationDashboardViewController: UIViewController {
 
     startRouteButton.addTarget(self, action: #selector(didTapStartRouteButton), for: .touchUpInside)
 
-    bottomActionsMenu.addActionView(searchButton)
-    bottomActionsMenu.addActionView(bookmarksButton)
-    bottomActionsMenu.addActionView(saveRouteAsTrackButton)
+    searchButton.isHidden = true
+    bookmarksButton.isHidden = true
+    saveRouteAsTrackButton.isHidden = true
     bottomActionsMenu.addActionView(startRouteButton)
   }
 
   private func setupRoutePointsView() {
+    routePointsView.isHidden = true
     routePointsView.interactor = interactor
     routePointsView.scrollViewDelegate = self
   }
@@ -385,7 +394,7 @@ final class NavigationDashboardViewController: UIViewController {
     availableAreaView.addSubview(transportOptionsView)
 
     estimatesStackView.addArrangedSubview(estimatesView)
-    routeControlsStackView.addArrangedSubview(reverseRoutePointsButton)
+    reverseRoutePointsButton.isHidden = true
     routeControlsStackView.addArrangedSubview(settingsButton)
     estimatesStackView.addArrangedSubview(routeControlsStackView)
 
@@ -540,6 +549,12 @@ extension NavigationDashboardViewController: UIScrollViewDelegate {
 
 extension NavigationDashboardViewController {
   func render(_ viewModel: NavigationDashboard.ViewModel) {
+    if MikshatNavigationCoordinator.isDirectActive {
+      mikshatVisibilityChanged()
+      return
+    }
+    availableAreaView.isHidden = false
+    bottomActionsMenu.isHidden = false
     switch viewModel.dashboardState {
     case .closed:
       close()
@@ -587,8 +602,9 @@ extension NavigationDashboardViewController {
 
     bottomActionsMenu.setHidden(viewModel.isBottomActionsMenuHidden)
     startRouteButton.setState(viewModel.startButtonState)
-    reverseRoutePointsButton.isEnabled = viewModel.canReverseRoutePoints
+    reverseRoutePointsButton.isHidden = true
+    reverseRoutePointsButton.isEnabled = false
 
-    updatePresentationStep(viewModel.presentationStep)
+    updatePresentationStep(MikshatNavigationCoordinator.isDirectActive ? .hidden : viewModel.presentationStep)
   }
 }

@@ -47,6 +47,20 @@ _ANDROID_XML_RE = re.compile(r"@(?:string|plurals)/(\w+)")
 _IOS_L_CALL_RE = re.compile(r"\bL\(([^)]*)\)")
 _IOS_LITERAL_RE = re.compile(r'@?"(\w+)"')
 _IOS_NS_RE = re.compile(r'\bNSLocalizedString\(\s*@?"(\w+)"')
+# Weather models deliberately retain keys until UIKit localizes them. Only these
+# two known producers and their actual localizationKey assignments own these IDs.
+_IOS_WEATHER_TYPES_RE = re.compile(
+    r"^struct MikshatWeather(Condition|Wind)\s*\{(.*?)^\}", re.MULTILINE | re.DOTALL
+)
+_IOS_WEATHER_CONDITION_PREFIX_RE = re.compile(
+    r'\blocalizationKey\s*=\s*"(mikshat_weather_condition_)"\s*\+\s*name\b'
+)
+_IOS_WEATHER_CONDITION_NAME_RE = re.compile(r'\bname\s*=\s*"(\w+)"')
+_IOS_WEATHER_WIND_KEY_RE = re.compile(r'\blocalizationKey\s*=\s*"(mikshat_weather_wind_\w+)"')
+_IOS_WEATHER_WIND_PREFIX_RE = re.compile(
+    r'\blocalizationKey\s*=\s*"(mikshat_weather_wind_)"\s*\+\s*directions\s*\['
+)
+_IOS_WEATHER_WIND_DIRECTIONS_RE = re.compile(r"\blet\s+directions\s*=\s*\[([^\]]*)\]")
 _IOS_XML_RE = re.compile(
     r"<userDefinedRuntimeAttribute\b"
     r'(?=[^>]*\bkeyPath="localized(?:Text|Placeholder)")'
@@ -121,9 +135,29 @@ def _category_source_matcher(text) -> dict[str, int]:
     return _match_references(text, _CATEGORY_LIST_RE, _CORE_LITERAL_RE)
 
 
+def _ios_weather_source_matcher(text) -> dict[str, int]:
+    references = {}
+    for match in _IOS_WEATHER_TYPES_RE.finditer(text):
+        kind, body = match.groups()
+        line_offset = text.count("\n", 0, match.start(2))
+        if kind == "Condition":
+            prefix = _IOS_WEATHER_CONDITION_PREFIX_RE.search(body)
+            keys = _match_references(body, _IOS_WEATHER_CONDITION_NAME_RE) if prefix else {}
+            keys = {prefix.group(1) + key: line for key, line in keys.items()} if prefix else {}
+        else:
+            keys = _match_references(body, _IOS_WEATHER_WIND_KEY_RE)
+            prefix = _IOS_WEATHER_WIND_PREFIX_RE.search(body)
+            if prefix:
+                directions = _match_references(body, _IOS_WEATHER_WIND_DIRECTIONS_RE, _IOS_LITERAL_RE)
+                keys.update({prefix.group(1) + key: line for key, line in directions.items()})
+        references.update({key: line + line_offset for key, line in keys.items()})
+    return references
+
+
 def _ios_source_matcher(text) -> dict[str, int]:
     references = _match_references(text, _IOS_L_CALL_RE, _IOS_LITERAL_RE)
     references.update(_match_references(text, _IOS_NS_RE))
+    references.update(_ios_weather_source_matcher(text))
     return references
 
 

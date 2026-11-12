@@ -69,7 +69,7 @@ final class BookmarksListPresenter {
     guard let sortedSections else {
       if let searchResults, searchText != nil {
         let bookmarks = mapBookmarks(searchResults)
-        view?.setSections(bookmarks.isEmpty ? [] : [BookmarksSectionViewModel(title: L("bookmarks"),
+        view?.setSections(bookmarks.isEmpty ? [] : [BookmarksSectionViewModel(title: L("mikshat_my_location"),
                                                                               bookmarks: bookmarks)])
       } else {
         setDefaultSections()
@@ -102,7 +102,7 @@ final class BookmarksListPresenter {
 
     let bookmarks = mapBookmarks(bookmarkGroup.bookmarks)
     if !bookmarks.isEmpty {
-      sections.append(BookmarksSectionViewModel(title: L("bookmarks"), bookmarks: bookmarks))
+      sections.append(BookmarksSectionViewModel(title: L("mikshat_my_location"), bookmarks: bookmarks))
     }
     view?.setSections(sections)
   }

@@ -1,0 +1,75 @@
+name: Mikshat search theme probe
+on:
+  push:
+    branches: [diagnostics/search-window-attachment]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Record Xcode and simulator versions
+        run: |
+          xcodebuild -version
+          xcrun simctl list devices available
+      - name: Verify native Objective-C dispatch regression
+        run: |
+          clang -std=c11 -Wall -Wextra -Wno-cast-function-type mikshat/tests/ThemeSwizzleRuntimeTests.c -lobjc -o /tmp/mikshat-theme-runtime-tests
+          /tmp/mikshat-theme-runtime-tests
+      - name: Prepare baseline source and simulator
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin 74b5bf3f38411fca1006ca129e7a388b67e100f4
+          mkdir -p /tmp/mikshat-search-baseline
+          for path in iphone/Maps/Extensions/Views/UIView+SetStyle.swift iphone/Maps/Core/Theme/Renderers/UITextFieldRenderer.swift iphone/Maps/Core/Theme/Renderers/UISearchBarRenderer.swift iphone/Maps/Core/Theme/Swizzle/SwizzleStyle.m iphone/Maps/Core/Theme/Swizzle/SwizzleStyle.h; do
+            mkdir -p "/tmp/mikshat-search-baseline/$(dirname "$path")"
+            git show "74b5bf3f38411fca1006ca129e7a388b67e100f4:$path" > "/tmp/mikshat-search-baseline/$path"
+          done
+          python3 - <<'PY'
+          import json, subprocess
+          from pathlib import Path
+          data = json.loads(subprocess.check_output(['xcrun', 'simctl', 'list', 'devices', 'available', '-j']))
+          entries = [(runtime, d) for runtime, devices in data['devices'].items() if '.iOS-' in runtime for d in devices if d['name'].startswith('iPhone')]
+          if not entries:
+              raise SystemExit('No iPhone simulator runtime is installed')
+          preferred = [e for e in entries if '.iOS-26-' in e[0] or e[0].endswith('.iOS-26')]
+          runtime, device = sorted(preferred or entries, key=lambda e: e[0], reverse=True)[0]
+          print('Selected', runtime, device['name'], device['udid'])
+          if device['state'] != 'Booted':
+              subprocess.run(['xcrun', 'simctl', 'boot', device['udid']], check=True)
+          subprocess.run(['xcrun', 'simctl', 'bootstatus', device['udid'], '-b'], check=True)
+          Path('/tmp/mikshat-probe-udid').write_text(device['udid'])
+          PY
+      - name: Exercise 4.6.9 baseline UIKit hooks
+        continue-on-error: true
+        run: |
+          bash mikshat/tests/search-theme-probe/run_probe.sh /tmp/mikshat-search-baseline probe-results/baseline "$(cat /tmp/mikshat-probe-udid)" baseline
+      - name: Exercise fixed UIKit hooks
+        run: |
+          bash mikshat/tests/search-theme-probe/run_probe.sh "$GITHUB_WORKSPACE" probe-results/fixed "$(cat /tmp/mikshat-probe-udid)" fixed
+      - name: Exercise optimized 4.6.9 baseline UIKit hooks
+        continue-on-error: true
+        env:
+          MIKSHAT_PROBE_OPTIMIZATION: release
+        run: |
+          bash mikshat/tests/search-theme-probe/run_probe.sh /tmp/mikshat-search-baseline probe-results/baselinerelease "$(cat /tmp/mikshat-probe-udid)" baselinerelease
+      - name: Exercise optimized fixed UIKit hooks
+        env:
+          MIKSHAT_PROBE_OPTIMIZATION: release
+        run: |
+          bash mikshat/tests/search-theme-probe/run_probe.sh "$GITHUB_WORKSPACE" probe-results/fixedrelease "$(cat /tmp/mikshat-probe-udid)" fixedrelease
+      - name: Collect simulator diagnostics
+        if: always()
+        run: |
+          mkdir -p probe-results/diagnostics
+          find "$HOME/Library/Logs/DiagnosticReports" -maxdepth 1 -type f -iname '*ThemeProbe*' -exec cp {} probe-results/diagnostics/ \; || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mikshat-search-theme-probe
+          path: probe-results

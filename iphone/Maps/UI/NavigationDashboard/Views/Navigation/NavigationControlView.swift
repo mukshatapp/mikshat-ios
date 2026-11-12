@@ -1,8 +1,8 @@
 final class NavigationControlView: SolidTouchView {
   private enum Constants {
     static let buttonContentInset: CGFloat = 15
-    static var metricFont: UIFont { .bold22.dynamic(maxSize: 26) }
-    static var metricLegendFont: UIFont { .bold12.dynamic(maxSize: 16) }
+    static var metricFont: UIFont { UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: 38, weight: .regular)) }
+    static var metricLegendFont: UIFont { UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: 18, weight: .regular)) }
   }
 
   @IBOutlet private var distanceLabel: UILabel!
@@ -64,7 +64,7 @@ final class NavigationControlView: SolidTouchView {
   private var isExtended = false {
     willSet {
       guard isExtended != newValue else { return }
-      morphExtendButton()
+      // The centered grabber replaces the old three-line button.
     }
     didSet {
       guard isVisible, superview != nil, isExtended != oldValue else { return }
@@ -92,10 +92,14 @@ final class NavigationControlView: SolidTouchView {
     [distanceLegendLabel, speedLegendLabel]
   }
 
+  private var mikshatActions: MikshatNavigationActionsView?
   private var lastViewportHeight: CGFloat = 0
+  private var legacyViews: [UIView] = []
+  private let timeLegend = MikshatStyle.label(size: 18, color: .gray)
 
   override func awakeFromNib() {
     super.awakeFromNib()
+    buildMikshatPanel()
 
     for label in metricsLabels {
       configureMetricLabel(label, font: Constants.metricFont)
@@ -108,9 +112,101 @@ final class NavigationControlView: SolidTouchView {
     configureButton(settingsButton)
     configureButton(ttsButton)
     configureButton(trackRecordingButton)
+    trackRecordingButton.isHidden = true
+    addGestureRecognizer(UIPanGestureRecognizer(target: self, action: #selector(mikshatPan(_:))))
     configureStopButton(stopButton)
 
     MWMTextToSpeech.add(self)
+  }
+
+  private func buildMikshatPanel() {
+    let distance = distanceLabel!, distanceUnit = distanceLegendLabel!, speed = speedLabel!, speedUnit = speedLegendLabel!, time = timeLabel!
+    let speedBox = speedBackground!, progress = progressView!, extended = extendedView!
+    let stop = stopButton!, voice = ttsButton!, settings = settingsButton!
+    legacyViews = [distanceWithLegendLabel, speedWithLegendLabel, timePageControl, extendButton, trackRecordingButton]
+    let retained: [UIView] = [distance, distanceUnit, speed, speedUnit, time, speedBox, progress, extended, stop, voice, settings] + legacyViews
+    NSLayoutConstraint.deactivate(constraints)
+    retained.forEach { $0.removeFromSuperview() }
+    subviews.forEach { $0.removeFromSuperview() }
+    speedBox.subviews.forEach { $0.removeFromSuperview() }
+    NSLayoutConstraint.deactivate(speedBox.constraints)
+    extended.subviews.forEach { $0.removeFromSuperview() }
+    NSLayoutConstraint.deactivate(extended.constraints)
+    backgroundColor = .white
+    layer.cornerRadius = 24
+    layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+    let grip = UIView()
+    grip.backgroundColor = .lightGray
+    grip.layer.cornerRadius = 3
+    grip.translatesAutoresizingMaskIntoConstraints = false
+    let handle = UIView()
+    handle.addSubview(grip)
+    NSLayoutConstraint.activate([
+      handle.heightAnchor.constraint(equalToConstant: 8), grip.widthAnchor.constraint(equalToConstant: 38), grip.heightAnchor.constraint(equalToConstant: 5),
+      grip.centerXAnchor.constraint(equalTo: handle.centerXAnchor), grip.centerYAnchor.constraint(equalTo: handle.centerYAnchor),
+    ])
+    handle.isAccessibilityElement = true
+    handle.accessibilityLabel = L("mikshat_show_stop")
+    handle.accessibilityTraits = .button
+    handle.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(extendAction)))
+    let timeColumn = UIStackView(arrangedSubviews: [time, timeLegend])
+    timeColumn.axis = .vertical
+    timeColumn.spacing = 7
+    timeColumn.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(toggleInfoAction)))
+    timeColumn.accessibilityCustomActions = [UIAccessibilityCustomAction(name: L("mikshat_toggle_time"), target: self, selector: #selector(accessibleToggleTime))]
+    let speedColumn = UIStackView(arrangedSubviews: [speed, speedUnit])
+    speedColumn.axis = .vertical; speedColumn.spacing = 7
+    speedColumn.translatesAutoresizingMaskIntoConstraints = false
+    speedBox.addSubview(speedColumn)
+    NSLayoutConstraint.activate([
+      speedColumn.topAnchor.constraint(equalTo: speedBox.topAnchor), speedColumn.bottomAnchor.constraint(equalTo: speedBox.bottomAnchor),
+      speedColumn.leadingAnchor.constraint(equalTo: speedBox.leadingAnchor), speedColumn.trailingAnchor.constraint(equalTo: speedBox.trailingAnchor),
+    ])
+    let distanceColumn = UIStackView(arrangedSubviews: [distance, distanceUnit])
+    distanceColumn.axis = .vertical; distanceColumn.spacing = 7
+    let metrics = UIStackView(arrangedSubviews: [distanceColumn, timeColumn, speedBox])
+    metrics.semanticContentAttribute = .forceLeftToRight
+    metrics.distribution = .fillEqually
+    metrics.spacing = 8
+    metrics.heightAnchor.constraint(greaterThanOrEqualToConstant: 102).isActive = true
+    for label in [distance, distanceUnit, time, speed, speedUnit] {
+      label.textAlignment = .center
+      label.numberOfLines = 1
+      label.textColor = label === distanceUnit || label === speedUnit ? .gray : .black
+    }
+    for button in [stop, voice, settings] {
+      NSLayoutConstraint.deactivate(button.constraints.filter { $0.firstAttribute == .width })
+    }
+    let actions = UIStackView(arrangedSubviews: [stop, voice, settings])
+    actions.semanticContentAttribute = .forceLeftToRight
+    actions.spacing = 14
+    actions.translatesAutoresizingMaskIntoConstraints = false
+    voice.widthAnchor.constraint(equalToConstant: 50).isActive = true
+    settings.widthAnchor.constraint(equalToConstant: 50).isActive = true
+    extended.addSubview(actions)
+    NSLayoutConstraint.activate([
+      actions.topAnchor.constraint(equalTo: extended.topAnchor, constant: 8), actions.bottomAnchor.constraint(equalTo: extended.bottomAnchor, constant: -8).withPriority(.required - 1),
+      actions.leadingAnchor.constraint(equalTo: extended.leadingAnchor), actions.trailingAnchor.constraint(equalTo: extended.trailingAnchor),
+      actions.heightAnchor.constraint(greaterThanOrEqualToConstant: 54).withPriority(.required - 1),
+    ])
+    extended.isHidden = true
+    let stack = UIStackView(arrangedSubviews: [handle, metrics, progress, extended])
+    stack.axis = .vertical; stack.spacing = 12
+    stack.translatesAutoresizingMaskIntoConstraints = false
+    addSubview(stack)
+    NSLayoutConstraint.activate([
+      stack.topAnchor.constraint(equalTo: topAnchor, constant: 7), stack.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -12),
+      stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16), stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -16),
+    ])
+    legacyViews.forEach { $0.isHidden = true }
+  }
+
+  @objc private func accessibleToggleTime() -> Bool { toggleInfoAction(); return true }
+
+  @objc private func mikshatPan(_ gesture: UIPanGestureRecognizer) {
+    guard gesture.state == .ended else { return }
+    let y = gesture.translation(in: self).y
+    if abs(y) > 12 { isExtended = y < 0; refreshDiminishTimer() }
   }
 
   private func configureMetricLabel(_ label: UILabel, font: UIFont) {
@@ -168,14 +264,20 @@ final class NavigationControlView: SolidTouchView {
     notExtendedConstraint = progressView.bottomAnchor.constraint(equalTo: lg.bottomAnchor)
     notExtendedConstraint.isActive = true
 
+    let actions = MikshatNavigationActionsView()
+    actions.install(in: ownerView, above: self)
+    mikshatActions = actions
     updateVisibleViewportArea()
   }
 
   private func removeView() {
     // Cancel diminish timer on remove, otherwise performSelector keeps the view alive ~5s after close, blocking deinit.
     cancelDiminishTimer()
+    mikshatActions?.removeFromSuperview()
+    mikshatActions = nil
     updateVisibleViewportArea(onClose: true)
-    dimBackground.setVisible(false, completion: {
+    dimBackground.setVisible(false, completion: { [weak self] in
+      guard let self, !self.isVisible else { return }
       self.removeFromSuperview()
     })
   }
@@ -187,16 +289,11 @@ final class NavigationControlView: SolidTouchView {
   }
 
   private func updateLegendSize() {
-    let isCompact = traitCollection.verticalSizeClass == .compact
-    distanceLabel.isHidden = isCompact
-    distanceLegendLabel.isHidden = isCompact
-    distanceWithLegendLabel.isHidden = !isCompact
-    speedLabel.isHidden = isCompact
-    speedLegendLabel.isHidden = isCompact
-    speedWithLegendLabel.isHidden = !isCompact
-
-    let pgScale: CGFloat = isCompact ? 0.7 : 1
-    timePageControl.transform = CGAffineTransform(scaleX: pgScale, y: pgScale)
+    distanceLabel.isHidden = false
+    distanceLegendLabel.isHidden = false
+    speedLabel.isHidden = false
+    speedLegendLabel.isHidden = false
+    legacyViews.forEach { $0.isHidden = true }
   }
 
   func setTrackRecordingState(_ state: TrackRecordingState) {
@@ -208,15 +305,17 @@ final class NavigationControlView: SolidTouchView {
     guard isVisible else { return }
     let routingNumberAttributes: [NSAttributedString.Key: Any] =
       [
-        NSAttributedString.Key.foregroundColor: UIColor.blackPrimaryText,
+        NSAttributedString.Key.foregroundColor: UIColor.black,
         NSAttributedString.Key.font: Constants.metricFont,
       ]
     let routingLegendAttributes: [NSAttributedString.Key: Any] =
       [
-        NSAttributedString.Key.foregroundColor: UIColor.blackSecondaryText,
+        NSAttributedString.Key.foregroundColor: UIColor.gray,
         NSAttributedString.Key.font: Constants.metricLegendFont,
       ]
 
+    timeLegend.text = L(timePageControl.currentPage == 0 ? "mikshat_remaining_time" : "mikshat_arrival")
+    timeLabel.textColor = .black
     if timePageControl.currentPage == 0 {
       timeLabel.text = DurationFormatter.routingDurationString(from: TimeInterval(info.timeToTarget))
     } else {
@@ -230,9 +329,13 @@ final class NavigationControlView: SolidTouchView {
     }
 
     if let targetUnits = info.targetUnits {
-      distanceLegendLabel.text = targetUnits
+      distanceLegendLabel.attributedText = NSAttributedString(string: targetUnits, attributes: [
+        .baselineOffset: targetUnits.trimmingCharacters(in: .whitespaces) == "كم" ? 3 : 0,
+      ])
       if let distanceWithLegend = distanceWithLegend {
-        distanceWithLegend.append(NSAttributedString(string: targetUnits, attributes: routingLegendAttributes))
+        var distanceUnitAttributes = routingLegendAttributes
+        if targetUnits.trimmingCharacters(in: .whitespaces) == "كم" { distanceUnitAttributes[.baselineOffset] = 3 }
+        distanceWithLegend.append(NSAttributedString(string: targetUnits, attributes: distanceUnitAttributes))
         distanceWithLegendLabel.attributedText = distanceWithLegend
       }
     }
@@ -265,7 +368,7 @@ final class NavigationControlView: SolidTouchView {
       speedBackground.backgroundColor = .buttonRed
     } else {
       let isSpeedLimitExceeded = info.speedLimitMps > 0 && speedMps > info.speedLimitMps
-      speedLabel.textColor = isSpeedLimitExceeded ? .buttonRed : .blackPrimaryText
+      speedLabel.textColor = isSpeedLimitExceeded ? .buttonRed : .black
       speedBackground.backgroundColor = UIColor.clear
     }
     speedLegendLabel.textColor = speedLabel.textColor
@@ -321,20 +424,22 @@ final class NavigationControlView: SolidTouchView {
     }
     imageView.animationImages = morphImages
     imageView.animationRepeatCount = 1
+    imageView.animationDuration = 0.2
     imageView.image = morphImages.last
     imageView.startAnimating()
     setExtendButtonImage()
   }
 
   private func setExtendButtonImage() {
-    DispatchQueue.main.async {
-      guard let imageView = self.extendButton.imageView else { return }
-      if imageView.isAnimating {
-        self.setExtendButtonImage()
-      } else {
-        self.extendButton.setImage(UIImage(resource: self.isExtended ? .icMenuDown : .icMenu), for: .normal)
-      }
+    guard let imageView = extendButton.imageView else { return }
+    let update: () -> Void = { [weak self] in
+      guard let self else { return }
+      self.extendButton.setImage(UIImage(resource: self.isExtended ? .icMenuDown : .icMenu), for: .normal)
     }
+    if imageView.isAnimating {
+      // One completion update, rather than repeatedly rescheduling work on the main queue.
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.22, execute: update)
+    } else { update() }
   }
 
   private func refreshDiminishTimer() {

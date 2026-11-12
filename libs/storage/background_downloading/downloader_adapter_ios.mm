@@ -31,6 +31,7 @@ namespace storage
 
 void BackgroundDownloaderAdapter::Remove(CountryId const & countryId)
 {
+  m_downloadGenerations.erase(countryId);
   MapFilesDownloader::Remove(countryId);
 
   if (!m_queue.Contains(countryId))
@@ -45,6 +46,7 @@ void BackgroundDownloaderAdapter::Remove(CountryId const & countryId)
 
 void BackgroundDownloaderAdapter::Clear()
 {
+  m_downloadGenerations.clear();
   MapFilesDownloader::Clear();
 
   BackgroundDownloader * downloader = [BackgroundDownloader sharedBackgroundMapDownloader];
@@ -69,7 +71,12 @@ void BackgroundDownloaderAdapter::Download(QueuedCountry && queuedCountry)
   }
 
   auto const countryId = queuedCountry.GetCountryId();
-  auto urls = MakeUrlList(queuedCountry.GetRelativeUrl());
+  auto urls = MakeUrlList(queuedCountry);
+  if (urls.empty())
+  {
+    queuedCountry.OnDownloadFinished(downloader::DownloadStatus::Failed);
+    return;
+  }
   // Get urls order from worst to best.
   std::reverse(urls.begin(), urls.end());
   auto const path = queuedCountry.GetFileDownloadPath();
@@ -78,15 +85,26 @@ void BackgroundDownloaderAdapter::Download(QueuedCountry && queuedCountry)
   // Infinite recursion possible here, otherwise:
   // OnStartDownloading -> NotifyStatusChanged -> processCountryEvent -> configDialog (?!)
   // -> downloadNode for the same country if autodownload enabled -> Download.
+  auto const generation = ++m_nextDownloadGeneration;
+  m_downloadGenerations[countryId] = generation;
+  auto const isCurrentAttempt = [this, &countryId, generation]
+  {
+    auto const it = m_downloadGenerations.find(countryId);
+    return it != m_downloadGenerations.end() && it->second == generation;
+  };
   m_queue.Append(QueuedCountry(queuedCountry));
+  if (!isCurrentAttempt())
+    return;
 
   queuedCountry.OnStartDownloading();
+  if (!isCurrentAttempt())
+    return;
 
-  DownloadFromLastUrl(countryId, path, std::move(urls));
+  DownloadFromLastUrl(countryId, path, std::move(urls), generation);
 }
 
 void BackgroundDownloaderAdapter::DownloadFromLastUrl(CountryId const & countryId, std::string const & downloadPath,
-                                                      std::vector<std::string> && urls)
+                                                      std::vector<std::string> && urls, uint64_t generation)
 {
   if (urls.empty())
     return;
@@ -95,28 +113,31 @@ void BackgroundDownloaderAdapter::DownloadFromLastUrl(CountryId const & countryI
   assert(url != nil);
   urls.pop_back();
 
-  auto onFinish = [this, countryId, downloadPath, urls = std::move(urls)](NSError * error) mutable
+  auto onFinish = [this, countryId, downloadPath, generation, urls = std::move(urls)](NSError * error) mutable
   {
     downloader::DownloadStatus status = error ? [error toDownloaderError] : downloader::DownloadStatus::Completed;
 
-    if (!m_queue.Contains(countryId))
+    auto const it = m_downloadGenerations.find(countryId);
+    if (it == m_downloadGenerations.end() || it->second != generation)
       return;
 
     if (status == downloader::DownloadStatus::Failed && !urls.empty())
     {
-      DownloadFromLastUrl(countryId, downloadPath, std::move(urls));
+      DownloadFromLastUrl(countryId, downloadPath, std::move(urls), generation);
     }
     else
     {
       auto const country = m_queue.GetCountryById(countryId);
       m_queue.Remove(countryId);
+      m_downloadGenerations.erase(countryId);
       country.OnDownloadFinished(status);
     }
   };
 
-  auto onProgress = [this, countryId](int64_t totalWritten, int64_t totalExpected)
+  auto onProgress = [this, countryId, generation](int64_t totalWritten, int64_t totalExpected)
   {
-    if (!m_queue.Contains(countryId))
+    auto const it = m_downloadGenerations.find(countryId);
+    if (it == m_downloadGenerations.end() || it->second != generation)
       return;
 
     auto const & country = m_queue.GetCountryById(countryId);

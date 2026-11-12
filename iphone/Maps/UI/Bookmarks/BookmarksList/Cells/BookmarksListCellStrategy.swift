@@ -20,6 +20,9 @@ final class BookmarksListCellStrategy {
         guard let cell else { return }
         self?.cellEditHandler?(cell)
       }))
+      if case .bookmark(let id) = bookmark.itemId {
+        cell.setDirectionTarget(BookmarksManager.shared().bookmark(withId: id).locationCoordinate)
+      }
       return cell
     case let tracksSection as ITracksSectionViewModel:
       let track = tracksSection.tracks[indexPath.row]

@@ -1,3 +1,4 @@
+#import <CoreLocation/CoreLocation.h>
 #import "MWMRoutePoint.h"
 #import "MWMRouterType.h"
 
@@ -13,6 +14,11 @@ typedef NS_ENUM(NSInteger, MWMRoadType) {
 NS_ASSUME_NONNULL_BEGIN
 
 @interface MWMRouter : NSObject
++ (BOOL)isMikshatDirectActive;
++ (nullable MWMRoutePoint *)mikshatUserPosition;
++ (void)beginMikshatDirectFrom:(CLLocationCoordinate2D)origin to:(CLLocationCoordinate2D)destination NS_SWIFT_NAME(beginMikshatDirect(from:to:));
++ (void)endMikshatDirect;
+
 
 + (void)subscribeToEvents;
 + (void)unsubscribeFromEvents;

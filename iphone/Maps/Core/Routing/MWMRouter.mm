@@ -26,7 +26,16 @@
 #include "platform/local_country_file_utils.hpp"
 #include "platform/localization.hpp"
 
+#include <cmath>
+
 using namespace routing;
+
+namespace
+{
+bool s_mikshatDirectActive = false;
+char const kMikshatBaseline[] = "mikshat-direct-baseline";
+}
+
 
 @interface MWMRouter () <MWMLocationObserver, MWMFrameworkRouteBuilderObserver>
 
@@ -41,6 +50,70 @@ using namespace routing;
 @end
 
 @implementation MWMRouter
+
++ (BOOL)isMikshatDirectActive { return s_mikshatDirectActive; }
+
++ (MWMRoutePoint *)mikshatUserPosition
+{
+  // Use the position that drives the map arrow, never the viewport or a planned route point.
+  auto const position = GetFramework().GetCurrentPosition();
+  if (!position || !std::isfinite(position->x) || !std::isfinite(position->y))
+    return nil;
+  CLLocationCoordinate2D const coordinate =
+      CLLocationCoordinate2DMake(mercator::YToLat(position->y), mercator::XToLon(position->x));
+  if (!CLLocationCoordinate2DIsValid(coordinate))
+    return nil;
+
+  RouteMarkData start;
+  start.m_position = *position;
+  start.m_pointType = RouteMarkType::Start;
+  start.m_isMyPosition = true;
+  start.m_title = L(@"p2p_your_location").UTF8String;
+  return [[MWMRoutePoint alloc] initWithRouteMarkData:start];
+}
+
++ (void)beginMikshatDirectFrom:(CLLocationCoordinate2D)origin to:(CLLocationCoordinate2D)destination
+{
+  if (s_mikshatDirectActive || !CLLocationCoordinate2DIsValid(origin) || !CLLocationCoordinate2DIsValid(destination))
+    return;
+  std::vector<m2::PointD> points = {mercator::FromLatLon(origin.latitude, origin.longitude),
+                                  mercator::FromLatLon(destination.latitude, destination.longitude)};
+  df::DrapeApiLineData line(points, dp::Color(25, 130, 245, 255));
+  line.Width(12.0f);
+  GetFramework().GetDrapeApi().AddLine(kMikshatBaseline, line);
+  s_mikshatDirectActive = true;
+  GetFramework().SetRulerDestinationPolicy(true, true);
+  GetFramework().GetRoutingManager().SetPreserveRulerCamera(true);
+
+  auto & routingManager = GetFramework().GetRoutingManager();
+  auto const routePoints = routingManager.GetRoutePoints();
+  bool matchesOrigin = false;
+  for (auto const & point : routePoints)
+    if (point.m_pointType == RouteMarkType::Start)
+      matchesOrigin = point.m_isMyPosition && point.m_position.EqualDxDy(points.front(), mercator::kPointEqualityEps);
+  if (!matchesOrigin && GetFramework().GetCurrentPosition())
+  {
+    RouteMarkData start;
+    start.m_position = points.front();
+    start.m_pointType = RouteMarkType::Start;
+    start.m_isMyPosition = true;
+    start.m_title = L(@"p2p_your_location").UTF8String;
+    // Set the camera/destination policy above before rebuilding the purple line.
+    if (routingManager.AddRoutePoint(std::move(start), false /* optimize */))
+      routingManager.BuildRoute();
+  }
+}
+
++ (void)endMikshatDirect
+{
+  if (!s_mikshatDirectActive)
+    return;
+  s_mikshatDirectActive = false;
+  GetFramework().SetRulerDestinationPolicy(true, false);
+  GetFramework().GetRoutingManager().SetPreserveRulerCamera(false);
+  GetFramework().GetDrapeApi().RemoveLine(kMikshatBaseline);
+}
+
 
 + (MWMRouter *)router
 {
@@ -197,13 +270,13 @@ using namespace routing;
 
 + (BOOL)canAddIntermediatePoint
 {
-  return GetFramework().GetRoutingManager().CouldAddIntermediatePoint();
+  return NO;
 }
 
 + (BOOL)isRoutePointsLimitReached
 {
   // Unlike canAddIntermediatePoint, this also works before routing becomes active.
-  return GetFramework().GetRoutingManager().GetRoutePointsCount() >= RoutePointsLayout::kMaxRoutePointsCount;
+  return GetFramework().GetRoutingManager().GetRoutePointsCount() >= 2;
 }
 
 - (instancetype)initRouter
@@ -235,6 +308,8 @@ using namespace routing;
 
 + (void)setType:(MWMRouterType)type
 {
+  if (s_mikshatDirectActive)
+    return;
   if (type == self.type)
     return;
 
@@ -285,6 +360,8 @@ using namespace routing;
 
 + (void)removePointAndRebuild:(MWMRoutePoint *)point
 {
+  if (s_mikshatDirectActive)
+    return;
   if (!point)
     return;
   if ([self pointsCount] == 1)
@@ -300,6 +377,8 @@ using namespace routing;
 
 + (void)replacePointAndRebuild:(MWMRoutePoint *)point withPoint:(MWMRoutePoint *)newPoint
 {
+  if (s_mikshatDirectActive)
+    return;
   if (!point)
   {
     NSAssert(NO, @"Source point can not be nil");
@@ -323,6 +402,8 @@ using namespace routing;
   }
 
   auto & routingManager = GetFramework().GetRoutingManager();
+  if (point.type == MWMRoutePointTypeIntermediate)
+    return;
   RouteMarkData pt = point.routeMarkData;
   RouteMarkData newPt = newPoint.routeMarkData;
   routingManager.ReplaceRoutePoint(pt.m_pointType, pt.m_intermediateIndex, std::move(newPt));
@@ -332,6 +413,8 @@ using namespace routing;
 
 + (void)reverseRoute
 {
+  if (s_mikshatDirectActive)
+    return;
   if (!GetFramework().GetRoutingManager().ReverseRoutePoints())
     return;
   [self rebuildWithBestRouter:NO];
@@ -339,17 +422,23 @@ using namespace routing;
 
 + (void)removePoints
 {
+  if (s_mikshatDirectActive)
+    return;
   GetFramework().GetRoutingManager().RemoveRoutePoints();
 }
 
 + (void)addPoint:(MWMRoutePoint *)point
 {
+  if (s_mikshatDirectActive && (!point || point.type != MWMRoutePointTypeStart || !point.isMyPosition))
+    return;
   if (!point)
   {
     NSAssert(NO, @"Point can not be nil");
     return;
   }
 
+  if (point.type == MWMRoutePointTypeIntermediate)
+    return;
   RouteMarkData pt = point.routeMarkData;
   GetFramework().GetRoutingManager().AddRoutePoint(std::move(pt), RoutingOptions::LoadRouteOptimizationFromSettings());
   [[MWMNavigationDashboardManager sharedManager] onRoutePointsUpdated];
@@ -357,22 +446,13 @@ using namespace routing;
 
 + (void)continueRouteToPointAndRebuild:(MWMRoutePoint *)point
 {
-  if (!point)
-  {
-    NSAssert(NO, @"Point can not be nil");
-    return;
-  }
-
-  RouteMarkData pt = point.routeMarkData;
-  if (!GetFramework().GetRoutingManager().ContinueRouteToPoint(std::move(pt)))
-    return;
-
-  [[MWMNavigationDashboardManager sharedManager] onRoutePointsUpdated];
-  [self rebuildWithBestRouter:NO];
+  [self buildToPoint:point bestRouter:NO];
 }
 
 + (void)addPointAndRebuild:(MWMRoutePoint *)point
 {
+  if (s_mikshatDirectActive && (!point || point.type != MWMRoutePointTypeStart || !point.isMyPosition))
+    return;
   if (!point)
     return;
   [self addPoint:point];
@@ -381,6 +461,8 @@ using namespace routing;
 
 + (void)buildFromPoint:(MWMRoutePoint *)startPoint bestRouter:(BOOL)bestRouter
 {
+  if (s_mikshatDirectActive)
+    return;
   if (!startPoint)
     return;
   [self addPoint:startPoint];
@@ -389,10 +471,17 @@ using namespace routing;
 
 + (void)buildToPoint:(MWMRoutePoint *)finishPoint bestRouter:(BOOL)bestRouter
 {
+  if (s_mikshatDirectActive)
+    return;
   if (!finishPoint)
     return;
   [self addPoint:finishPoint];
-  if (![self startPoint] && [MWMLocationManager lastLocation] && [MWMRouter router].canAutoAddLastLocation)
+  if ([self type] == MWMRouterTypeRuler)
+  {
+    if (MWMRoutePoint * start = [self mikshatUserPosition])
+      [self addPoint:start];
+  }
+  else if ([MWMLocationManager lastLocation])
     [self addPoint:[[MWMRoutePoint alloc] initWithLastLocationAndType:MWMRoutePointTypeStart intermediateIndex:0]];
   if ([self startPoint] && [self finishPoint])
     [self rebuildWithBestRouter:bestRouter];
@@ -402,7 +491,7 @@ using namespace routing;
                    startPoint:(MWMRoutePoint *)startPoint
                   finishPoint:(MWMRoutePoint *)finishPoint
 {
-  if (!startPoint || !finishPoint)
+  if (s_mikshatDirectActive || !startPoint || !finishPoint)
     return;
 
   [MWMRouter setType:type];
@@ -419,6 +508,19 @@ using namespace routing;
 + (void)rebuildWithBestRouter:(BOOL)bestRouter
 {
   auto & rm = GetFramework().GetRoutingManager();
+  // Switching from car to direct guidance must also work when the native GPS
+  // accessor is temporarily empty but the map still has a valid user arrow.
+  if (!s_mikshatDirectActive && self.type == MWMRouterTypeRuler && [self router].canAutoAddLastLocation)
+  {
+    if (MWMRoutePoint * start = [self mikshatUserPosition])
+      [self addPoint:start];
+  }
+  auto const previousPoints = rm.GetRoutePoints();
+  for (auto it = previousPoints.rbegin(); it != previousPoints.rend(); ++it)
+  {
+    if (it->m_pointType == RouteMarkType::Intermediate)
+      rm.RemoveRoutePoint(it->m_pointType, it->m_intermediateIndex);
+  }
   auto const & points = rm.GetRoutePoints();
   auto const pointsCount = points.size();
   if (pointsCount < 2)
@@ -427,8 +529,8 @@ using namespace routing;
     [[MWMMapViewControlsManager manager] onRoutePrepare];
     return;
   }
-  if (bestRouter)
-    self.type = routerType(rm.GetBestRouter(points.front().m_position, points.back().m_position));
+  if (self.type != MWMRouterTypeVehicle && self.type != MWMRouterTypeRuler)
+    self.type = MWMRouterTypeVehicle;
 
   [[MWMMapViewControlsManager manager] onRouteRebuild];
   rm.BuildRoute();
@@ -494,6 +596,7 @@ using namespace routing;
 
 + (void)doStop:(BOOL)removeRoutePoints
 {
+  [self endMikshatDirect];
   [[MWMRoutingManager routingManager] stopRoutingAndRemoveRoutePoints:removeRoutePoints];
   if (removeRoutePoints)
     [[MWMRoutingManager routingManager] deleteSavedRoutePoints];

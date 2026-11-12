@@ -34,7 +34,6 @@
                                     <constraint firstAttribute="trailing" secondItem="bsv-S8-EiF" secondAttribute="trailing" id="KwJ-SH-nj7"/>
                                     <constraint firstItem="bsv-S8-EiF" firstAttribute="top" secondItem="dJ0-97-CDh" secondAttribute="top" id="byT-8G-JKg"/>
                                     <constraint firstItem="bsv-S8-EiF" firstAttribute="width" secondItem="dJ0-97-CDh" secondAttribute="width" id="d1E-jc-iKG"/>
-                                    <constraint firstItem="bsv-S8-EiF" firstAttribute="height" secondItem="dJ0-97-CDh" secondAttribute="height" priority="250" id="fkW-aL-Erl"/>
                                 </constraints>
                                 <viewLayoutGuide key="contentLayoutGuide" id="VD0-9k-Kda"/>
                                 <viewLayoutGuide key="frameLayoutGuide" id="fDP-bR-gGe"/>

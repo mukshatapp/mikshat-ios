@@ -40,6 +40,7 @@ set(SRC
   pinger.hpp
   routing_helpers.cpp
   routing_helpers.hpp
+  saudi_map_download_source.hpp
   storage.cpp
   storage.hpp
   storage_defines.cpp

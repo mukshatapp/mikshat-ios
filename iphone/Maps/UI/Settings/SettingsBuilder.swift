@@ -1,4 +1,5 @@
 enum SettingsScreen {
+  case mikshatTools
   case profile
   case units
   case mobileInternet
@@ -38,6 +39,8 @@ final class SettingsBuilder: NSObject {
 
   @nonobjc static func build(_ screen: SettingsScreen) -> UIViewController {
     switch screen {
+    case .mikshatTools:
+      return MikshatToolsViewController()
     case .profile:
       return UIStoryboard(name: "Authorization", bundle: nil)
         .instantiateViewController(withIdentifier: StoryboardId.authorizationProfile)

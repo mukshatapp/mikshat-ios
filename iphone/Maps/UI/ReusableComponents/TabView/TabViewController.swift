@@ -5,6 +5,7 @@ class TabViewController: MWMViewController {
         addChild(viewController)
         viewController.didMove(toParent: self)
       }
+      if isViewLoaded { tabView.reloadData() }
     }
   }
 

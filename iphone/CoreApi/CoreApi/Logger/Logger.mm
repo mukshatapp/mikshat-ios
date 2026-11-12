@@ -246,7 +246,7 @@ bool AssertMessage(base::SrcPoint const & src, std::string const & message)
   // Build the log message string.
   auto & logHelper = base::LogHelper::Instance();
   std::ostringstream output;
-  // TODO: (KK) Either guard this call, or refactor thread ids in logHelper.
+  // LogHelper synchronizes shared thread IDs; this output stream belongs to this call.
   logHelper.WriteProlog(output, level);
   logHelper.WriteLog(output, src, message);
 

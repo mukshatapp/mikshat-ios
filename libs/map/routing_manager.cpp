@@ -413,7 +413,8 @@ void RoutingManager::OnBuildRouteReady(RoutesResult const & result, RouterResult
   HidePreviewSegments();
 
   auto const hasWarnings = InsertRoute(result);
-  m_drapeEngine.SafeCall(&df::DrapeEngine::StopLocationFollow);
+  if (!(m_currentRouterType == routing::RouterType::Ruler && m_preserveRulerCamera))
+    m_drapeEngine.SafeCall(&df::DrapeEngine::StopLocationFollow);
 
   // Validate route (in case of bicycle routing it can be invalid).
   ASSERT(result.IsValid(), ());

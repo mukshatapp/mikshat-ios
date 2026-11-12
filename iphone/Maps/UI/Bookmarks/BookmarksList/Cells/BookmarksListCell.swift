@@ -28,6 +28,7 @@ final class BookmarksListCell: MWMTableViewCell {
   private let labelsContainerView = UIView()
   private let labelsStackView = UIStackView()
   private let titleLabel = UILabel()
+  private let directionIndicator = MikshatDirectionIndicator()
   private let subtitleLabel = UILabel()
   private let innerTrailingButton = IconButton(frame: .zero)
   private let trailingButton = IconButton(frame: .zero)
@@ -49,12 +50,23 @@ final class BookmarksListCell: MWMTableViewCell {
   func configure(_ configuration: Configuration) {
     // A pooled cell keeps whatever state it had; UIKit re-applies the real one before display.
     isShowingEditControl = false
+    setDirectionTarget(nil)
     titleLabel.text = configuration.title
     subtitleLabel.text = configuration.subtitle
     subtitleLabel.isHidden = configuration.subtitle?.isEmpty ?? true
     applyLeadingItem(configuration.leadingItem)
     applyTrailingButtons(configuration.trailingButtons)
     updateEditingState()
+  }
+
+  func setDirectionTarget(_ coordinate: CLLocationCoordinate2D?) {
+    directionIndicator.target = coordinate
+    directionIndicator.isHidden = coordinate == nil
+  }
+
+  override func prepareForReuse() {
+    super.prepareForReuse()
+    setDirectionTarget(nil)
   }
 
   override func setEditing(_ editing: Bool, animated: Bool) {
@@ -90,7 +102,11 @@ final class BookmarksListCell: MWMTableViewCell {
 
     labelsStackView.axis = .vertical
     labelsStackView.spacing = Constants.labelsSpacing
-    labelsStackView.addArrangedSubview(titleLabel)
+    let titleRow = UIStackView(arrangedSubviews: [titleLabel, directionIndicator])
+    titleRow.alignment = .center
+    titleRow.spacing = 8
+    directionIndicator.isHidden = true
+    labelsStackView.addArrangedSubview(titleRow)
     labelsStackView.addArrangedSubview(subtitleLabel)
     labelsContainerView.addSubview(labelsStackView)
     labelsContainerView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)

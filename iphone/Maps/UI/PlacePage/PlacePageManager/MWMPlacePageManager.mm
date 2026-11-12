@@ -54,11 +54,9 @@ using namespace storage;
   if ([MWMRouter isOnRoute])
     [MWMRouter stopRouting];
 
-  if ([MWMMapOverlayManager transitEnabled])
-    [MWMRouter setType:MWMRouterTypePublicTransport];
 
   MWMRoutePoint * point = [self routePoint:data withType:MWMRoutePointTypeFinish intermediateIndex:0];
-  [MWMRouter buildToPoint:point bestRouter:YES];
+  [MWMRouter buildToPoint:point bestRouter:NO];
   [self.searchManager close];
   [self closePlacePage];
 }

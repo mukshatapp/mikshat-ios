@@ -22,6 +22,9 @@ final class SearchOnMapViewController: UIViewController {
     static let dimViewThreshold: CGFloat = 50
   }
 
+  private var isUpdatingFrame = false
+  private var isClosing = false
+  private var lastRenderedModel: ViewModel?
   var interactor: SearchOnMapInteractor?
 
   @objc let availableAreaView = SearchOnMapAreaView()
@@ -29,7 +32,7 @@ final class SearchOnMapViewController: UIViewController {
   private let headerView = SearchOnMapHeaderView()
   private let searchResultsView = UIView()
   private let resultsTableView = UITableView()
-  private let historyAndCategoryTabViewController = SearchTabViewController()
+  private let historyViewController = SearchTabViewController()
   private var searchingActivityView = PlaceholderView(hasActivityIndicator: true)
   private var searchNoResultsView = PlaceholderView(title: L("search_not_found"),
                                                     subtitle: L("search_not_found_query"))
@@ -124,7 +127,7 @@ final class SearchOnMapViewController: UIViewController {
     setupHeaderView()
     setupSearchResultsView()
     setupResultsTableView()
-    setupHistoryAndCategoryTabView()
+    setupHistoryView()
   }
 
   private func setupDimView() {
@@ -149,6 +152,16 @@ final class SearchOnMapViewController: UIViewController {
 
   private func setupHeaderView() {
     headerView.delegate = self
+    headerView.coordinateDidSubmit = { [weak self] coordinate in
+      self?.view.endEditing(true)
+      let pair = String(format: "%.8f,%.8f", locale: Locale(identifier: "en_US_POSIX"), coordinate.latitude, coordinate.longitude)
+      let query = SearchQuery(pair, source: .typedText)
+      Search.save(query)
+      MikshatSearchLocations.remember(coordinate, query: pair)
+      guard let url = URL(string: "om://map?ll=\(pair)") else { return }
+      self?.close()
+      _ = DeepLinkHandler.shared.applicationDidOpenUrl(url)
+    }
   }
 
   private func setupSearchResultsView() {
@@ -166,8 +179,8 @@ final class SearchOnMapViewController: UIViewController {
     resultsTableView.keyboardDismissMode = .onDrag
   }
 
-  private func setupHistoryAndCategoryTabView() {
-    historyAndCategoryTabViewController.delegate = self
+  private func setupHistoryView() {
+    historyViewController.delegate = self
   }
 
   private func layoutViews() {
@@ -201,7 +214,7 @@ final class SearchOnMapViewController: UIViewController {
     ])
 
     layoutResultsView()
-    layoutHistoryAndCategoryTabView()
+    layoutHistoryView()
     layoutSearchNoResultsView()
     layoutSearchingView()
     updateFrameOfPresentedViewInContainerView()
@@ -219,18 +232,18 @@ final class SearchOnMapViewController: UIViewController {
     ])
   }
 
-  private func layoutHistoryAndCategoryTabView() {
-    addChild(historyAndCategoryTabViewController)
-    searchResultsView.addSubview(historyAndCategoryTabViewController.view)
-    historyAndCategoryTabViewController.view.translatesAutoresizingMaskIntoConstraints = false
+  private func layoutHistoryView() {
+    addChild(historyViewController)
+    searchResultsView.addSubview(historyViewController.view)
+    historyViewController.view.translatesAutoresizingMaskIntoConstraints = false
 
     NSLayoutConstraint.activate([
-      historyAndCategoryTabViewController.view.topAnchor.constraint(equalTo: searchResultsView.topAnchor),
-      historyAndCategoryTabViewController.view.leadingAnchor.constraint(equalTo: searchResultsView.leadingAnchor),
-      historyAndCategoryTabViewController.view.trailingAnchor.constraint(equalTo: searchResultsView.trailingAnchor),
-      historyAndCategoryTabViewController.view.bottomAnchor.constraint(equalTo: searchResultsView.bottomAnchor),
+      historyViewController.view.topAnchor.constraint(equalTo: searchResultsView.topAnchor),
+      historyViewController.view.leadingAnchor.constraint(equalTo: searchResultsView.leadingAnchor),
+      historyViewController.view.trailingAnchor.constraint(equalTo: searchResultsView.trailingAnchor),
+      historyViewController.view.bottomAnchor.constraint(equalTo: searchResultsView.bottomAnchor),
     ])
-    historyAndCategoryTabViewController.didMove(toParent: self)
+    historyViewController.didMove(toParent: self)
   }
 
   private func layoutSearchNoResultsView() {
@@ -258,8 +271,11 @@ final class SearchOnMapViewController: UIViewController {
   // MARK: - Handle Presentation Steps
 
   private func updateFrameOfPresentedViewInContainerView() {
+    guard !isUpdatingFrame, !isClosing else { return }
+    isUpdatingFrame = true
+    defer { isUpdatingFrame = false }
     presentationStepsController.updateFrame()
-    view.layoutIfNeeded()
+    view.setNeedsLayout()
   }
 
   @objc
@@ -318,7 +334,7 @@ final class SearchOnMapViewController: UIViewController {
   private func setContent(_ content: Content) {
     switch content {
     case .historyAndCategory:
-      historyAndCategoryTabViewController.reloadSearchHistory()
+      historyViewController.reloadSearchHistory()
     case .results(let results):
       if searchResults != results {
         searchResults = results
@@ -337,7 +353,7 @@ final class SearchOnMapViewController: UIViewController {
   private func viewToShow(for content: Content) -> UIView {
     switch content {
     case .historyAndCategory:
-      return historyAndCategoryTabViewController.view
+      return historyViewController.view
     case .results:
       return resultsTableView
     case .noResults:
@@ -349,19 +365,12 @@ final class SearchOnMapViewController: UIViewController {
 
   private func showView(_ view: UIView) {
     let viewsToHide: [UIView] = [resultsTableView,
-                                 historyAndCategoryTabViewController.view,
+                                 historyViewController.view,
                                  searchNoResultsView,
                                  searchingActivityView].filter { $0 != view }
-    UIView.animate(withDuration: AppConstants.fastAnimationDuration,
-                   delay: 0,
-                   options: .curveEaseInOut,
-                   animations: {
-                     viewsToHide.forEach { $0.alpha = 0 }
-                     view.alpha = 1
-                   }) { _ in
-      viewsToHide.forEach { $0.isHidden = true }
-      view.isHidden = false
-    }
+    viewsToHide.forEach { $0.isHidden = true; $0.alpha = 0 }
+    view.isHidden = false
+    view.alpha = 1
   }
 
   private func setIsSearching(_ isSearching: Bool) {
@@ -379,6 +388,8 @@ final class SearchOnMapViewController: UIViewController {
 
 extension SearchOnMapViewController: SearchOnMapView {
   func render(_ viewModel: ViewModel) {
+    guard !isClosing, lastRenderedModel != viewModel else { return }
+    lastRenderedModel = viewModel
     headerView.setRoutePointActions(viewModel.routePointActions)
     setContent(viewModel.contentState)
     setIsSearching(viewModel.isTyping)
@@ -391,6 +402,8 @@ extension SearchOnMapViewController: SearchOnMapView {
   }
 
   func close() {
+    guard !isClosing else { return }
+    isClosing = true
     mapPointPickerViewController?.close()
     mapPointPickerViewController = nil
     headerView.setIsSearching(false)
@@ -432,7 +445,7 @@ extension SearchOnMapViewController: ModallyPresentedViewController {
   func presentationFrameDidChange(_ frame: CGRect) {
     let translationY = frame.origin.y
     resultsTableView.contentInset.bottom = translationY
-    historyAndCategoryTabViewController.presentationFrameDidChange(frame)
+    historyViewController.presentationFrameDidChange(frame)
     searchNoResultsView.presentationFrameDidChange(frame)
     searchingActivityView.presentationFrameDidChange(frame)
   }

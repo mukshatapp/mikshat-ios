@@ -216,6 +216,9 @@ CGFloat ScaledTurnsWidth()
 
 - (void)layoutSearch
 {
+  self.searchButtonsView.hidden = YES;
+  self.searchMainButton.hidden = YES;
+  self.bookmarksButton.hidden = YES;
   BOOL const defaultView = defaultOrientation(self.availableArea.size);
   CGFloat alpha = 0;
   CGFloat searchButtonsSideSize = 0;

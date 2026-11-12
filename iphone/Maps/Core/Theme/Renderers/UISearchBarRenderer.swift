@@ -11,16 +11,16 @@ extension UISearchBar {
     }
   }
 
-  @objc override func sw_didMoveToWindow() {
+  @objc dynamic func sw_searchBarDidMoveToWindow() {
     // A nil app window (a CarPlay-first launch, or a disconnected phone scene) must not match a
     // view that is leaving the hierarchy: nil === nil is true.
     guard let appWindow = MapsAppDelegate.theApp().window, appWindow === window else {
-      sw_didMoveToWindow()
+      sw_searchBarDidMoveToWindow()
       return
     }
     applyTheme()
     isStyleApplied = true
-    sw_didMoveToWindow()
+    sw_searchBarDidMoveToWindow()
   }
 }
 
@@ -64,6 +64,7 @@ class UISearchBarRenderer: UIViewRenderer {
       let clearButtonImage = UIImage(named: "ic_clear")?.withRenderingMode(.alwaysTemplate).withTintColor(tintColor)
       control.setImage(clearButtonImage, for: .clear, state: .normal)
     }
+    searchTextField.tintColor = UIColor(red: 22.0 / 255, green: 78.0 / 255, blue: 63.0 / 255, alpha: 1)
     if let barTintColor = style.barTintColor {
       let traits = control.window?.traitCollection ?? control.traitCollection
       let position = control.delegate?.position?(for: control) ?? control.barPosition

@@ -1,0 +1,98 @@
+import Foundation
+
+@main
+struct NavigationMathTests {
+  static func main() throws {
+    func check(_ condition: Bool, _ message: String) {
+      precondition(condition, message)
+    }
+    let math = MikshatNavigationMath.self
+    check(math.relativeBearing(bearing: 10, heading: 350) == 20, "Direction crosses north clockwise")
+    check(math.relativeBearing(bearing: 350, heading: 10) == 340, "Direction crosses north counterclockwise")
+    check(math.relativeBearing(bearing: 90, heading: 90) == 0, "Destination straight ahead")
+    let parsed = math.parseDecimalPair("(٢٤.٣٠٠٣ ٤٧.١٢٥٩١٧)")
+    check(parsed?.latitude == 24.3003 && parsed?.longitude == 47.125917, "Arabic coordinate history")
+    check(math.parseDecimalPair("24.3,47.1")?.longitude == 47.1, "Comma separated coordinate history")
+    check(math.parseDecimalPair("coffee 24 47") == nil, "Generic query has no invented location")
+    check(math.parseDecimalPair("91,47") == nil, "History coordinate bounds")
+    let riyadh = math.bearing(latitude: 24.7136, longitude: 46.6753)
+    check(abs(riyadh - 243.8) < 0.2, "Riyadh Qibla bearing")
+    check(abs(math.bearing(latitude: 0, longitude: 0, targetLatitude: 10, targetLongitude: 0)) < 0.0001,
+          "Due north")
+    check(abs(math.bearing(latitude: 0, longitude: 0, targetLatitude: 0, targetLongitude: 10) - 90) < 0.0001,
+          "Due east")
+    check(math.minuteInput("٢٠٣٨٨") == "20.388", "Automatic Arabic minute input")
+    let lat = try math.coordinate(degrees: "٢٤", minutes: "٤٢٫٨١٠", latitude: true)
+    check(abs(lat - 24.7135) < 0.000001, "Arabic DDM")
+    let lon = try math.coordinate(degrees: "046", minutes: "40.518", latitude: false, negative: true)
+    check(abs(lon + 46.6753) < 0.000001, "Western longitude")
+    for (degrees, minutes, latitude) in [("91", "00.000", true), ("180", "00.001", false),
+                                          ("24", "60.000", true), ("24", "ab.cd", true)] {
+      do {
+        _ = try math.coordinate(degrees: degrees, minutes: minutes, latitude: latitude)
+        preconditionFailure("Invalid coordinate accepted")
+      } catch {}
+    }
+    check(math.ddm(24.99999999, latitude: true) == "N 25° 00.000′", "DDM minute rollover")
+    check(math.ddm(0, latitude: true) == "N 00° 00.000′", "DDM zero padding")
+    check(math.ddm(-46.6753, latitude: false) == "W 046° 40.518′", "DDM west and fractional minutes")
+    check(!math.usesGPS(mode: 0, speed: 30), "Sensor preference")
+    check(math.usesGPS(mode: 1, speed: 0), "GPS preference")
+    check(!math.usesGPS(mode: 2, speed: 9.9 / 3.6), "Auto below threshold")
+    check(math.usesGPS(mode: 2, speed: 10 / 3.6), "Auto at threshold")
+    let northPole = try math.coordinate(degrees: "90", minutes: "00.000", latitude: true)
+    let dateLine = try math.coordinate(degrees: "180", minutes: "00.000", latitude: false)
+    check(northPole == 90 && dateLine == 180, "Exact coordinate limits")
+    check(math.dms(24.999999999, latitude: true) == "N 25° 00′ 00.00″", "DMS second/minute rollover")
+    check(math.dms(-47.125, latitude: false) == "W 047° 07′ 30.00″", "DMS west")
+    let pairs = math.coordinatePairs(latitude: 24.3003, longitude: 47.125917)
+    check(pairs.count == 3 && pairs.allSatisfy { !$0.isEmpty }, "Three complete coordinate copy values")
+    check(pairs[0] == "24.300300\n47.125917", "Decimal pair precision")
+    check(pairs[1].contains("N ") && pairs[1].contains("E ") && pairs[1].contains("\n"), "DDM pair contains both components")
+    let namedLink = math.shareLink(latitude: 23.934312, longitude: 47.249434, name: "نقطة الخريطة & test")!
+    let linkParts = URLComponents(url: namedLink, resolvingAgainstBaseURL: false)!
+    check(linkParts.host == "mukshatapp.github.io" && linkParts.path == "/map/", "Mikshat sharing domain")
+    check(linkParts.queryItems?.first(where: { $0.name == "ll" })?.value == "23.934312,47.249434", "Latitude/longitude order and precision")
+    check(linkParts.queryItems?.first(where: { $0.name == "n" })?.value == "نقطة الخريطة & test", "Arabic share title round trip")
+    check(math.shareLink(latitude: 91, longitude: 47, name: "bad") == nil, "Invalid share coordinate rejected")
+    check(math.mikshatMapLink(namedLink)?.scheme == "om", "Shared web link converts to iOS map link")
+    check(math.mikshatMapLink(URL(string: "https://example.com/map/?ll=24,47")!) == nil, "Unrelated host rejected")
+    check(math.mikshatMapLink(URL(string: "https://mukshatapp.github.io/map/?ll=24,47&ll=1,2")!) == nil, "Ambiguous coordinate query rejected")
+    let dedicated = URL(string: "mikshat-maps://map?ll=23.934312,47.249434&n=%D9%85%D9%83%D8%B4%D8%A7%D8%AA")!
+    let normalized = math.normalizedIncomingLink(dedicated)!
+    check(normalized.scheme == "om", "Dedicated app scheme normalizes internally")
+    check(URLComponents(url: normalized, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "n" })?.value == "مكشات", "Arabic destination survives incoming link")
+    for invalid in ["mikshat-maps://map?ll=91,47", "mikshat-maps://map?ll=24,47&ll=1,2", "mikshat-maps://other?ll=24,47"] {
+      check(math.normalizedIncomingLink(URL(string: invalid)!) == nil, "Invalid dedicated link rejected")
+    }
+    check(math.normalizedIncomingLink(URL(string: "om://map?ll=24,47")!)?.scheme == "om", "Legacy incoming links remain supported")
+    check(math.distanceParts("220 متر").value == "220", "Arabic distance numeric value")
+    check(math.distanceParts("2.3 km").unit == "km", "Metric distance unit")
+    check(math.distanceParts("٢٫٣ كم").value == "٢٫٣", "Arabic decimal distance")
+    var estimate = MikshatTravelEstimate()
+    check(estimate.update(distance: 1000, speed: 0, timestamp: 100, now: 100) == nil, "No ETA while stopped")
+    check(estimate.update(distance: 1000, speed: 10, timestamp: 101, now: 101) == 100, "Travel estimate from movement")
+    check(estimate.update(distance: 1000, speed: 30, timestamp: 102, now: 102) == 50, "Mean speed estimate")
+    check(estimate.update(distance: 1000, speed: 30, timestamp: 102, now: 103) == 50, "Repeated GPS fix is not sampled twice")
+    check(estimate.update(distance: 1000, speed: 30, timestamp: 102, now: 120) == nil, "Stale fix has no ETA")
+    check(estimate.update(distance: 5, speed: 0, timestamp: 121, now: 121) == 0, "Arrival near destination")
+    check(math.sensorHeading(trueHeading: -1, magneticHeading: 72, accuracy: 8, age: -1) == 72, "Magnetic sensor works without true north/GPS")
+    check(math.sensorHeading(trueHeading: 73, magneticHeading: 72, accuracy: 8, age: -1) == 73, "True north preferred when available")
+    check(math.sensorHeading(trueHeading: .nan, magneticHeading: 72, accuracy: 8, age: -1) == 72, "Invalid true north falls back to magnetic")
+    check(math.sensorHeading(trueHeading: 72, magneticHeading: 72, accuracy: -1, age: 0) == nil, "Invalid sensor accuracy rejected")
+    check(math.sensorHeading(trueHeading: 72, magneticHeading: 72, accuracy: 8, age: -60) == nil, "Stopped sensor snapshot must not pretend fresh")
+    check(math.sensorHeading(trueHeading: -1, magneticHeading: 72, accuracy: 8, age: -60, activeSensor: true) == 72, "Stationary active sensor retains a valid heading")
+    check(math.sensorHeading(trueHeading: 72, magneticHeading: 72, accuracy: 8, age: 60, activeSensor: true) == nil, "Future-dated sensor rejected")
+    check(math.courseHeading(course: 90, speed: 0, accuracy: 8, age: 0) == nil, "Standing GPS has no direction of travel")
+    check(math.courseHeading(course: 90, speed: 10, accuracy: 8, age: -60) == nil, "Stale course rejected independently from map position")
+    check(math.courseHeading(course: -1, speed: 10, accuracy: 8, age: 0) == nil, "Missing course rejected")
+    check(math.courseHeading(course: 90, speed: 10, accuracy: 8, age: 0) == 90, "Valid moving GPS course")
+    check(math.selectHeading(mode: 0, speed: -1, sensor: 72, course: nil).degrees == 72, "Phone sensor is independent of GPS and speed")
+    check(math.selectHeading(mode: 1, speed: 0, sensor: 72, course: nil).degrees == nil, "Explicit GPS mode waits for movement")
+    let automatic = math.selectHeading(mode: 2, speed: 10, sensor: 72, course: nil)
+    check(automatic.degrees == 72 && !automatic.gps, "Automatic mode falls back when course is missing")
+    let moving = math.selectHeading(mode: 2, speed: 10, sensor: 72, course: 90)
+    check(moving.degrees == 90 && moving.gps, "Automatic mode uses reliable course in motion")
+    print("PASS: Qibla, DD/DDM/DMS, Arabic input, coordinate limits/rollover, heading threshold and travel estimates")
+  }
+}
