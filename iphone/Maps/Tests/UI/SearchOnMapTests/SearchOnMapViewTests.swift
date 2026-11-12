@@ -502,6 +502,53 @@ final class MikshatMapControlLayoutTests: XCTestCase {
 }
 
 final class MikshatSearchDirectionIndicatorTests: XCTestCase {
+  func test_RenderingKeepsOuterSizingStableAndResetsUnavailableDirections() throws {
+    let arrow = MikshatDirectionIndicator()
+    let image = try XCTUnwrap(arrow.subviews.compactMap { $0 as? UIImageView }.first)
+    let size = CGSize(width: 28, height: 28)
+    XCTAssertEqual(arrow.bounds.size, size)
+    XCTAssertEqual(arrow.intrinsicContentSize, size)
+    XCTAssertEqual(arrow.sizeThatFits(.zero), size)
+    XCTAssertEqual(arrow.sizeThatFits(CGSize(width: 1_000, height: 1_000)), size)
+
+    arrow.renderDirection(bearing: 90, heading: 45)
+    arrow.layoutIfNeeded()
+    XCTAssertEqual(arrow.transform, .identity)
+    XCTAssertEqual(image.bounds.size, size)
+    XCTAssertEqual(image.transform.a, cos(.pi / 4), accuracy: 0.0001)
+    XCTAssertEqual(image.transform.b, sin(.pi / 4), accuracy: 0.0001)
+    XCTAssertEqual(arrow.alpha, 1)
+    XCTAssertFalse(arrow.accessibilityElementsHidden)
+    XCTAssertTrue(arrow.isAccessibilityElement)
+    XCTAssertFalse(image.isAccessibilityElement)
+    XCTAssertEqual(arrow.accessibilityLabel, L("mikshat_arrow_to_point"))
+    XCTAssertEqual(arrow.accessibilityValue, "90°")
+
+    for unavailable in [Double.nan, .infinity, -.infinity] {
+      arrow.renderDirection(bearing: unavailable, heading: 45)
+      XCTAssertEqual(arrow.alpha, 0)
+      XCTAssertTrue(arrow.accessibilityElementsHidden)
+      XCTAssertNil(arrow.accessibilityValue)
+      XCTAssertEqual(image.transform, .identity)
+      arrow.renderDirection(bearing: 90, heading: unavailable)
+      XCTAssertEqual(arrow.alpha, 0)
+      XCTAssertEqual(image.transform, .identity)
+    }
+
+    arrow.renderDirection(bearing: 225, heading: 0)
+    arrow.target = CLLocationCoordinate2D(latitude: 91, longitude: 0)
+    XCTAssertEqual(image.transform, .identity)
+    XCTAssertEqual(arrow.alpha, 0)
+    XCTAssertTrue(arrow.accessibilityElementsHidden)
+    XCTAssertNil(arrow.accessibilityValue)
+    arrow.renderDirection(bearing: 315, heading: 0)
+    arrow.target = nil
+    XCTAssertEqual(image.transform, .identity)
+    XCTAssertEqual(arrow.transform, .identity)
+    XCTAssertEqual(arrow.alpha, 0)
+    XCTAssertNil(arrow.accessibilityValue)
+  }
+
   func test_AttachingHistoryArrowsDoesNotStartGPS() {
     let wasStarted = LocationManager.isStarted()
     let window = UIWindow(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
