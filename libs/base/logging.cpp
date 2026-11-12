@@ -52,6 +52,7 @@ LogHelper & LogHelper::Instance()
 
 int LogHelper::GetThreadID()
 {
+  std::lock_guard lock(m_threadIDMutex);
   int & id = m_threadID[threads::GetCurrentThreadID()];
   if (id == 0)
     id = ++m_threadsCount;
