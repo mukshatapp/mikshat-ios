@@ -703,6 +703,7 @@
 		82034E1ADFE11D725DD445DB /* MikshatWeatherData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EE14583A4D60E7E0D96D8B9 /* MikshatWeatherData.swift */; };
 		5F63290EC74989A482EDD63E /* MikshatWeatherViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C4C46B31257E57DE3F9C9EF /* MikshatWeatherViewController.swift */; };
 		263634E5E7623B24C50FA11E /* MikshatMemoryDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1173A06B6959B382B7C7716E /* MikshatMemoryDiagnostics.swift */; };
+		AB1200261112000000000001 /* MikshatLiveSearchProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB1200261112000000000002 /* MikshatLiveSearchProbe.swift */; };
 		F00CF1CED5EA863FBBA99723 /* MikshatWeatherViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ECE76EF25BEFF62E98FDE2A5 /* MikshatWeatherViewTests.swift */; };
 		2D7826B96397DBCA1CC933A0 /* SearchHistoryOnlyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1067C686AC3C81E430216275 /* SearchHistoryOnlyTests.swift */; };
 		89BC41D00BDE6C84859459CE /* MikshatMemoryDiagnosticsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C21A5100D9E7780856FFE168 /* MikshatMemoryDiagnosticsTests.swift */; };
@@ -1895,6 +1896,7 @@
 		9EE14583A4D60E7E0D96D8B9 /* MikshatWeatherData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MikshatWeatherData.swift; path = UI/Mikshat/Weather/MikshatWeatherData.swift; sourceTree = SOURCE_ROOT; };
 		3C4C46B31257E57DE3F9C9EF /* MikshatWeatherViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MikshatWeatherViewController.swift; path = UI/Mikshat/Weather/MikshatWeatherViewController.swift; sourceTree = SOURCE_ROOT; };
 		1173A06B6959B382B7C7716E /* MikshatMemoryDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MikshatMemoryDiagnostics.swift; path = UI/Mikshat/MikshatMemoryDiagnostics.swift; sourceTree = SOURCE_ROOT; };
+		AB1200261112000000000002 /* MikshatLiveSearchProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MikshatLiveSearchProbe.swift; path = UI/Mikshat/MikshatLiveSearchProbe.swift; sourceTree = SOURCE_ROOT; };
 		ECE76EF25BEFF62E98FDE2A5 /* MikshatWeatherViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MikshatWeatherViewTests.swift; path = Tests/UI/Weather/MikshatWeatherViewTests.swift; sourceTree = SOURCE_ROOT; };
 		1067C686AC3C81E430216275 /* SearchHistoryOnlyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SearchHistoryOnlyTests.swift; path = Tests/UI/SearchOnMapTests/SearchHistoryOnlyTests.swift; sourceTree = SOURCE_ROOT; };
 		C21A5100D9E7780856FFE168 /* MikshatMemoryDiagnosticsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MikshatMemoryDiagnosticsTests.swift; path = Tests/UI/SearchOnMapTests/MikshatMemoryDiagnosticsTests.swift; sourceTree = SOURCE_ROOT; };
@@ -2308,6 +2310,7 @@
 				9EE14583A4D60E7E0D96D8B9 /* MikshatWeatherData.swift */,
 				3C4C46B31257E57DE3F9C9EF /* MikshatWeatherViewController.swift */,
 				1173A06B6959B382B7C7716E /* MikshatMemoryDiagnostics.swift */,
+				AB1200261112000000000002 /* MikshatLiveSearchProbe.swift */,
 				A6B8C0030000000000000004 /* GOOGLE.sqlitedb */,
 				A6B8C0030000000000000006 /* MikshatSatellite.json */,
 				A6B8C0020000000000000002 /* MikshatInterface.swift */,
@@ -5086,6 +5089,7 @@
 				82034E1ADFE11D725DD445DB /* MikshatWeatherData.swift in Sources */,
 				5F63290EC74989A482EDD63E /* MikshatWeatherViewController.swift in Sources */,
 				263634E5E7623B24C50FA11E /* MikshatMemoryDiagnostics.swift in Sources */,
+				AB1200261112000000000001 /* MikshatLiveSearchProbe.swift in Sources */,
 				A6B8C0020000000000000001 /* MikshatInterface.swift in Sources */,
 				A6B8C0010000000000000003 /* MikshatToolsViewController.swift in Sources */,
 				A6B8C0010000000000000001 /* MikshatNavigationMath.swift in Sources */,

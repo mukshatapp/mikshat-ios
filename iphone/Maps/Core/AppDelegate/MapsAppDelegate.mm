@@ -151,6 +151,10 @@ using namespace osm_auth_ios;
 
   [self commonInit];
 
+#if DEBUG && TARGET_OS_SIMULATOR
+  [MikshatLiveSearchProbe installIfRequested];
+#endif
+
   if ([FirstSession isFirstSession])
     [self firstLaunchSetup];
   else

@@ -1,0 +1,483 @@
+name: Mikshat normal app active-map search diagnostics
+'on':
+  push:
+    branches:
+    - diagnostics/search-live-app
+permissions:
+  contents: read
+concurrency:
+  group: mikshat-search-live-app
+  cancel-in-progress: true
+jobs:
+  live-app:
+    name: Normal foreground iOS app with actual Saudi maps
+    runs-on: macos-26
+    timeout-minutes: 90
+    env:
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+    steps:
+    - name: Check out diagnostic-only source
+      uses: actions/checkout@v4
+    - name: Record toolchain and available simulators
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p build/search-diagnostics
+        xcodebuild -version | tee build/search-diagnostics/toolchain.txt
+        printf 'MIKSHAT_XCODE_CACHE_ID=%s\n' "$(xcodebuild -version | tr -cs '[:alnum:]' '-')" >> "$GITHUB_ENV"
+        xcrun --sdk iphonesimulator --show-sdk-version | tee -a build/search-diagnostics/toolchain.txt
+        uname -m | tee -a build/search-diagnostics/toolchain.txt
+        xcrun simctl list --json runtimes > build/search-diagnostics/runtimes.json
+        xcrun simctl list --json devicetypes > build/search-diagnostics/device-types.json
+    - name: Fetch pinned submodules
+      shell: bash
+      run: |
+        set -euo pipefail
+        git submodule update --init --recursive --depth 1 --jobs 8
+    - name: Prepare app resources
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 mikshat/prepare_branding.py
+        python3 mikshat/prepare_satellite.py
+    - name: Ensure Metal compiler is available
+      shell: bash
+      run: |
+        set -euo pipefail
+        if ! xcrun metal -v >/dev/null 2>&1; then
+          xcodebuild -downloadComponent MetalToolchain
+          xcrun -k
+        fi
+        xcrun metal -v
+    - name: Restore compiled objects for this Xcode toolchain
+      id: derived-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: build/SearchDerivedData
+        key: mikshat-search-derived-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.MIKSHAT_XCODE_CACHE_ID }}-${{
+          github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+        restore-keys: |
+          mikshat-search-derived-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.MIKSHAT_XCODE_CACHE_ID }}-
+    - name: Restore unchanged build input timestamps
+      shell: bash
+      run: |
+        set -euo pipefail
+        cat > build/search-diagnostics/cache-input-mtimes.py <<'PY'
+        from pathlib import Path
+        import hashlib
+        import json
+        import os
+        import sys
+
+        manifest = Path('build/SearchDerivedData/mikshat-input-mtimes.json')
+        roots = ('iphone', 'libs', 'xcode', 'data', '3party', 'private')
+        def inputs():
+            for root in roots:
+                if not Path(root).is_dir():
+                    continue
+                for directory, children, files in os.walk(root):
+                    children[:] = [name for name in children if name not in ('.git', '__pycache__', 'node_modules')]
+                    yield Path(directory)
+                    for name in files:
+                        if name != '.git':
+                            yield Path(directory) / name
+        def digest(path):
+            if path.is_dir():
+                names = sorted(child.name for child in path.iterdir() if child.name != '.git')
+                return hashlib.sha256('\n'.join(names).encode()).hexdigest()
+            result = hashlib.sha256()
+            with path.open('rb') as stream:
+                for block in iter(lambda: stream.read(1024 * 1024), b''):
+                    result.update(block)
+            return result.hexdigest()
+        if sys.argv[1] == 'restore':
+            restored = 0
+            if manifest.exists():
+                for item in json.loads(manifest.read_text()):
+                    path = Path(item['path'])
+                    if path.exists() and not path.is_symlink() and digest(path) == item['sha256']:
+                        os.utime(path, ns=(path.stat().st_atime_ns, item['mtime_ns']))
+                        restored += 1
+            print(f'Restored timestamps for {restored} unchanged build inputs')
+        else:
+            entries = []
+            for path in inputs():
+                if path.exists() and not path.is_symlink():
+                    entries.append(dict(path=str(path), sha256=digest(path), mtime_ns=path.stat().st_mtime_ns))
+            manifest.parent.mkdir(parents=True, exist_ok=True)
+            manifest.write_text(json.dumps(entries))
+            print(f'Recorded {len(entries)} build input timestamps')
+        PY
+        python3 build/search-diagnostics/cache-input-mtimes.py restore
+    - name: Select and boot iPhone 16 with iOS 26
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 - <<'PY'
+        import json
+        import os
+        from pathlib import Path
+        import subprocess
+
+        def simctl(*arguments):
+            return subprocess.run(['xcrun', 'simctl', *arguments], check=True, capture_output=True, text=True).stdout
+
+        runtimes = json.loads(simctl('list', '--json', 'runtimes'))['runtimes']
+        candidates = [runtime for runtime in runtimes
+                      if runtime.get('isAvailable')
+                      and runtime.get('identifier', '').startswith('com.apple.CoreSimulator.SimRuntime.iOS-26-')]
+        if not candidates:
+            raise SystemExit('No available iOS 26 runtime. See build/search-diagnostics/runtimes.json; do not substitute another iOS version silently.')
+        runtime = max(candidates, key=lambda value: tuple(int(part) for part in value['version'].split('.')))
+        device_type = 'com.apple.CoreSimulator.SimDeviceType.iPhone-16'
+        device_types = json.loads(simctl('list', '--json', 'devicetypes'))['devicetypes']
+        if not any(value['identifier'] == device_type for value in device_types):
+            raise SystemExit('This Xcode installation has no iPhone 16 simulator device type.')
+        udid = simctl('create', 'Mikshat Live Search iPhone 16', device_type, runtime['identifier']).strip()
+        simctl('boot', udid)
+        subprocess.run(['xcrun', 'simctl', 'bootstatus', udid, '-b'], check=True)
+        selection = dict(device='iPhone 16', udid=udid, runtime=runtime['identifier'], version=runtime['version'])
+        Path('build/search-diagnostics/simulator-selection.json').write_text(json.dumps(selection, indent=2) + '\n')
+        with open(os.environ['GITHUB_ENV'], 'a') as stream:
+            stream.write(f'MIKSHAT_SIMULATOR_UDID={udid}\n')
+        subprocess.run(['defaults', 'write', 'com.apple.iphonesimulator', 'ConnectHardwareKeyboard', '-bool', 'NO'], check=True)
+        subprocess.run(['open', '-a', 'Simulator', '--args', '-CurrentDeviceUDID', udid], check=True)
+        print(json.dumps(selection))
+        PY
+    - name: Build the ordinary Debug simulator application
+      id: build-app
+      timeout-minutes: 55
+      shell: bash
+      run: |
+        set -euo pipefail
+        # A normal build, not xcodebuild test/build-for-testing. Run-scheme -IsTests is not used by simctl.
+        set +e
+        xcodebuild build \
+          -workspace xcode/omim.xcworkspace \
+          -scheme OMaps \
+          -configuration Debug \
+          -sdk iphonesimulator \
+          -destination "id=$MIKSHAT_SIMULATOR_UDID" \
+          -destination-timeout 120 \
+          -derivedDataPath build/SearchDerivedData \
+          ARCHS="$(uname -m)" ONLY_ACTIVE_ARCH=YES \
+          CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
+          > build/search-diagnostics/xcodebuild-live-app.log 2>&1
+        mikshat_build_status=$?
+        set -e
+        tail -n 100 build/search-diagnostics/xcodebuild-live-app.log
+        exit "$mikshat_build_status"
+    - name: Install actual Saudi maps and documented simulator fixtures before first launch
+      id: prepare-app
+      timeout-minutes: 12
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 - <<'PY'
+        from pathlib import Path
+        import hashlib,json,math,os,plistlib,subprocess,time,urllib.parse,urllib.request
+
+        out=Path('build/search-diagnostics')
+        products=Path('build/SearchDerivedData/Build/Products/Debug-iphonesimulator').resolve()
+        bundle='com.mikshat.maps.debug'
+        udid=os.environ['MIKSHAT_SIMULATOR_UDID']
+        apps=[]
+        for app in products.glob('*.app'):
+            info=app/'Info.plist'
+            if info.exists():
+                with info.open('rb') as stream: metadata=plistlib.load(stream)
+                if metadata.get('CFBundleIdentifier')==bundle:
+                    apps.append((app,metadata))
+        if len(apps)!=1: raise SystemExit(f'Expected one normal Debug app, found {len(apps)}')
+        app,metadata=apps[0]
+        subprocess.run(['xcrun','simctl','install',udid,str(app)],check=True,timeout=120)
+        container=Path(subprocess.run(['xcrun','simctl','get_app_container',udid,bundle,'data'],check=True,capture_output=True,text=True,timeout=30).stdout.strip())
+        documents=container/'Documents'
+        mapdir=documents/'260714'
+        mapdir.mkdir(parents=True,exist_ok=True)
+        # Native source path verified in platform_ios.mm and local_country_file_utils.cpp:
+        # WritableDir=Documents; GetFilePath(version)=WritableDir/version/Country.mwm.
+        files=[
+            ('Saudi Arabia_North.mwm','1a7BwcYn1SsV1gPIvdvyfNN95E97hoV5R',71760131,'6cd35fcb5b2bcd8c0ce5f9249426126c1a3c56635033c07fde855b9316651fe0'),
+            ('Saudi Arabia_South.mwm','1oGhGU__h1XZzBMTZfJnnnv5r-ftJE6kk',69904708,'7591a4c97628994b04856b84988ea6259bda4bf4c194702ef39817f02d484425'),
+        ]
+        records=[]
+        for name,file_id,expected_bytes,expected_sha in files:
+            target=mapdir/name
+            partial=target.with_suffix('.fixture-part')
+            url='https://drive.usercontent.google.com/download?'+urllib.parse.urlencode({'id':file_id,'export':'download','confirm':'t'})
+            errors=[]
+            for attempt in range(1,4):
+                try:
+                    digest=hashlib.sha256(); count=0; deadline=time.monotonic()+180
+                    request=urllib.request.Request(url,headers={'User-Agent':'Mikshat-CI-Map-Fixture/1.0'})
+                    with urllib.request.urlopen(request,timeout=45) as response,partial.open('wb') as stream:
+                        content_type=response.headers.get('Content-Type','')
+                        if 'text/html' in content_type.lower():
+                            raise RuntimeError('Drive returned HTML; no map fixture installed')
+                        while True:
+                            block=response.read(1024*1024)
+                            if not block: break
+                            count+=len(block)
+                            if count>expected_bytes or time.monotonic()>deadline:
+                                raise RuntimeError('Map fixture exceeded exact byte limit or time budget')
+                            digest.update(block);stream.write(block)
+                    actual_sha=digest.hexdigest()
+                    if count!=expected_bytes or actual_sha!=expected_sha:
+                        raise RuntimeError(f'Map fixture integrity mismatch: bytes={count},sha256={actual_sha}')
+                    partial.replace(target)
+                    records.append(dict(name=name,relativePath=str(target.relative_to(container)),bytes=count,sha256=actual_sha,source=url,attempt=attempt))
+                    print(json.dumps(records[-1]),flush=True)
+                    break
+                except Exception as error:
+                    partial.unlink(missing_ok=True)
+                    errors.append(str(error))
+                    if attempt==3: raise SystemExit(f'Could not install {name}: {errors}')
+        # A local public Riyadh viewport avoids the already-documented Debug World-overview assertion.
+        # AnyRectD = centreX centreY angle localMinX localMinY localMaxX localMaxY.
+        latitude,longitude=24.7136,46.6753
+        mercator_y=math.degrees(math.log(math.tan(math.pi/4+math.radians(latitude)/2)))
+        values=(longitude,mercator_y,0,-.1,-.2,.1,.2)
+        if not all(math.isfinite(value) for value in values):raise SystemExit('Invalid synthetic viewport')
+        settings={
+            'ScreenClipRect':' '.join(format(value,'.12g') for value in values),
+            'BgTilesEnabled':'false',
+            'PreferredGraphicsAPI':'Metal',
+        }
+        (documents/'settings.ini').write_text(''.join(f'{key}={value}\n' for key,value in settings.items()))
+        prefs={
+            'AppleLanguages':['ar'],
+            'AppleLocale':'ar_SA',
+            'mikshat_satellite_enabled':False,
+            'AlohalyticsInstallationId':'I:MikshatLiveDiagnostic',
+            'FileLoggingEnabledKey':True,
+        }
+        preferences=container/'Library/Preferences'/f'{bundle}.plist'
+        preferences.parent.mkdir(parents=True,exist_ok=True)
+        with preferences.open('wb') as stream:plistlib.dump(prefs,stream)
+        # Installation ID is the existing-user analytics state only. No activation, licence,
+        # OAuth credential or authorization store is seeded or bypassed.
+        privacy=[]
+        for service in ('location','location-always'):
+            result=subprocess.run(['xcrun','simctl','privacy',udid,'grant',service,bundle],capture_output=True,text=True,timeout=30)
+            privacy.append(dict(service=service,returncode=result.returncode,output=result.stdout+result.stderr))
+            if service=='location' and result.returncode:raise SystemExit('Foreground synthetic location permission setup failed')
+        location=subprocess.run(['xcrun','simctl','location',udid,'set',f'{latitude},{longitude}'],capture_output=True,text=True,timeout=30)
+        if location.returncode:raise SystemExit('Synthetic location setup failed: '+location.stderr)
+        manifest=dict(schemaVersion=1,bundleIdentifier=bundle,appPath=str(app),executable=metadata['CFBundleExecutable'],version=metadata.get('CFBundleShortVersionString'),build=metadata.get('CFBundleVersion'),container=str(container),installedMaps=records,catalogVersion=260714,settingsIni=settings,userDefaults=prefs,privacy=privacy,syntheticLocation=dict(latitude=latitude,longitude=longitude,source='simctl public Riyadh reference; not user GPS'),scope='Normal foreground Debug app on a fresh simulator; not a physical-device test',excludedCoverage=['World overview assertion','physical memory pressure','physical GPS/heading'],authentication='No activation/authentication bypass; any real blocker is reported as setup failure')
+        (out/'live-app-fixture.json').write_text(json.dumps(manifest,indent=2)+'\n')
+        with open(os.environ['GITHUB_ENV'],'a') as stream:
+            stream.write(f'MIKSHAT_LIVE_APP_ID={bundle}\nMIKSHAT_LIVE_APP_CONTAINER={container}\nMIKSHAT_LIVE_APP_EXECUTABLE={metadata["CFBundleExecutable"]}\n')
+        print(json.dumps(manifest),flush=True)
+        PY
+    - name: Launch normal foreground app and capture bounded live search evidence
+      id: live-probe
+      timeout-minutes: 9
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 -u - <<'PY'
+        from pathlib import Path
+        import datetime,json,os,re,shutil,signal,subprocess,time
+
+        out=Path('build/search-diagnostics');out.mkdir(parents=True,exist_ok=True)
+        udid=os.environ['MIKSHAT_SIMULATOR_UDID'];bundle=os.environ['MIKSHAT_LIVE_APP_ID']
+        container=Path(os.environ['MIKSHAT_LIVE_APP_CONTAINER']);documents=container/'Documents'
+        summary_path=documents/'mikshat-search-live-summary.json'
+        events_path=documents/'mikshat-search-live-events.jsonl'
+        for path in (summary_path,events_path):path.unlink(missing_ok=True)
+        launch_args=['xcrun','simctl','launch','--terminate-running-process',udid,bundle,'-MikshatLiveSearchProbe','-MikshatLiveSearchRepeats','1','-AppleLanguages','(ar)','-AppleLocale','ar_SA']
+        assert '-IsTests' not in launch_args and not any('xctest' in arg.lower() for arg in launch_args)
+        report=dict(schemaVersion=1,launchArguments=launch_args,startedAt=datetime.datetime.now(datetime.timezone.utc).isoformat(),hostStatus='not-started',searchIterationsStarted=0,searchIterationsCompleted=0,scope='Normal Debug simulator app with active Metal; not physical-device Jetsam validation')
+        logfile=(out/'simulator-live-system-stream.log').open('w')
+        stream=None;pid=None;app_summary=None;passed=False;capture_results=[]
+
+        def capture(name,args,timeout=30):
+            path=out/name
+            with path.open('w') as output:
+                try:
+                    result=subprocess.run(args,stdout=output,stderr=subprocess.STDOUT,text=True,timeout=timeout)
+                    record=dict(file=name,arguments=args,returncode=result.returncode)
+                except Exception as error:
+                    output.write('\nCAPTURE ERROR: '+str(error)+'\n')
+                    record=dict(file=name,arguments=args,error=str(error))
+            capture_results.append(record)
+            return record
+
+        def valid_app_summary(value,pid):
+            if not isinstance(value,dict) or type(pid) is not int or pid<=0:
+                return False
+            readiness=value.get('readiness')
+            if not isinstance(readiness,dict):return False
+            positive=('normalApp','active','windowAttached','windowKey','windowVisible','sceneActive','metal','drapeReady','graphicsReady','rtl','arabic','satelliteDisabled','saudiNorthRegistered','saudiSouthRegistered','freshSyntheticLocation','noPresentedController')
+            expected=value.get('iterationsExpected');completed=value.get('iterationsCompleted');started=value.get('iterationsStarted')
+            return (type(value.get('schemaVersion')) is int and value['schemaVersion']==1 and
+                    value.get('complete') is True and value.get('passed') is True and value.get('status')=='passed' and
+                    type(expected) is int and expected==1 and type(completed) is int and completed==1 and
+                    type(started) is int and started==1 and
+                    all(readiness.get(key) is True for key in positive) and
+                    isinstance(value.get('requiredReadinessKeys'),list) and len(value['requiredReadinessKeys'])==len(positive) and set(value['requiredReadinessKeys'])==set(positive) and
+                    value.get('pid')==pid)
+
+        try:
+            stream=subprocess.Popen(['xcrun','simctl','spawn',udid,'log','stream','--style','compact','--level','debug'],stdout=logfile,stderr=subprocess.STDOUT,text=True)
+            # No test runner is attached. simctl launches through SpringBoard into the normal foreground scene.
+            try:
+                launch=subprocess.run(launch_args,capture_output=True,text=True,timeout=45)
+                (out/'simctl-live-launch.log').write_text(launch.stdout+launch.stderr)
+                report['launchReturncode']=launch.returncode
+                match=re.search(r':\s*(\d+)\s*$',launch.stdout.strip())
+                pid=int(match.group(1)) if match else None
+                if launch.returncode:report['hostStatus']='launch-failed'
+                else:report['hostStatus']='waiting-for-app-summary'
+            except Exception as error:
+                report['hostStatus']='launch-failed';report['launchError']=str(error)
+            # launch may time out even after the app process starts. Resolve that process
+            # from the simulator's launchd table so a live hang can still be sampled.
+            if pid is None:
+                try:
+                    listing=subprocess.run(['xcrun','simctl','spawn',udid,'launchctl','list'],capture_output=True,text=True,timeout=15)
+                    matches=[]
+                    for line in listing.stdout.splitlines():
+                        parts=line.split(None,2)
+                        if len(parts)==3 and parts[0].isdigit() and f'UIKitApplication:{bundle}[' in parts[2]:
+                            matches.append(int(parts[0]))
+                    if len(set(matches))==1:
+                        pid=matches[0];report['pidResolvedFromLaunchd']=True
+                except Exception as error:report['pidLookupError']=str(error)
+            report['pid']=pid
+            deadline=time.monotonic()+180
+            while report['hostStatus']=='waiting-for-app-summary' and time.monotonic()<deadline:
+                if summary_path.exists():
+                    try:
+                        candidate=json.loads(summary_path.read_text())
+                        if candidate.get('complete') is True:
+                            app_summary=candidate;break
+                    except (OSError,ValueError):pass
+                if pid is not None:
+                    try:os.kill(pid,0)
+                    except ProcessLookupError:
+                        report['hostStatus']='app-exited-before-summary';break
+                    except PermissionError:pass
+                time.sleep(.5)
+            if app_summary is not None:
+                report['appSummary']=app_summary
+                expected=app_summary.get('iterationsExpected');completed=app_summary.get('iterationsCompleted')
+                started=app_summary.get('iterationsStarted')
+                report['searchIterationsStarted']=started if type(started) is int else None
+                report['searchIterationsCompleted']=completed if type(completed) is int else None
+                required=('normalApp','active','windowAttached','windowKey','windowVisible','sceneActive','metal','drapeReady','graphicsReady','rtl','arabic','satelliteDisabled','saudiNorthRegistered','saudiSouthRegistered','freshSyntheticLocation','noPresentedController')
+                # Every required readiness key is positive; windowVisible already excludes hidden windows.
+                readiness=app_summary.get('readiness',{})
+                readiness_ok=isinstance(readiness,dict) and all(readiness.get(key) is True for key in required)
+                report['readinessVerified']=readiness_ok
+                passed=valid_app_summary(app_summary,pid)
+                report['hostStatus']='verified-passed' if passed else 'app-reported-failure-or-invalid-evidence'
+            elif report['hostStatus']=='waiting-for-app-summary':
+                report['hostStatus']='summary-timeout'
+            # Capture before intentionally terminating the app, including on setup failure or heartbeat stall.
+            capture('simulator-app-process.txt',['ps','-p',str(pid),'-o','pid=,ppid=,etime=,rss=,vsz=,comm=']) if pid else None
+            if not passed and pid:
+                capture('live-app-hang.sample.txt',['sample',str(pid),'10','1'],25)
+                capture('live-app-memory-map.txt',['vmmap','-summary',str(pid)],30)
+            try:
+                screenshot=subprocess.run(['xcrun','simctl','io',udid,'screenshot',str(out/'live-app-final-screen.png')],capture_output=True,text=True,timeout=30)
+                capture_results.append(dict(file='live-app-final-screen.png',returncode=screenshot.returncode,output=screenshot.stdout+screenshot.stderr))
+            except Exception as error:capture_results.append(dict(file='live-app-final-screen.png',error=str(error)))
+            if pid:
+                capture('simulator-live-app.log',['xcrun','simctl','spawn',udid,'log','show','--last','6m','--style','compact','--info','--debug','--predicate',f'processIdentifier == {pid}'],45)
+            capture('simulator-live-system.log',['xcrun','simctl','spawn',udid,'log','show','--last','6m','--style','compact','--info','--debug'],45)
+            for source in (events_path,summary_path,documents/'log.txt',documents/'settings.ini'):
+                if source.is_file():shutil.copy2(source,out/source.name)
+        finally:
+            # Artifacts above preserve the live failure before this explicit host cleanup.
+            capture('simctl-intentional-cleanup.log',['xcrun','simctl','terminate',udid,bundle],15)
+            if stream is not None:
+                stream.terminate()
+                try:stream.wait(timeout=10)
+                except subprocess.TimeoutExpired:stream.kill();stream.wait(timeout=5)
+            logfile.close()
+            report['passed']=passed
+            report['captureResults']=capture_results
+            report['endedAt']=datetime.datetime.now(datetime.timezone.utc).isoformat()
+            (out/'live-app-host-summary.json').write_text(json.dumps(report,indent=2)+'\n')
+            print('LIVE_APP_HOST_SUMMARY')
+            print(json.dumps(report,indent=2),flush=True)
+            # Whole raw JSONL rows and native phase lines, capped independently below 100 KiB.
+            # The complete files remain in the artifact even when the display budget is reached.
+            def print_bounded_rows(marker,rows,budget):
+                selected=[];used=0
+                for row in rows:
+                    size=len(row.encode('utf-8'))+1
+                    if used+size>budget:continue
+                    selected.append(row);used+=size
+                print(marker+'_BEGIN '+json.dumps(dict(displayed=len(selected),candidateRows=len(rows),bytes=used)))
+                for row in selected:print(row)
+                print(marker+'_END',flush=True)
+            copied_events=out/'mikshat-search-live-events.jsonl'
+            if copied_events.exists():
+                rows=copied_events.read_text(errors='replace').splitlines()
+                selected=rows if len(rows)<=48 else rows[:16]+rows[-32:]
+                print_bounded_rows('LIVE_APP_RAW_EVENTS',selected,40*1024)
+            copied_summary=out/'mikshat-search-live-summary.json'
+            if copied_summary.exists():
+                print_bounded_rows('LIVE_APP_RAW_SUMMARY',[copied_summary.read_text(errors='replace').strip()],8*1024)
+            native_log=out/'log.txt'
+            if native_log.exists():
+                phases=[row for row in native_log.read_text(errors='replace').splitlines() if 'MikshatSearch' in row]
+                print_bounded_rows('LIVE_APP_NATIVE_SEARCH_PHASES',phases[-60:],24*1024)
+            if os.environ.get('GITHUB_STEP_SUMMARY'):
+                with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as summary:
+                    summary.write(f'## Normal app live search probe\n\nStatus: {report["hostStatus"]}; verified passed: {passed}.\n\nStarted: {report.get("searchIterationsStarted")}; completed: {report.get("searchIterationsCompleted")}.\n\nThis is a normal Debug simulator app with actual installed Saudi maps, not a physical-device Jetsam reproduction.\n')
+        if not passed:raise SystemExit('Live search probe failed or did not establish complete active-renderer search coverage')
+        PY
+    - name: Collect crash and launch failure evidence
+      if: always()
+      shell: bash
+      run: |
+        python3 - <<'PY'
+        from pathlib import Path
+        import os,shutil,subprocess
+        out=Path('build/search-diagnostics');out.mkdir(parents=True,exist_ok=True)
+        crashes=out/'crash-reports';crashes.mkdir(exist_ok=True)
+        source=Path.home()/'Library/Logs/DiagnosticReports'
+        if source.exists():
+            for path in source.rglob('*'):
+                if path.is_file() and path.suffix in ('.ips','.crash','.hang') and any(name in path.name.lower() for name in ('organic','omaps')):
+                    shutil.copy2(path,crashes/path.name)
+        container=os.environ.get('MIKSHAT_LIVE_APP_CONTAINER')
+        if container:
+            for name in ('mikshat-search-live-events.jsonl','mikshat-search-live-summary.json','log.txt'):
+                path=Path(container)/'Documents'/name
+                if path.is_file():shutil.copy2(path,out/name)
+        udid=os.environ.get('MIKSHAT_SIMULATOR_UDID')
+        if udid and not (out/'live-app-final-screen.png').exists():
+            try:
+                result=subprocess.run(['xcrun','simctl','io',udid,'screenshot',str(out/'live-app-setup-screen.png')],capture_output=True,text=True,timeout=30)
+                (out/'setup-screenshot.log').write_text(result.stdout+result.stderr)
+            except Exception as error:(out/'setup-screenshot.log').write_text(str(error))
+        PY
+    - name: Upload actual normal app diagnostics
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: mikshat-search-live-app
+        retention-days: 7
+        if-no-files-found: warn
+        path: build/search-diagnostics/
+    - name: Record current source timestamps for the next incremental build
+      if: always()
+      shell: bash
+      run: |
+        if [[ -f build/search-diagnostics/cache-input-mtimes.py && -d build/SearchDerivedData/Build ]]; then
+          python3 build/search-diagnostics/cache-input-mtimes.py record
+        fi
+    - name: Save compiled objects even when a test or test compilation fails
+      if: always() && hashFiles('build/SearchDerivedData/mikshat-input-mtimes.json') != ''
+      timeout-minutes: 4
+      uses: actions/cache/save@v4
+      with:
+        path: build/SearchDerivedData
+        key: mikshat-search-derived-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.MIKSHAT_XCODE_CACHE_ID }}-${{
+          github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
