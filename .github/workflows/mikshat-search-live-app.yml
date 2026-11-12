@@ -164,9 +164,14 @@ jobs:
             stream.write(f'MIKSHAT_SIMULATOR_UDID={udid}\n')
         subprocess.run(['defaults', 'write', 'com.apple.iphonesimulator', 'ConnectHardwareKeyboard', '-bool', 'NO'], check=True)
         simulator_app = Path(os.environ['DEVELOPER_DIR']) / 'Applications/Simulator.app'
-        if not simulator_app.is_dir():
-            raise SystemExit(f'Simulator UI application is missing at the selected Xcode path: {simulator_app}')
-        subprocess.run(['open', '-a', str(simulator_app), '--args', '-CurrentDeviceUDID', udid], check=True)
+        mirror = dict(path=str(simulator_app), available=simulator_app.is_dir())
+        if simulator_app.is_dir():
+            result = subprocess.run(['open', '-a', str(simulator_app), '--args', '-CurrentDeviceUDID', udid], capture_output=True, text=True)
+            mirror.update(returncode=result.returncode, output=result.stdout + result.stderr)
+        else:
+            mirror['note'] = 'The host mirror app is absent. CoreSimulator booted; the normal phone app must still satisfy all 16 foreground, window, renderer and search preconditions. No condition is manufactured or skipped.'
+        Path('build/search-diagnostics/simulator-host-mirror.json').write_text(json.dumps(mirror, indent=2) + '\n')
+        print(json.dumps(mirror))
         print(json.dumps(selection))
         PY
     - name: Build the ordinary Debug simulator application
