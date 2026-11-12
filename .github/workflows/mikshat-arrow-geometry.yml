@@ -3,6 +3,7 @@ name: Mikshat fixed search arrow validation
   push:
     branches:
     - fix/search-arrow-geometry
+    - validation/search-arrow-geometry
 permissions:
   contents: read
 concurrency:
@@ -20,26 +21,35 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Boot exact matching iOS runtime
-      run: "set -euo pipefail\nmkdir -p build/arrow-geometry\nxcodebuild -version | tee build/arrow-geometry/toolchain.txt\n\
-        xcrun simctl list --json runtimes > build/arrow-geometry/runtimes.json\npython3 - <<'PYCODE'\nimport json,os,subprocess\n\
-        from pathlib import Path\ndef simctl(*args):\n    return subprocess.check_output(['xcrun','simctl',*args],text=True)\n\
-        runtimes=json.loads(simctl('list','--json','runtimes'))['runtimes']\nmatching=[r for r in runtimes if r.get('isAvailable')\
-        \ and r.get('version')=='27.0' and 'iOS' in r.get('identifier','')]\nif len(matching)!=1:raise SystemExit('Exactly\
-        \ iOS 27.0 is required; no silent runtime substitution')\nruntime=matching[0]\nudid=simctl('create','Mikshat\
-        \ Arrow iOS 27','com.apple.CoreSimulator.SimDeviceType.iPhone-16',runtime['identifier']).strip()\nsimctl('boot',udid)\n\
-        subprocess.run(['xcrun','simctl','bootstatus',udid,'-b'],check=True)\nselection={'udid':udid,'device':'iPhone\
-        \ 16','runtime':runtime}\nPath('build/arrow-geometry/simulator.json').write_text(json.dumps(selection,indent=2)+'\\\
-        n')\nwith open(os.environ['GITHUB_ENV'],'a') as f:f.write('MIKSHAT_SIMULATOR_UDID='+udid+'\\n')\nprint(json.dumps(selection))\n\
-        PYCODE"
+      run: |-
+        set -euo pipefail
+        mkdir -p build/arrow-geometry
+        xcodebuild -version | tee build/arrow-geometry/toolchain.txt
+        xcrun simctl list --json runtimes > build/arrow-geometry/runtimes.json
+        python3 - <<'PYCODE'
+        import json,os,subprocess
+        from pathlib import Path
+        def simctl(*args):
+            return subprocess.check_output(['xcrun','simctl',*args],text=True)
+        runtimes=json.loads(simctl('list','--json','runtimes'))['runtimes']
+        matching=[r for r in runtimes if r.get('isAvailable') and r.get('version')=='27.0' and 'iOS' in r.get('identifier','')]
+        if len(matching)!=1:raise SystemExit('Exactly iOS 27.0 is required; no silent runtime substitution')
+        runtime=matching[0]
+        udid=simctl('create','Mikshat Arrow iOS 27','com.apple.CoreSimulator.SimDeviceType.iPhone-16',runtime['identifier']).strip()
+        simctl('boot',udid)
+        subprocess.run(['xcrun','simctl','bootstatus',udid,'-b'],check=True)
+        selection={'udid':udid,'device':'iPhone 16','runtime':runtime}
+        Path('build/arrow-geometry/simulator.json').write_text(json.dumps(selection,indent=2)+'\n')
+        with open(os.environ['GITHUB_ENV'],'a') as f:f.write('MIKSHAT_SIMULATOR_UDID='+udid+'\n')
+        print(json.dumps(selection))
+        PYCODE
     - name: Fetch published 4.6.12 component baseline
-      run: 'set -euo pipefail
-
+      run: |-
+        set -euo pipefail
         git fetch --no-tags --depth 1 origin 59b8e1b752092f07ada180cefaf1d23596f03559
-
         mkdir -p build/arrow-baseline
-
-        git archive 59b8e1b752092f07ada180cefaf1d23596f03559 iphone/Maps/UI/Mikshat/MikshatInterface.swift iphone/Maps/UI/Mikshat/MikshatNavigationMath.swift
-        | tar -x -C build/arrow-baseline'
+        git archive --format=tar -o build/arrow-baseline.tar 59b8e1b752092f07ada180cefaf1d23596f03559 iphone/Maps/UI/Mikshat/MikshatInterface.swift iphone/Maps/UI/Mikshat/MikshatNavigationMath.swift
+        tar -xf build/arrow-baseline.tar -C build/arrow-baseline
     - name: Bounded old component comparison
       run: bash mikshat/tests/arrow-geometry/run_probe.sh build/arrow-baseline build/arrow-geometry/baseline "$MIKSHAT_SIMULATOR_UDID"
         baseline
@@ -68,43 +78,35 @@ jobs:
       uses: actions/checkout@v4
     - name: Record toolchain and available simulators
       shell: bash
-      run: 'set -euo pipefail
-
+      run: |
+        set -euo pipefail
         mkdir -p build/search-diagnostics
-
         xcodebuild -version | tee build/search-diagnostics/toolchain.txt
-
-        printf ''MIKSHAT_XCODE_CACHE_ID=%s\n'' "$(xcodebuild -version | tr -cs ''[:alnum:]'' ''-'')" >> "$GITHUB_ENV"
-
+        printf 'MIKSHAT_XCODE_CACHE_ID=%s\n' "$(xcodebuild -version | tr -cs '[:alnum:]' '-')" >> "$GITHUB_ENV"
         xcrun --sdk iphonesimulator --show-sdk-version | tee -a build/search-diagnostics/toolchain.txt
-
         uname -m | tee -a build/search-diagnostics/toolchain.txt
-
         xcrun simctl list --json runtimes > build/search-diagnostics/runtimes.json
-
         xcrun simctl list --json devicetypes > build/search-diagnostics/device-types.json
-
-        '
     - name: Fetch pinned submodules
       shell: bash
-      run: 'set -euo pipefail
-
+      run: |
+        set -euo pipefail
         git submodule update --init --recursive --depth 1 --jobs 8
-
-        '
     - name: Prepare app resources
       shell: bash
-      run: 'set -euo pipefail
-
+      run: |
+        set -euo pipefail
         python3 mikshat/prepare_branding.py
-
         python3 mikshat/prepare_satellite.py
-
-        '
     - name: Ensure Metal compiler is available
       shell: bash
-      run: "set -euo pipefail\nif ! xcrun metal -v >/dev/null 2>&1; then\n  xcodebuild -downloadComponent MetalToolchain\n\
-        \  xcrun -k\nfi\nxcrun metal -v\n"
+      run: |
+        set -euo pipefail
+        if ! xcrun metal -v >/dev/null 2>&1; then
+          xcodebuild -downloadComponent MetalToolchain
+          xcrun -k
+        fi
+        xcrun metal -v
     - name: Restore compiled objects for this Xcode toolchain
       id: derived-cache
       uses: actions/cache/restore@v4
@@ -112,93 +114,149 @@ jobs:
         path: build/SearchDerivedData
         key: mikshat-search-derived-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.MIKSHAT_XCODE_CACHE_ID }}-${{
           github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
-        restore-keys: 'mikshat-search-derived-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.MIKSHAT_XCODE_CACHE_ID
-          }}-
-
-          '
+        restore-keys: |
+          mikshat-search-derived-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.MIKSHAT_XCODE_CACHE_ID }}-
     - name: Restore unchanged build input timestamps
       shell: bash
-      run: "set -euo pipefail\ncat > build/search-diagnostics/cache-input-mtimes.py <<'PY'\nfrom pathlib import\
-        \ Path\nimport hashlib\nimport json\nimport os\nimport sys\n\nmanifest = Path('build/SearchDerivedData/mikshat-input-mtimes.json')\n\
-        roots = ('iphone', 'libs', 'xcode', 'data', '3party', 'private')\ndef inputs():\n    for root in roots:\n\
-        \        if not Path(root).is_dir():\n            continue\n        for directory, children, files in os.walk(root):\n\
-        \            children[:] = [name for name in children if name not in ('.git', '__pycache__', 'node_modules')]\n\
-        \            yield Path(directory)\n            for name in files:\n                if name != '.git':\n\
-        \                    yield Path(directory) / name\ndef digest(path):\n    if path.is_dir():\n        names\
-        \ = sorted(child.name for child in path.iterdir() if child.name != '.git')\n        return hashlib.sha256('\\\
-        n'.join(names).encode()).hexdigest()\n    result = hashlib.sha256()\n    with path.open('rb') as stream:\n\
-        \        for block in iter(lambda: stream.read(1024 * 1024), b''):\n            result.update(block)\n \
-        \   return result.hexdigest()\nif sys.argv[1] == 'restore':\n    restored = 0\n    if manifest.exists():\n\
-        \        for item in json.loads(manifest.read_text()):\n            path = Path(item['path'])\n        \
-        \    if path.exists() and not path.is_symlink() and digest(path) == item['sha256']:\n                os.utime(path,\
-        \ ns=(path.stat().st_atime_ns, item['mtime_ns']))\n                restored += 1\n    print(f'Restored timestamps\
-        \ for {restored} unchanged build inputs')\nelse:\n    entries = []\n    for path in inputs():\n        if\
-        \ path.exists() and not path.is_symlink():\n            entries.append(dict(path=str(path), sha256=digest(path),\
-        \ mtime_ns=path.stat().st_mtime_ns))\n    manifest.parent.mkdir(parents=True, exist_ok=True)\n    manifest.write_text(json.dumps(entries))\n\
-        \    print(f'Recorded {len(entries)} build input timestamps')\nPY\npython3 build/search-diagnostics/cache-input-mtimes.py\
-        \ restore\n"
+      run: |
+        set -euo pipefail
+        cat > build/search-diagnostics/cache-input-mtimes.py <<'PY'
+        from pathlib import Path
+        import hashlib
+        import json
+        import os
+        import sys
+
+        manifest = Path('build/SearchDerivedData/mikshat-input-mtimes.json')
+        roots = ('iphone', 'libs', 'xcode', 'data', '3party', 'private')
+        def inputs():
+            for root in roots:
+                if not Path(root).is_dir():
+                    continue
+                for directory, children, files in os.walk(root):
+                    children[:] = [name for name in children if name not in ('.git', '__pycache__', 'node_modules')]
+                    yield Path(directory)
+                    for name in files:
+                        if name != '.git':
+                            yield Path(directory) / name
+        def digest(path):
+            if path.is_dir():
+                names = sorted(child.name for child in path.iterdir() if child.name != '.git')
+                return hashlib.sha256('\n'.join(names).encode()).hexdigest()
+            result = hashlib.sha256()
+            with path.open('rb') as stream:
+                for block in iter(lambda: stream.read(1024 * 1024), b''):
+                    result.update(block)
+            return result.hexdigest()
+        if sys.argv[1] == 'restore':
+            restored = 0
+            if manifest.exists():
+                for item in json.loads(manifest.read_text()):
+                    path = Path(item['path'])
+                    if path.exists() and not path.is_symlink() and digest(path) == item['sha256']:
+                        os.utime(path, ns=(path.stat().st_atime_ns, item['mtime_ns']))
+                        restored += 1
+            print(f'Restored timestamps for {restored} unchanged build inputs')
+        else:
+            entries = []
+            for path in inputs():
+                if path.exists() and not path.is_symlink():
+                    entries.append(dict(path=str(path), sha256=digest(path), mtime_ns=path.stat().st_mtime_ns))
+            manifest.parent.mkdir(parents=True, exist_ok=True)
+            manifest.write_text(json.dumps(entries))
+            print(f'Recorded {len(entries)} build input timestamps')
+        PY
+        python3 build/search-diagnostics/cache-input-mtimes.py restore
     - name: Boot exact matching iOS runtime
       shell: bash
-      run: "set -euo pipefail\nmkdir -p build/arrow-geometry\nxcodebuild -version | tee build/arrow-geometry/toolchain.txt\n\
-        xcrun simctl list --json runtimes > build/arrow-geometry/runtimes.json\npython3 - <<'PYCODE'\nimport json,os,subprocess\n\
-        from pathlib import Path\ndef simctl(*args):\n    return subprocess.check_output(['xcrun','simctl',*args],text=True)\n\
-        runtimes=json.loads(simctl('list','--json','runtimes'))['runtimes']\nmatching=[r for r in runtimes if r.get('isAvailable')\
-        \ and r.get('version')=='27.0' and 'iOS' in r.get('identifier','')]\nif len(matching)!=1:raise SystemExit('Exactly\
-        \ iOS 27.0 is required; no silent runtime substitution')\nruntime=matching[0]\nudid=simctl('create','Mikshat\
-        \ Arrow iOS 27','com.apple.CoreSimulator.SimDeviceType.iPhone-16',runtime['identifier']).strip()\nsimctl('boot',udid)\n\
-        subprocess.run(['xcrun','simctl','bootstatus',udid,'-b'],check=True)\nselection={'udid':udid,'device':'iPhone\
-        \ 16','runtime':runtime}\nPath('build/arrow-geometry/simulator.json').write_text(json.dumps(selection,indent=2)+'\\\
-        n')\nwith open(os.environ['GITHUB_ENV'],'a') as f:f.write('MIKSHAT_SIMULATOR_UDID='+udid+'\\n')\nprint(json.dumps(selection))\n\
-        PYCODE"
+      run: |-
+        set -euo pipefail
+        mkdir -p build/arrow-geometry
+        xcodebuild -version | tee build/arrow-geometry/toolchain.txt
+        xcrun simctl list --json runtimes > build/arrow-geometry/runtimes.json
+        python3 - <<'PYCODE'
+        import json,os,subprocess
+        from pathlib import Path
+        def simctl(*args):
+            return subprocess.check_output(['xcrun','simctl',*args],text=True)
+        runtimes=json.loads(simctl('list','--json','runtimes'))['runtimes']
+        matching=[r for r in runtimes if r.get('isAvailable') and r.get('version')=='27.0' and 'iOS' in r.get('identifier','')]
+        if len(matching)!=1:raise SystemExit('Exactly iOS 27.0 is required; no silent runtime substitution')
+        runtime=matching[0]
+        udid=simctl('create','Mikshat Arrow iOS 27','com.apple.CoreSimulator.SimDeviceType.iPhone-16',runtime['identifier']).strip()
+        simctl('boot',udid)
+        subprocess.run(['xcrun','simctl','bootstatus',udid,'-b'],check=True)
+        selection={'udid':udid,'device':'iPhone 16','runtime':runtime}
+        Path('build/arrow-geometry/simulator.json').write_text(json.dumps(selection,indent=2)+'\n')
+        with open(os.environ['GITHUB_ENV'],'a') as f:f.write('MIKSHAT_SIMULATOR_UDID='+udid+'\n')
+        print(json.dumps(selection))
+        PYCODE
     - name: Run native history, direction and GPS ownership tests
       id: search-tests
       timeout-minutes: 55
       shell: bash
-      run: "set -euo pipefail\nxcodebuild test \\\n  -workspace xcode/omim.xcworkspace \\\n  -scheme OMaps \\\n\
-        \  -configuration Debug \\\n  -sdk iphonesimulator \\\n  -destination \"id=$MIKSHAT_SIMULATOR_UDID\" \\\n\
-        \  -destination-timeout 120 \\\n  -derivedDataPath build/SearchDerivedData \\\n  -resultBundlePath build/SearchRegressions.xcresult\
-        \ \\\n  -testLanguage ar \\\n  -testRegion SA \\\n  -parallel-testing-enabled NO \\\n  -maximum-concurrent-test-simulator-destinations\
-        \ 1 \\\n  -test-timeouts-enabled YES \\\n  -default-test-execution-time-allowance 120 \\\n  -maximum-test-execution-time-allowance\
-        \ 180 \\\n  -only-testing:OMapsTests/SearchHistoryOnlyTests \\\n  -only-testing:OMapsTests/MikshatSearchDirectionIndicatorTests\
-        \ \\\n  -only-testing:OMapsTests/MikshatHeadingCacheLifecycleTests \\\n  ARCHS=\"$(uname -m)\" \\\n  ONLY_ACTIVE_ARCH=YES\
-        \ \\\n  CODE_SIGNING_REQUIRED=NO \\\n  CODE_SIGNING_ALLOWED=NO \\\n  2>&1 | tee build/search-diagnostics/xcodebuild-search-tests.log\n"
+      run: |
+        set -euo pipefail
+        xcodebuild test \
+          -workspace xcode/omim.xcworkspace \
+          -scheme OMaps \
+          -configuration Debug \
+          -sdk iphonesimulator \
+          -destination "id=$MIKSHAT_SIMULATOR_UDID" \
+          -destination-timeout 120 \
+          -derivedDataPath build/SearchDerivedData \
+          -resultBundlePath build/SearchRegressions.xcresult \
+          -testLanguage ar \
+          -testRegion SA \
+          -parallel-testing-enabled NO \
+          -maximum-concurrent-test-simulator-destinations 1 \
+          -test-timeouts-enabled YES \
+          -default-test-execution-time-allowance 120 \
+          -maximum-test-execution-time-allowance 180 \
+          -only-testing:OMapsTests/SearchHistoryOnlyTests \
+          -only-testing:OMapsTests/MikshatSearchDirectionIndicatorTests \
+          -only-testing:OMapsTests/MikshatHeadingCacheLifecycleTests \
+          ARCHS="$(uname -m)" \
+          ONLY_ACTIVE_ARCH=YES \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGNING_ALLOWED=NO \
+          2>&1 | tee build/search-diagnostics/xcodebuild-search-tests.log
     - name: Require real native test execution
       if: always()
-      run: 'python3 - <<''PYCODE''
-
+      run: |-
+        python3 - <<'PYCODE'
         from pathlib import Path
-
         import importlib.util,json
-
-        spec=importlib.util.spec_from_file_location(''native_results'',''mikshat/tests/weather-data/verify-native-results.py'')
-
+        spec=importlib.util.spec_from_file_location('native_results','mikshat/tests/weather-data/verify-native-results.py')
         m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
-
-        m.EXPECTED_CLASSES={''SearchHistoryOnlyTests'':8,''MikshatSearchDirectionIndicatorTests'':3,''MikshatHeadingCacheLifecycleTests'':2}
-
-        p=Path(''build/search-diagnostics/xcodebuild-search-tests.log'')
-
-        report=m.analyze(p.read_text(errors=''replace'') if p.exists() else '''')
-
-        p.with_suffix(''.summary.json'').write_text(json.dumps(report,indent=2)+''\n'')
-
+        m.EXPECTED_CLASSES={'SearchHistoryOnlyTests':8,'MikshatSearchDirectionIndicatorTests':3,'MikshatHeadingCacheLifecycleTests':2}
+        p=Path('build/search-diagnostics/xcodebuild-search-tests.log')
+        report=m.analyze(p.read_text(errors='replace') if p.exists() else '')
+        p.with_suffix('.summary.json').write_text(json.dumps(report,indent=2)+'\n')
         print(json.dumps(report))
-
-        if not report[''passed'']:raise SystemExit(''All 13 native tests must execute once and pass without skips
-        or cancellation'')
-
-        PYCODE'
+        if not report['passed']:raise SystemExit('All 13 native tests must execute once and pass without skips or cancellation')
+        PYCODE
     - name: Collect app crash reports and simulator log
       if: always()
       shell: bash
-      run: "mkdir -p build/search-diagnostics/crash-reports\npython3 - <<'PY'\nfrom pathlib import Path\nimport\
-        \ shutil\nsource = Path.home() / 'Library/Logs/DiagnosticReports'\ndestination = Path('build/search-diagnostics/crash-reports')\n\
-        if source.exists():\n    for report in source.rglob('*'):\n        if report.is_file() and report.suffix\
-        \ in ('.ips', '.crash', '.hang'):\n            if any(name in report.name.lower() for name in ('organic',\
-        \ 'omaps')):\n                shutil.copy2(report, destination / report.name)\nPY\nif [[ -n \"${MIKSHAT_SIMULATOR_UDID:-}\"\
-        \ ]]; then\n  xcrun simctl spawn \"$MIKSHAT_SIMULATOR_UDID\" log show --last 3m --style compact \\\n   \
-        \ --predicate 'process CONTAINS[c] \"Organic\" OR process CONTAINS[c] \"OMaps\"' \\\n    > build/search-diagnostics/simulator-app.log\
-        \ 2>&1 || true\nfi\n"
+      run: |
+        mkdir -p build/search-diagnostics/crash-reports
+        python3 - <<'PY'
+        from pathlib import Path
+        import shutil
+        source = Path.home() / 'Library/Logs/DiagnosticReports'
+        destination = Path('build/search-diagnostics/crash-reports')
+        if source.exists():
+            for report in source.rglob('*'):
+                if report.is_file() and report.suffix in ('.ips', '.crash', '.hang'):
+                    if any(name in report.name.lower() for name in ('organic', 'omaps')):
+                        shutil.copy2(report, destination / report.name)
+        PY
+        if [[ -n "${MIKSHAT_SIMULATOR_UDID:-}" ]]; then
+          xcrun simctl spawn "$MIKSHAT_SIMULATOR_UDID" log show --last 3m --style compact \
+            --predicate 'process CONTAINS[c] "Organic" OR process CONTAINS[c] "OMaps"' \
+            > build/search-diagnostics/simulator-app.log 2>&1 || true
+        fi
     - name: Upload app, native tests and screenshots
       if: always()
       uses: actions/upload-artifact@v4
@@ -206,18 +264,18 @@ jobs:
         name: mikshat-maps-weather-native
         retention-days: 7
         if-no-files-found: warn
-        path: 'build/search-diagnostics/
-
+        path: |-
+          build/search-diagnostics/
           build/weather-screenshots/
-
           build/SearchRegressions.xcresult/
-
-          build/Mikshat-4.6.11-Simulator.zip'
+          build/Mikshat-4.6.11-Simulator.zip
     - name: Record current source timestamps for the next incremental build
       if: always()
       shell: bash
-      run: "if [[ -f build/search-diagnostics/cache-input-mtimes.py && -d build/SearchDerivedData/Build ]]; then\n\
-        \  python3 build/search-diagnostics/cache-input-mtimes.py record\nfi\n"
+      run: |
+        if [[ -f build/search-diagnostics/cache-input-mtimes.py && -d build/SearchDerivedData/Build ]]; then
+          python3 build/search-diagnostics/cache-input-mtimes.py record
+        fi
     - name: Save compiled objects even when a test or test compilation fails
       if: always() && hashFiles('build/SearchDerivedData/mikshat-input-mtimes.json') != ''
       timeout-minutes: 4
@@ -226,3 +284,4 @@ jobs:
         path: build/SearchDerivedData
         key: mikshat-search-derived-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.MIKSHAT_XCODE_CACHE_ID }}-${{
           github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+    if: '!contains(github.event.head_commit.message, ''[component-only]'')'
