@@ -43,7 +43,7 @@ import subprocess
 import sys
 
 directory, baseline_ref = Path(sys.argv[1]), sys.argv[2]
-environment = dict(os.environ, TSAN_OPTIONS='halt_on_error=1:exitcode=66')
+environment = dict(os.environ, TSAN_OPTIONS='halt_on_error=1:exitcode=66:abort_on_error=0')
 summary = {'baselineRef': baseline_ref or None, 'threads': 32,
            'callsPerThread': 1000, 'productionSources': True, 'runs': []}
 

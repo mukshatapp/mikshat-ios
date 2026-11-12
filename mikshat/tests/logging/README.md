@@ -26,6 +26,9 @@ no full application build is needed. A C++23 compiler with ThreadSanitizer,
 Python 3, Git and tar are required. Linux GCC 14 and modern Apple Clang use the
 appropriate platform link flags. Compiler or sanitizer-runtime errors fail the
 script; they are not treated as a successful race verdict.
+The runner disables the sanitizer's default abort on Apple platforms so the
+expected race still must exit with the configured code 66; the race stack and
+zero-report controls remain mandatory.
 
 Thirty-two simultaneously live threads start at one barrier and each call the
 production `WriteProlog` 1,000 times with its own output stream. The test checks
