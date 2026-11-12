@@ -44,7 +44,20 @@ jobs:
           } | tee "$MIKSHAT_LOG_TEST_OUTPUT/toolchain.log"
           git diff --exit-code 4e7819b01bc4b862e97372bf0519b7e6a0711e2c -- \
             libs/base/logging.cpp libs/base/logging.hpp libs/base/thread.cpp \
-            mikshat/tests/logging/run.sh mikshat/tests/logging/LogHelperConcurrencyTests.cpp
+            mikshat/tests/logging/LogHelperConcurrencyTests.cpp
+
+      - name: Verify the exact Apple sanitizer-exit configuration adjustment
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          old = subprocess.check_output(['git', 'show', '4e7819b01bc4b862e97372bf0519b7e6a0711e2c:mikshat/tests/logging/run.sh'], text=True)
+          assert old.count('halt_on_error=1:exitcode=66') == 1
+          expected = old.replace('halt_on_error=1:exitcode=66', 'halt_on_error=1:exitcode=66:abort_on_error=0')
+          assert Path('mikshat/tests/logging/run.sh').read_text() == expected
+          print('Only abort_on_error=0 differs in the test runner; production source and harness are unchanged.')
+          PY
 
       - name: Compare baseline race, serialized control and fixed production logger
         timeout-minutes: 7
