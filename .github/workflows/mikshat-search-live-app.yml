@@ -31,6 +31,26 @@ jobs:
         uname -m | tee -a build/search-diagnostics/toolchain.txt
         xcrun simctl list --json runtimes > build/search-diagnostics/runtimes.json
         xcrun simctl list --json devicetypes > build/search-diagnostics/device-types.json
+    - name: Install the required iOS 26.5 simulator runtime if missing
+      timeout-minutes: 20
+      shell: bash
+      run: |
+        set -euo pipefail
+        df -h
+        xcodebuild -help > build/search-diagnostics/xcodebuild-help.txt 2>&1
+        if ! xcrun simctl list --json runtimes | python3 -c 'import json,sys; values=json.load(sys.stdin)["runtimes"]; sys.exit(0 if any(x.get("isAvailable") and x.get("identifier", "").startswith("com.apple.CoreSimulator.SimRuntime.iOS-26-") for x in values) else 1)'; then
+          set +e
+          xcodebuild -downloadPlatform iOS -buildVersion 26.5 -architectureVariant arm64 > build/search-diagnostics/runtime-download.log 2>&1
+          mikshat_runtime_status=$?
+          set -e
+          tail -n 80 build/search-diagnostics/runtime-download.log
+          if [[ "$mikshat_runtime_status" -ne 0 ]]; then
+            echo 'iOS 26.5 runtime provisioning failed before app or search execution.'
+            exit "$mikshat_runtime_status"
+          fi
+        fi
+        xcrun simctl list --json runtimes > build/search-diagnostics/runtimes.json
+        python3 -c 'import json,sys; values=json.load(open("build/search-diagnostics/runtimes.json"))["runtimes"]; print(json.dumps(values,indent=2)); sys.exit(0 if any(x.get("isAvailable") and x.get("identifier", "").startswith("com.apple.CoreSimulator.SimRuntime.iOS-26-") for x in values) else 1)'
     - name: Fetch pinned submodules
       shell: bash
       run: |
