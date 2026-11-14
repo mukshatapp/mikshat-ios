@@ -170,6 +170,8 @@ jobs:
           -only-testing:OMapsTests/MikshatResponsiveCompassTests \
                   -only-testing:OMapsTests/MikshatResponsivePlaceCoordinatesTests \
                   -only-testing:OMapsTests/MikshatResponsiveNavigationTests \
+          -only-testing:OMapsTests/MikshatResponsivePresentationTests \
+          -only-testing:OMapsTests/MikshatMapControlLayoutTests \
                   -only-testing:OMapsTests/MikshatWeatherViewTests \
                   -only-testing:OMapsTests/SearchThemeWindowLifecycleTests \
                   -only-testing:OMapsTests/SearchHistoryOnlyTests \
@@ -188,12 +190,12 @@ jobs:
         import importlib.util,json
         spec=importlib.util.spec_from_file_location('native_results','mikshat/tests/weather-data/verify-native-results.py')
         m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
-        m.EXPECTED_CLASSES={'MikshatResponsiveCompassTests':3,'MikshatResponsivePlaceCoordinatesTests':3,'MikshatResponsiveNavigationTests':3,'MikshatWeatherViewTests':6,'SearchThemeWindowLifecycleTests':4,'SearchHistoryOnlyTests':8,'MikshatSearchDirectionIndicatorTests':3,'MikshatHeadingCacheLifecycleTests':2}
+        m.EXPECTED_CLASSES={'MikshatResponsiveCompassTests':3,'MikshatResponsivePlaceCoordinatesTests':3,'MikshatResponsiveNavigationTests':4,'MikshatResponsivePresentationTests':2,'MikshatMapControlLayoutTests':1,'MikshatWeatherViewTests':6,'SearchThemeWindowLifecycleTests':4,'SearchHistoryOnlyTests':8,'MikshatSearchDirectionIndicatorTests':3,'MikshatHeadingCacheLifecycleTests':2}
         p=Path('build/search-diagnostics/xcodebuild-search-tests.log')
         report=m.analyze(p.read_text(errors='replace') if p.exists() else '')
         p.with_suffix('.summary.json').write_text(json.dumps(report,indent=2)+'\n')
         print(json.dumps(report))
-        if not report['passed']:raise SystemExit('All 32 native tests must execute once and pass without skips or cancellation')
+        if not report['passed']:raise SystemExit('All 36 native tests must execute once and pass without skips or cancellation')
         PYCODE
     - name: Collect app crash reports and simulator log
       if: always()
@@ -224,6 +226,35 @@ jobs:
         if [[ -d build/SearchRegressions.xcresult ]]; then
           xcrun xcresulttool export attachments --path build/SearchRegressions.xcresult --output-path build/responsive-screenshots
         fi
+    - name: Prepare small previews for visual review
+      if: always()
+      shell: bash
+      run: |
+        python3 - <<'PYCODE'
+        from pathlib import Path
+        import base64,json,os,subprocess
+        udid=os.environ.get('MIKSHAT_SIMULATOR_UDID')
+        if not udid:raise SystemExit(0)
+        container=subprocess.run(['xcrun','simctl','get_app_container',udid,'com.mikshat.maps.debug','data'],text=True,capture_output=True)
+        if container.returncode:raise SystemExit(0)
+        source=Path(container.stdout.strip())/'Documents'
+        target=Path('build/responsive-screenshots/previews');target.mkdir(parents=True,exist_ok=True)
+        files=sorted([*source.glob('responsive-*-fixture.png'),*source.glob('weather-*-fixture.png')])
+        print('MIKSHAT_UI_IMAGES '+json.dumps([p.name for p in files]))
+        preferred=['compass-destination-compact-phone-landscape','compass-general-tablet-landscape',
+                   'navigation-joint-native-phone-expanded','navigation-joint-direct-compact-phone-collapsed',
+                   'place-preview','weather-light-landscape','weather-saved-after-failed-refresh']
+        selected=[]
+        for token in preferred:
+            matches=[p for p in files if token in p.name]
+            if matches:selected.append(matches[0])
+        for image in selected:
+            preview=target/image.name
+            subprocess.run(['sips','-Z','700',str(image),'--out',str(preview)],check=True,stdout=subprocess.DEVNULL)
+            data=preview.read_bytes()
+            if len(data)<=300000:
+                print('MIKSHAT_UI_PREVIEW '+json.dumps({'name':preview.name,'pngBase64':base64.b64encode(data).decode()}))
+        PYCODE
     - name: Upload native test results, layout screenshots and diagnostics
       if: always()
       uses: actions/upload-artifact@v4

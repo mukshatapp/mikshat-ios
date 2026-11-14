@@ -95,6 +95,7 @@ final class NavigationControlView: SolidTouchView {
   private var navigationActionsRow: UIStackView!
   private var secondaryActionsRow: UIStackView?
   private var narrowActions = false
+  private var lastMetricsLayout: (width: CGFloat, category: UIContentSizeCategory)?
 
   override func awakeFromNib() {
     super.awakeFromNib()
@@ -268,6 +269,9 @@ final class NavigationControlView: SolidTouchView {
   }
 
   private func updateResponsiveMetrics() {
+    let category = traitCollection.preferredContentSizeCategory
+    if let previous = lastMetricsLayout, previous.width == bounds.width, previous.category == category { return }
+    lastMetricsLayout = (bounds.width, category)
     let columnWidth = max(1, (bounds.width - 48) / 3)
     let valueLimit = max(24, min(56, columnWidth * 0.65))
     let legendLimit = max(12, min(24, columnWidth * 0.36))

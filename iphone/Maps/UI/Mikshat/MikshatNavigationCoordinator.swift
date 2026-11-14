@@ -199,6 +199,7 @@ final class MikshatDirectGuidanceView: UIStackView, MWMLocationObserver {
   private var placementSafeArea = UIEdgeInsets.zero
   private var placementRailWidth: CGFloat = 0
   private var metricLegends: [UILabel] = []
+  private var lastMetricsLayout: (width: CGFloat, category: UIContentSizeCategory)?
 
   init(target: CLLocationCoordinate2D, origin: CLLocation) {
     self.target = target
@@ -286,6 +287,23 @@ final class MikshatDirectGuidanceView: UIStackView, MWMLocationObserver {
     guard let parent = superview else { return }
     installPlacement(in: parent)
     MikshatHomeControls.updateNavigationInformationCard(self, visible: true)
+    updateResponsiveMetrics()
+    let landscape = parent.bounds.width > parent.bounds.height
+    let insets = UIEdgeInsets(top: 0, left: 0, bottom: landscape ? 0 : parent.bounds.maxY - frame.minY, right: 0)
+    guard bounds.height > 0, insets != lastInsets else { return }
+    lastInsets = insets
+    MapViewController.shared()?.updateVisibleAreaInsets(for: self, insets: insets, updatingViewport: true)
+  }
+
+  override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+    super.traitCollectionDidChange(previousTraitCollection)
+    if previousTraitCollection?.preferredContentSizeCategory != traitCollection.preferredContentSizeCategory { setNeedsLayout() }
+  }
+
+  private func updateResponsiveMetrics() {
+    let category = traitCollection.preferredContentSizeCategory
+    if let previous = lastMetricsLayout, previous.width == bounds.width, previous.category == category { return }
+    lastMetricsLayout = (bounds.width, category)
     let columnWidth = max(1, (bounds.width - 48) / 3)
     let valueLimit = max(24, min(56, columnWidth * 0.65))
     let legendLimit = max(12, min(24, columnWidth * 0.36))
@@ -298,11 +316,6 @@ final class MikshatDirectGuidanceView: UIStackView, MWMLocationObserver {
       label.font = UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: 18), maximumPointSize: legendLimit, compatibleWith: traitCollection)
       label.configureSingleLineAutoScaling()
     }
-    let landscape = parent.bounds.width > parent.bounds.height
-    let insets = UIEdgeInsets(top: 0, left: 0, bottom: landscape ? 0 : parent.bounds.maxY - frame.minY, right: 0)
-    guard bounds.height > 0, insets != lastInsets else { return }
-    lastInsets = insets
-    MapViewController.shared()?.updateVisibleAreaInsets(for: self, insets: insets, updatingViewport: true)
   }
 
   func installPlacement(in parent: UIView) {

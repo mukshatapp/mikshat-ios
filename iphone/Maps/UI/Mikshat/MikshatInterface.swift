@@ -67,12 +67,14 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
   private var layoutMode = 0
   private var nativeButtonSize: CGFloat = 52
   private var nativeHorizontal = false
+  private var lastControlStyle: (mode: Int, landscape: Bool, buttonSize: CGFloat, category: UIContentSizeCategory)?
   private var timer: Timer?
 
   private static weak var installedControls: MikshatHomeControls?
   private static weak var mapControls: UIView?
   private static weak var navigationObstruction: UIView?
   private static var navigationObstructionFrame = CGRect.zero
+  private static var obstructionViewport: (bounds: CGRect, safeInsets: UIEdgeInsets, frame: CGRect)?
   private static weak var navigationInformationCard: UIView?
   private static var informationCardFrame = CGRect.zero
   private static var mapControlConstraints: [NSLayoutConstraint] = []
@@ -82,8 +84,17 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
 
   @objc(updateNavigationObstruction:frame:)
   static func updateNavigationObstruction(_ view: UIView, frame: CGRect) {
-    navigationObstruction = frame.isEmpty ? nil : view
+    let source: UIView? = frame.isEmpty ? nil : view
+    let container = installedControls?.superview
+    let viewportBounds = container?.bounds ?? .zero
+    let safeInsets = container?.safeAreaInsets ?? .zero
+    let occupied = source.map { $0.convert(frame, to: container) } ?? .zero
+    guard navigationObstruction !== source || navigationObstructionFrame != frame ||
+            obstructionViewport?.bounds != viewportBounds || obstructionViewport?.safeInsets != safeInsets ||
+            obstructionViewport?.frame != occupied else { return }
+    navigationObstruction = source
     navigationObstructionFrame = frame
+    obstructionViewport = (viewportBounds, safeInsets, occupied)
     installedControls?.setNeedsLayout()
   }
 
@@ -230,7 +241,6 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
     super.layoutSubviews()
     guard let parent = superview else { return }
     let landscape = parent.bounds.width > parent.bounds.height
-    MikshatSatelliteController.shared.updateLayout(in: parent)
     let safe = parent.bounds.inset(by: parent.safeAreaInsets)
     let obstruction = Self.navigationObstruction.map { $0.convert(Self.navigationObstructionFrame, to: parent) } ?? .zero
     let top = obstruction.isEmpty ? safe.minY + (landscape ? 4 : 64) : max(safe.minY + 4, obstruction.maxY + 12)
@@ -254,6 +264,13 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
       mode = 3
       speedHeight = 44
     }
+    let topInset = top - safe.minY
+    if topConstraint?.constant != topInset { topConstraint?.constant = topInset }
+    let category = traitCollection.preferredContentSizeCategory
+    if let previous = lastControlStyle, previous.mode == mode, previous.landscape == landscape,
+       previous.buttonSize == buttonSize, previous.category == category { return }
+    lastControlStyle = (mode, landscape, buttonSize, category)
+    MikshatSatelliteController.shared.updateLayout(in: parent)
     let previousMode = layoutMode
     layoutMode = mode
     nativeButtonSize = buttonSize
@@ -263,7 +280,6 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
     spacing = 8
     distribution = .fill
     widthConstraint?.constant = mode >= 2 ? 76 + 2 * 44 + 16 : (landscape ? 76 : 88)
-    topConstraint?.constant = top - safe.minY
     let nativeWidth = nativeHorizontal ? 3 * buttonSize + 16 : buttonSize
     rightConstraint?.constant = -14 - (mode == 1 ? nativeWidth + 8 : 0)
     qiblaHeightConstraint?.constant = customButtonHeight
@@ -280,12 +296,21 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
 
   override func didMoveToWindow() {
     super.didMoveToWindow()
+    setNeedsLayout()
     timer?.invalidate()
     if window != nil {
       LocationManager.add(observer: self)
       timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.refresh() }
       refresh()
     } else { LocationManager.remove(observer: self) }
+  }
+  override func safeAreaInsetsDidChange() {
+    super.safeAreaInsetsDidChange()
+    setNeedsLayout()
+  }
+  override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+    super.traitCollectionDidChange(previousTraitCollection)
+    if previousTraitCollection?.preferredContentSizeCategory != traitCollection.preferredContentSizeCategory { setNeedsLayout() }
   }
   func onLocationUpdate(_ location: CLLocation) { refresh() }
   private func refresh() {

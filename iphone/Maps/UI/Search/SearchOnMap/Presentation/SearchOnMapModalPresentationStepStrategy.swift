@@ -53,14 +53,20 @@ struct SearchOnMapModalPresentationStepStrategy: ModalPresentationStepStrategy {
     let safeAreaInsets = containerViewController.view.safeAreaInsets
     let traitCollection = containerViewController.traitCollection
     var frame = CGRect(origin: .zero, size: containerSize)
+    let safeWidth = max(0, containerSize.width - safeAreaInsets.left - safeAreaInsets.right)
+    let safeHeight = max(0, containerSize.height - safeAreaInsets.top - safeAreaInsets.bottom)
+    let sheetWidth = min(Constants.iPadWidth, safeWidth)
+    let centeredX = safeAreaInsets.left + (safeWidth - sheetWidth) / 2
 
     if isIPad {
-      frame.size.width = Constants.iPadWidth
+      frame.size.width = sheetWidth
       switch step {
       case .hidden:
         frame.origin.x = -Constants.iPadWidth
       default:
-        frame.origin.x = .zero
+        frame.origin.x = centeredX
+        frame.origin.y = safeAreaInsets.top
+        frame.size.height = safeHeight
       }
       return frame
     }
@@ -79,11 +85,12 @@ struct SearchOnMapModalPresentationStepStrategy: ModalPresentationStepStrategy {
         frame.origin.y = containerSize.height
       }
     } else {
-      frame.size.width = Constants.iPadWidth
-      frame.origin.x = safeAreaInsets.left
+      frame.size.width = sheetWidth
+      frame.origin.x = centeredX
       switch step {
       case .expanded:
-        frame.origin.y = Constants.topInset
+        frame.origin.y = safeAreaInsets.top + Constants.topInset
+        frame.size.height = max(0, safeHeight - 2 * Constants.topInset)
       case .halfScreen, .compact:
         frame.origin.y =
           containerSize.height - Constants.compactHeightOffset(bottomSafeAreaInset: safeAreaInsets.bottom)

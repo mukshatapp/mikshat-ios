@@ -226,7 +226,7 @@ final class MikshatResponsiveNavigationTests: XCTestCase {
       let host = ResponsiveUIKitHost(controller, size: CGSize(width: 320, height: 568), category: category)
       defer { host.close() }
       MikshatHomeControls.install(in: controller.view)
-      let native = MWMSideButtons(parentView: controller.view)
+      let native = try XCTUnwrap(MWMSideButtons(parentView: controller.view))
       let maneuver = UIView()
       maneuver.backgroundColor = .systemBlue
       controller.view.addSubview(maneuver)
@@ -284,7 +284,7 @@ final class MikshatResponsiveNavigationTests: XCTestCase {
           guidance.installPlacement(in: controller.view)
           card = guidance
         } else {
-          let native = try XCTUnwrap(Bundle.main.load(viewClass: NavigationControlView.self))
+          let native = try XCTUnwrap(Bundle.main.loadNibNamed("NavigationControlView", owner: nil)?.first as? NavigationControlView)
           native.ownerView = controller.view
           native.isVisible = true
           card = native
@@ -352,6 +352,112 @@ final class MikshatResponsiveNavigationTests: XCTestCase {
   }
 
   @MainActor
+  func testManeuversRightControlsAndCenteredNavigationCardsShareLandscapeViewport() async throws {
+    defer { restoreResponsiveMapControls() }
+    for direct in [false, true] {
+      let controller = UIViewController()
+      let host = ResponsiveUIKitHost(controller, size: CGSize(width: 568, height: 320))
+      defer { host.close() }
+      MikshatHomeControls.install(in: controller.view)
+      let nativeButtons = try XCTUnwrap(MWMSideButtons(parentView: controller.view))
+      let maneuvers = try XCTUnwrap(Bundle.main.loadNibNamed("MWMNavigationInfoView", owner: nil)?.first as? NavigationInfoView)
+      maneuvers.ownerView = controller.view
+      maneuvers.availableArea = controller.view.bounds
+      maneuvers.state = .navigation
+      let info = MWMNavigationDashboardEntity()
+      info.setValue("طريق الموقع المحدد", forKey: "streetName")
+      info.setValue("250", forKey: "distanceToTurn")
+      info.setValue("م", forKey: "turnUnits")
+      info.setValue(UIImage(systemName: "arrow.turn.up.left"), forKey: "turnImage")
+      info.setValue(UIImage(systemName: "arrow.turn.up.right"), forKey: "nextTurnImage")
+      maneuvers.onNavigationInfoUpdated(info)
+      defer { maneuvers.state = .hidden }
+      let card: UIView
+      if direct {
+        let guidance = MikshatDirectGuidanceView(target: responsiveDestination, origin: responsiveLocation())
+        guidance.translatesAutoresizingMaskIntoConstraints = false
+        controller.view.addSubview(guidance)
+        guidance.installPlacement(in: controller.view)
+        card = guidance
+      } else {
+        let native = try XCTUnwrap(Bundle.main.loadNibNamed("NavigationControlView", owner: nil)?.first as? NavigationControlView)
+        native.ownerView = controller.view
+        native.isVisible = true
+        card = native
+      }
+      defer {
+        if let native = card as? NavigationControlView { native.isVisible = false }
+        if let guidance = card as? MikshatDirectGuidanceView { guidance.stop() }
+      }
+      let expand = NSSelectorFromString(direct ? "toggleExpanded" : "extendAction")
+      for (device, size) in [("compact-phone", CGSize(width: 568, height: 320)),
+                             ("phone", CGSize(width: 844, height: 390)),
+                             ("tablet", CGSize(width: 1024, height: 768)),
+                             ("compact-phone-return", CGSize(width: 568, height: 320))] {
+        host.resize(size)
+        maneuvers.availableArea = controller.view.bounds
+        // NavigationInfoView applies available-area changes on its production main-queue path.
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+          DispatchQueue.main.async { continuation.resume() }
+        }
+        host.layout()
+        let speed = try responsiveElement("map.speedValue", in: controller.view, as: UILabel.self)
+        speed.text = "123"
+        let prefix = direct ? "navigation.direct." : "navigation."
+        try responsiveElement(prefix + "speedValue", in: card, as: UILabel.self).text = "123"
+        try responsiveElement(prefix + "distanceValue", in: card, as: UILabel.self).text = "999.9"
+        try responsiveElement(prefix + "timeValue", in: card, as: UILabel.self).text = "12:59"
+        var showingExpanded = false
+        for expanded in [false, true, false] {
+          if expanded != showingExpanded {
+            UIView.performWithoutAnimation { _ = card.perform(expand) }
+          }
+          showingExpanded = expanded
+          host.layout()
+          let safe = controller.view.safeAreaLayoutGuide.layoutFrame
+          XCTAssertEqual(card.frame.midX, safe.midX, accuracy: 1)
+          XCTAssertEqual(card.frame.midY, safe.midY, accuracy: 1)
+          assertResponsiveVisible(card, in: controller.view, context: device)
+          let panels = try ["navigation.maneuverPanel", "navigation.nextManeuver", "navigation.streetPanel"]
+            .map { try responsiveElement($0, in: maneuvers) }
+          for panel in panels {
+            XCTAssertFalse(panel.isHidden)
+            XCTAssertGreaterThan(panel.bounds.width, 0)
+            XCTAssertGreaterThan(panel.bounds.height, 0)
+          }
+          let controls = try ["map.speedCard", "map.compass", "map.qibla", "map.zoomIn", "map.zoomOut", "map.location"]
+            .map { try responsiveElement($0, in: controller.view) }
+          for control in controls {
+            assertResponsiveVisible(control, in: controller.view, context: device)
+            XCTAssertGreaterThanOrEqual(control.bounds.width, 44)
+            XCTAssertGreaterThanOrEqual(control.bounds.height, 44)
+            let rect = control.convert(control.bounds, to: controller.view)
+            XCTAssertFalse(rect.intersects(card.frame), "\(control.accessibilityIdentifier ?? "control") overlaps \(direct ? "direct" : "native") card")
+            for panel in panels {
+              XCTAssertFalse(rect.intersects(panel.convert(panel.bounds, to: controller.view)),
+                             "\(control.accessibilityIdentifier ?? "control") overlaps an actual maneuver panel")
+            }
+          }
+          XCTAssertEqual(speed.numberOfLines, 1)
+          assertResponsiveLabelFits(speed)
+          XCTAssertNotNil(nativeButtons.view?.window)
+          if expanded {
+            let actionIDs = direct ? ["navigation.direct.stop"] : ["navigation.stop", "navigation.sound", "navigation.settings"]
+            for identifier in actionIDs {
+              let action = try responsiveElement(identifier, in: card)
+              assertResponsiveVisible(action, in: controller.view, context: device)
+              XCTAssertGreaterThanOrEqual(action.bounds.width, 44)
+              XCTAssertGreaterThanOrEqual(action.bounds.height, 44)
+            }
+          }
+          try attachResponsiveScreenshot(host.container.view,
+                                         name: "navigation-joint-\(direct ? "direct" : "native")-\(device)-\(expanded ? "expanded" : "collapsed")", test: self)
+        }
+      }
+    }
+  }
+
+  @MainActor
   func testDestinationRestorationAndCompassCloseReopenTheCapturedSelectedPoint() async throws {
     let map = try XCTUnwrap(MapViewController.shared())
     map.loadViewIfNeeded()
@@ -399,7 +505,7 @@ private func restoreResponsiveMapControls() {
   guard let map = MapViewController.shared() else { return }
   map.loadViewIfNeeded()
   MikshatHomeControls.install(in: map.view)
-  if let buttons = MWMSideButtons.buttons()?.view { MikshatHomeControls.attachMapControls(buttons) }
+  if let buttons = MWMSideButtons().view { MikshatHomeControls.attachMapControls(buttons) }
   MikshatHomeControls.updateNavigationObstruction(map.view, frame: .zero)
   map.view.setNeedsLayout()
   map.view.layoutIfNeeded()

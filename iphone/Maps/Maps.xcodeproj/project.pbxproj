@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A61400200000000000000001 /* MikshatResponsivePresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A61400200000000000000002 /* MikshatResponsivePresentationTests.swift */; };
 		A61400100000000000000001 /* MikshatResponsiveUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A61400100000000000000002 /* MikshatResponsiveUITests.swift */; };
 		C01F84D927D2414E9A530001 /* BookmarksListSortingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C01F84D927D2414E9A530002 /* BookmarksListSortingTests.swift */; };
 		0F13484A0000000000000002 /* UITableViewCell+SeparatorInset.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F13484A0000000000000001 /* UITableViewCell+SeparatorInset.swift */; };
@@ -791,6 +792,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A61400200000000000000002 /* MikshatResponsivePresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/UI/SearchOnMapTests/MikshatResponsivePresentationTests.swift; sourceTree = SOURCE_ROOT; };
 		A61400100000000000000002 /* MikshatResponsiveUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/UI/SearchOnMapTests/MikshatResponsiveUITests.swift; sourceTree = SOURCE_ROOT; };
 		C01F84D927D2414E9A530002 /* BookmarksListSortingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarksListSortingTests.swift; sourceTree = "<group>"; };
 		0F13484A0000000000000001 /* UITableViewCell+SeparatorInset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UITableViewCell+SeparatorInset.swift"; sourceTree = "<group>"; };
@@ -4287,6 +4289,7 @@
 			children = (
 				ECE76EF25BEFF62E98FDE2A5 /* MikshatWeatherViewTests.swift */,
 				1067C686AC3C81E430216275 /* SearchHistoryOnlyTests.swift */,
+				A61400200000000000000002 /* MikshatResponsivePresentationTests.swift */,
 				A61400100000000000000002 /* MikshatResponsiveUITests.swift */,
 				C21A5100D9E7780856FFE168 /* MikshatMemoryDiagnosticsTests.swift */,
 			);
@@ -5163,6 +5166,7 @@
 				2C6B64E5A79043179FD58BDC /* SearchOnMapViewTests.swift in Sources */,
 				F00CF1CED5EA863FBBA99723 /* MikshatWeatherViewTests.swift in Sources */,
 				2D7826B96397DBCA1CC933A0 /* SearchHistoryOnlyTests.swift in Sources */,
+				A61400200000000000000001 /* MikshatResponsivePresentationTests.swift in Sources */,
 				A61400100000000000000001 /* MikshatResponsiveUITests.swift in Sources */,
 				89BC41D00BDE6C84859459CE /* MikshatMemoryDiagnosticsTests.swift in Sources */,
 				81711202831385EF1E2F0356 /* TTSVoicePreviewPlayerTests.swift in Sources */,
