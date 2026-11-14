@@ -54,7 +54,7 @@ final class MikshatWeatherViewTests: XCTestCase {
       try assertNormalForecastFits(in: weather.view, context: name)
       let hours = try XCTUnwrap(try element("weather.hours", in: weather.view) as? UIScrollView)
       let cards = try XCTUnwrap(hours.subviews.compactMap { $0 as? UIStackView }.first).arrangedSubviews
-      try assertHorizontalHours(in: hours)
+      try assertHorizontalHours(in: hours, context: name)
       XCTAssertEqual(hours.contentOffset.x, max(0, hours.contentSize.width - hours.bounds.width), accuracy: 1)
       let temperature = try label("weather.current.temperature", in: weather.view)
       XCTAssertEqual((temperature.text ?? "").components(separatedBy: "°C").count - 1, 1)
@@ -91,7 +91,7 @@ final class MikshatWeatherViewTests: XCTestCase {
       layout(container)
       try assertHourlyAnchor(identifier, fraction: fraction, in: hours)
       try assertNormalForecastFits(in: weather.view, context: name + "-rotated")
-      try assertHorizontalHours(in: hours)
+      try assertHorizontalHours(in: hours, context: name + "-rotated")
       try writeScreenshot(container.view, name: name + "-rotated")
 
       // Returning to the first hour keeps it pinned after resizing back.
@@ -139,7 +139,7 @@ final class MikshatWeatherViewTests: XCTestCase {
         layout(container)
         try writeScreenshot(container.view, name: "large-type-\(name)-\(orientation)")
         let hours = try XCTUnwrap(try element("weather.hours", in: weather.view) as? UIScrollView)
-        try assertHorizontalHours(in: hours)
+        try assertHorizontalHours(in: hours, context: "large-type-\(name)-\(orientation)")
         let refresh = try element("weather.refresh", in: weather.view)
         page.scrollRectToVisible(refresh.convert(refresh.bounds, to: page), animated: false)
         layout(container)
@@ -270,7 +270,7 @@ final class MikshatWeatherViewTests: XCTestCase {
   }
 
   @MainActor
-  private func assertHorizontalHours(in hours: UIScrollView,
+  private func assertHorizontalHours(in hours: UIScrollView, context: String = "",
                                      file: StaticString = #filePath, line: UInt = #line) throws {
     let stack = try XCTUnwrap(hours.subviews.compactMap { $0 as? UIStackView }.first, file: file, line: line)
     let cards = stack.arrangedSubviews
@@ -295,7 +295,7 @@ final class MikshatWeatherViewTests: XCTestCase {
       XCTAssertGreaterThanOrEqual(rect.minY, -1, file: file, line: line)
       XCTAssertLessThanOrEqual(rect.maxY, stack.bounds.height + 1, file: file, line: line)
       for label in descendants(card).compactMap({ $0 as? UILabel }) where !isHiddenInHierarchy(label, upTo: card) {
-        try assertVisible(label, in: card, file: file, line: line)
+        try assertVisible(label, in: card, context: context, file: file, line: line)
       }
       if index > 0 {
         let previous = cards[index - 1].convert(cards[index - 1].bounds, to: stack)
@@ -309,7 +309,13 @@ final class MikshatWeatherViewTests: XCTestCase {
   @MainActor
   private func assertVisible(_ view: UIView, in root: UIView, context: String = "",
                              file: StaticString = #filePath, line: UInt = #line) throws {
-    let identifier = view.accessibilityIdentifier ?? String(describing: type(of: view))
+    let identifier: String
+    if let label = view as? UILabel {
+      let text = (label.text ?? label.attributedText?.string ?? "").replacingOccurrences(of: "\n", with: " ")
+      identifier = "\(view.accessibilityIdentifier ?? root.accessibilityIdentifier ?? "UILabel") [\(text)]"
+    } else {
+      identifier = view.accessibilityIdentifier ?? String(describing: type(of: view))
+    }
     XCTAssertFalse(isHiddenInHierarchy(view, upTo: root), "Hidden \(identifier): \(context)", file: file, line: line)
     let rect = view.convert(view.bounds, to: root)
     XCTAssertGreaterThan(rect.width, 0, "Zero width \(identifier): \(context)", file: file, line: line)

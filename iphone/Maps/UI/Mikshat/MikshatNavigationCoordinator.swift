@@ -198,6 +198,7 @@ final class MikshatDirectGuidanceView: UIStackView, MWMLocationObserver {
   private var placementSize = CGSize.zero
   private var placementSafeArea = UIEdgeInsets.zero
   private var placementRailWidth: CGFloat = 0
+  private var viewportObserver: UIView?
   private var metricLegends: [UILabel] = []
   private var lastMetricsLayout: (width: CGFloat, category: UIContentSizeCategory)?
 
@@ -319,6 +320,14 @@ final class MikshatDirectGuidanceView: UIStackView, MWMLocationObserver {
   }
 
   func installPlacement(in parent: UIView) {
+    if viewportObserver?.superview !== parent {
+      viewportObserver?.removeFromSuperview()
+      viewportObserver = MikshatHomeControls.observeViewport(in: parent) { [weak self, weak parent] in
+        guard let self, let parent, self.superview === parent else { return }
+        self.installPlacement(in: parent)
+        self.setNeedsLayout()
+      }
+    }
     let railWidth = MikshatHomeControls.landscapeRailWidth(in: parent)
     guard placementConstraints.isEmpty || placementSize != parent.bounds.size || placementSafeArea != parent.safeAreaInsets || placementRailWidth != railWidth else { return }
     placementSize = parent.bounds.size
@@ -345,6 +354,8 @@ final class MikshatDirectGuidanceView: UIStackView, MWMLocationObserver {
   }
   func stop() {
     MikshatHomeControls.updateNavigationInformationCard(self, visible: false)
+    viewportObserver?.removeFromSuperview()
+    viewportObserver = nil
     timer?.invalidate()
     timer = nil
     LocationManager.remove(observer: self)

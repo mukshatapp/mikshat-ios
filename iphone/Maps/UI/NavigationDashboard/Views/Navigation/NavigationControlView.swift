@@ -50,6 +50,7 @@ final class NavigationControlView: SolidTouchView {
   private var placementSize = CGSize.zero
   private var placementSafeArea = UIEdgeInsets.zero
   private var placementRailWidth: CGFloat = 0
+  private var viewportObserver: UIView?
   private let diminishSelector = #selector(diminish)
 
   var isVisible = false {
@@ -96,6 +97,8 @@ final class NavigationControlView: SolidTouchView {
   private var secondaryActionsRow: UIStackView?
   private var narrowActions = false
   private var lastMetricsLayout: (width: CGFloat, category: UIContentSizeCategory)?
+  private var metricsHeightConstraint: NSLayoutConstraint?
+  private var horizontalActionConstraints: [NSLayoutConstraint] = []
 
   override func awakeFromNib() {
     super.awakeFromNib()
@@ -177,7 +180,8 @@ final class NavigationControlView: SolidTouchView {
     metrics.semanticContentAttribute = .forceLeftToRight
     metrics.distribution = .fillEqually
     metrics.spacing = 8
-    metrics.heightAnchor.constraint(greaterThanOrEqualToConstant: 102).isActive = true
+    metricsHeightConstraint = metrics.heightAnchor.constraint(greaterThanOrEqualToConstant: 102)
+    metricsHeightConstraint?.isActive = true
     for label in [distance, distanceUnit, time, speed, speedUnit] {
       label.textAlignment = .center
       label.numberOfLines = 1
@@ -192,15 +196,18 @@ final class NavigationControlView: SolidTouchView {
     actions.translatesAutoresizingMaskIntoConstraints = false
     voice.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
     settings.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+    horizontalActionConstraints = [voice.widthAnchor.constraint(equalToConstant: 44), settings.widthAnchor.constraint(equalToConstant: 44)]
+    NSLayoutConstraint.activate(horizontalActionConstraints)
     voice.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
     settings.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
-    stop.heightAnchor.constraint(greaterThanOrEqualToConstant: 54).isActive = true
+    stop.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+    stop.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
     navigationActionsRow = actions
     extended.addSubview(actions)
     NSLayoutConstraint.activate([
       actions.topAnchor.constraint(equalTo: extended.topAnchor, constant: 8), actions.bottomAnchor.constraint(equalTo: extended.bottomAnchor, constant: -8).withPriority(.required - 1),
       actions.leadingAnchor.constraint(equalTo: extended.leadingAnchor), actions.trailingAnchor.constraint(equalTo: extended.trailingAnchor),
-      actions.heightAnchor.constraint(greaterThanOrEqualToConstant: 54).withPriority(.required - 1),
+      actions.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).withPriority(.required - 1),
     ])
     extended.isHidden = true
     let stack = UIStackView(arrangedSubviews: [handle, metrics, progress, extended])
@@ -245,6 +252,8 @@ final class NavigationControlView: SolidTouchView {
     button.titleLabel?.numberOfLines = 1
     button.titleLabel?.adjustsFontSizeToFitWidth = true
     button.titleLabel?.minimumScaleFactor = 0.5
+    button.setContentHuggingPriority(.defaultLow, for: .horizontal)
+    button.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
     button.setContentCompressionResistancePriority(.required, for: .vertical)
     button.contentEdgeInsets = UIEdgeInsets(top: 10, left: 22, bottom: 10, right: 22)
   }
@@ -269,13 +278,22 @@ final class NavigationControlView: SolidTouchView {
   }
 
   private func updateResponsiveMetrics() {
+    let compactLandscape = (superview?.bounds.width ?? 0) > (superview?.bounds.height ?? 0) && bounds.width < 360
+    metricsHeightConstraint?.constant = compactLandscape ? 88 : 102
+    let metrics = UIFontMetrics.default
+    // Theme rendering can restore the nib's dynamic font without changing the
+    // card width or content category, so keep this cap outside the metrics cache.
+    if stopButton.titleLabel?.adjustsFontForContentSizeCategory == true {
+      stopButton.titleLabel?.adjustsFontForContentSizeCategory = false
+    }
+    let stopFont = metrics.scaledFont(for: .systemFont(ofSize: 18), maximumPointSize: 22, compatibleWith: traitCollection)
+    if stopButton.titleLabel?.font != stopFont { stopButton.titleLabel?.font = stopFont }
     let category = traitCollection.preferredContentSizeCategory
     if let previous = lastMetricsLayout, previous.width == bounds.width, previous.category == category { return }
     lastMetricsLayout = (bounds.width, category)
     let columnWidth = max(1, (bounds.width - 48) / 3)
     let valueLimit = max(24, min(56, columnWidth * 0.65))
     let legendLimit = max(12, min(24, columnWidth * 0.36))
-    let metrics = UIFontMetrics.default
     for label in [distanceLabel!, speedLabel!, timeLabel!] {
       label.font = metrics.scaledFont(for: .systemFont(ofSize: 38), maximumPointSize: valueLimit, compatibleWith: traitCollection)
     }
@@ -284,8 +302,6 @@ final class NavigationControlView: SolidTouchView {
       label.font = metrics.scaledFont(for: .systemFont(ofSize: 18), maximumPointSize: legendLimit, compatibleWith: traitCollection)
       label.configureSingleLineAutoScaling()
     }
-    stopButton.titleLabel?.adjustsFontForContentSizeCategory = false
-    stopButton.titleLabel?.font = metrics.scaledFont(for: .systemFont(ofSize: 18), maximumPointSize: 22, compatibleWith: traitCollection)
   }
 
   private func updateActionsLayout() {
@@ -294,6 +310,7 @@ final class NavigationControlView: SolidTouchView {
     narrowActions = narrow
     let actions = navigationActionsRow!
     if narrow {
+      NSLayoutConstraint.deactivate(horizontalActionConstraints)
       for button in [ttsButton!, settingsButton!] {
         actions.removeArrangedSubview(button)
         button.removeFromSuperview()
@@ -317,6 +334,7 @@ final class NavigationControlView: SolidTouchView {
       actions.spacing = 14
       actions.addArrangedSubview(ttsButton)
       actions.addArrangedSubview(settingsButton)
+      NSLayoutConstraint.activate(horizontalActionConstraints)
     }
   }
 
@@ -341,14 +359,37 @@ final class NavigationControlView: SolidTouchView {
   }
 
   private func addView() {
-    guard superview != ownerView, !ownerView.subviews.contains(self) else { return }
+    guard let ownerView else { return }
     translatesAutoresizingMaskIntoConstraints = false
-    ownerView.addSubview(self)
+    if superview !== ownerView {
+      NSLayoutConstraint.deactivate(placementConstraints)
+      placementConstraints = []
+      ownerView.addSubview(self)
+    }
+    // Closing fades the dimmer before removing the card. A reopen during that
+    // fade must restore the helpers even though the card is still attached.
+    if viewportObserver?.superview !== ownerView {
+      viewportObserver?.removeFromSuperview()
+      viewportObserver = MikshatHomeControls.observeViewport(in: ownerView) { [weak self] in
+        guard let self, let parent = self.superview else { return }
+        self.updatePlacement(in: parent)
+        self.setNeedsLayout()
+      }
+    }
     updatePlacement(in: ownerView)
-
-    let actions = MikshatNavigationActionsView()
-    actions.install(in: ownerView, above: self)
-    mikshatActions = actions
+    if mikshatActions?.superview !== ownerView {
+      mikshatActions?.removeFromSuperview()
+      let actions = MikshatNavigationActionsView()
+      actions.install(in: ownerView, above: self)
+      mikshatActions = actions
+    }
+    extendedView.isHidden = !isExtended
+    if isExtended {
+      dimBackground.setVisible(true, completion: nil)
+      refreshDiminishTimer()
+    }
+    MikshatHomeControls.updateNavigationInformationCard(self, visible: true)
+    setNeedsLayout()
     updateVisibleViewportArea()
   }
 
@@ -358,9 +399,17 @@ final class NavigationControlView: SolidTouchView {
     cancelDiminishTimer()
     mikshatActions?.removeFromSuperview()
     mikshatActions = nil
+    viewportObserver?.removeFromSuperview()
+    viewportObserver = nil
     updateVisibleViewportArea(onClose: true)
     dimBackground.setVisible(false, completion: { [weak self] in
-      guard let self, !self.isVisible else { return }
+      guard let self else { return }
+      if self.isVisible {
+        // DimBackground finishes the previous hide by removing itself. Restore
+        // it when that completion belongs to a card which has already reopened.
+        if self.isExtended { self.dimBackground.setVisible(true, completion: nil) }
+        return
+      }
       NSLayoutConstraint.deactivate(self.placementConstraints)
       self.placementConstraints = []
       self.removeFromSuperview()
@@ -567,10 +616,8 @@ final class NavigationControlView: SolidTouchView {
 extension NavigationControlView: MWMTextToSpeechObserver {
   func onTTSStatusUpdated() {
     guard MWMRouter.isRoutingActive() else { return }
-    ttsButton.isHidden = !MWMTextToSpeech.isTTSEnabled()
-    if !ttsButton.isHidden {
-      ttsButton.isSelected = MWMTextToSpeech.tts().active
-    }
+    ttsButton.isHidden = false
+    ttsButton.isSelected = MWMTextToSpeech.isTTSEnabled() && MWMTextToSpeech.tts().active
     refreshDiminishTimer()
   }
 }

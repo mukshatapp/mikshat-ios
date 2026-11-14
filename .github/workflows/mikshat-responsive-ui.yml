@@ -243,7 +243,9 @@ jobs:
         print('MIKSHAT_UI_IMAGES '+json.dumps([p.name for p in files]))
         preferred=['compass-destination-compact-phone-landscape','compass-general-tablet-landscape',
                    'navigation-joint-native-phone-expanded','navigation-joint-direct-compact-phone-collapsed',
-                   'place-preview','weather-light-landscape','weather-saved-after-failed-refresh']
+                   'place-preview','weather-light-landscape','weather-saved-after-failed-refresh',
+                   'weather-compact-phone-portrait-fixture','weather-compact-phone-landscape-fixture',
+                   'weather-large-type-small-phone-fixture']
         selected=[]
         for token in preferred:
             matches=[p for p in files if token in p.name]

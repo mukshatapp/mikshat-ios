@@ -475,13 +475,25 @@ final class MikshatLocationCardTests: XCTestCase {
 }
 
 final class MikshatMapControlLayoutTests: XCTestCase {
+  @MainActor
   func test_NativeControlsStayBelowQiblaWhenAvailableAreaChanges() throws {
     let map = try XCTUnwrap(MapViewController.shared())
     map.loadViewIfNeeded()
+    let controls = try XCTUnwrap(MWMMapViewControlsManager.manager())
+    // Use the manager's production getter so the nib-backed controls exist before measuring them.
+    let sideButtons = try XCTUnwrap(controls.value(forKey: "sideButtons") as? MWMSideButtons)
+    let previousZoomHidden = controls.zoomHidden
+    let previousSideButtonsHidden = controls.sideButtonsHidden
+    controls.zoomHidden = false
+    controls.sideButtonsHidden = false
     let home = try XCTUnwrap(map.view.subviews.compactMap { $0 as? MikshatHomeControls }.first)
-    let buttons = try XCTUnwrap(MWMSideButtons().view)
+    let buttons = try XCTUnwrap(sideButtons.view)
     XCTAssertFalse(buttons.superview === home.superview, "Regression covers the actual separate containers")
-    defer { MWMSideButtons.updateAvailableArea(map.view.bounds) }
+    defer {
+      controls.zoomHidden = previousZoomHidden
+      controls.sideButtonsHidden = previousSideButtonsHidden
+      MWMSideButtons.updateAvailableArea(map.view.bounds)
+    }
     let heights: [CGFloat] = [map.view.bounds.height, 80, 240, map.view.bounds.height]
     var originalTools: CGRect?
     var originalUpperTools: CGRect?

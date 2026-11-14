@@ -85,9 +85,15 @@ final class MikshatResponsiveCompassTests: XCTestCase {
       XCTAssertTrue(scroll.isScrollEnabled)
       XCTAssertGreaterThan(scroll.contentSize.height, scroll.bounds.height)
       XCTAssertFalse(scroll.hasAmbiguousLayout)
-      XCTAssertEqual(coordinates.text, responsiveCoordinateText["ddm"])
+      XCTAssertEqual(coordinates.text?.components(separatedBy: "\n"), ["N 24° 39.001′", "E 046° 42.601′"])
       assertResponsiveLabelFits(coordinates)
+      XCTAssertGreaterThanOrEqual(copy.bounds.width, 44)
       XCTAssertGreaterThanOrEqual(copy.bounds.height, 44)
+      let coordinatesRect = coordinates.convert(coordinates.bounds, to: scroll)
+      let copyRect = copy.convert(copy.bounds, to: scroll)
+      XCTAssertFalse(coordinatesRect.intersects(copyRect), "Full coordinate pair and copy action must remain separate")
+      XCTAssertTrue(coordinatesRect.maxX <= copyRect.minX + 1 || copyRect.maxX <= coordinatesRect.minX + 1,
+                    "The copy action must stay beside the full coordinate pair")
       let actionRect = copy.convert(copy.bounds, to: scroll)
       scroll.scrollRectToVisible(actionRect, animated: false)
       host.layout()
@@ -505,7 +511,11 @@ private func restoreResponsiveMapControls() {
   guard let map = MapViewController.shared() else { return }
   map.loadViewIfNeeded()
   MikshatHomeControls.install(in: map.view)
-  if let buttons = MWMSideButtons().view { MikshatHomeControls.attachMapControls(buttons) }
+  if let manager = MWMMapViewControlsManager.manager(),
+     let buttons = manager.value(forKey: "sideButtons") as? MWMSideButtons,
+     let view = buttons.view {
+    MikshatHomeControls.attachMapControls(view)
+  }
   MikshatHomeControls.updateNavigationObstruction(map.view, frame: .zero)
   map.view.setNeedsLayout()
   map.view.layoutIfNeeded()
@@ -556,7 +566,14 @@ private func responsiveElement<T: UIView>(_ identifier: String, in root: UIView,
 private func assertResponsiveVisible(_ view: UIView, in viewport: UIView, context: String = "",
                                      file: StaticString = #filePath, line: UInt = #line) {
   let rect = view.convert(view.bounds, to: viewport)
-  XCTAssertFalse(view.isHidden, "\(view.accessibilityIdentifier ?? "view") \(context)", file: file, line: line)
+  var ancestor: UIView? = view
+  while let current = ancestor {
+    XCTAssertFalse(current.isHidden || current.alpha < 0.01,
+                   "Hidden \(view.accessibilityIdentifier ?? "view") \(context)", file: file, line: line)
+    if current === viewport { break }
+    ancestor = current.superview
+  }
+  XCTAssertTrue(view === viewport || view.isDescendant(of: viewport), context, file: file, line: line)
   XCTAssertGreaterThan(rect.width, 0, context, file: file, line: line)
   XCTAssertGreaterThan(rect.height, 0, context, file: file, line: line)
   XCTAssertTrue(viewport.bounds.insetBy(dx: -1, dy: -1).contains(rect),
@@ -669,6 +686,9 @@ private final class ResponsiveUIKitHost {
 
   func close() {
     window.isHidden = true
+    controller.willMove(toParent: nil)
+    controller.view.removeFromSuperview()
+    controller.removeFromParent()
     window.rootViewController = nil
   }
 }

@@ -69,13 +69,11 @@ final class MikshatResponsivePresentationTests: XCTestCase {
 
   @MainActor
   func testNativeMenuAndMapPointPickerRespectTheSameSafeHorizontalCenter() throws {
-    let map = try XCTUnwrap(MapViewController.shared())
-    map.loadViewIfNeeded()
-    let controls = try XCTUnwrap(MWMMapViewControlsManager.manager())
-    let delegate = PresentationMenuDelegate()
     for (name, portrait) in presentationViewports {
-      let menu = try XCTUnwrap(BottomMenuBuilder.buildMenu(mapViewController: map, controlsManager: controls,
-                                                         delegate: delegate) as? BottomMenuViewController)
+      // Freeze the rows while exercising the production controller, XIB and native cells.
+      // The production presenter needs a rendered map viewport to resolve the current country.
+      let menu = BottomMenuViewController(nibName: nil, bundle: nil)
+      menu.presenter = PresentationMenuRows()
       let menuHost = PresentationUIKitHost(menu, size: portrait)
       defer { menuHost.close() }
       let picker = MapPointPickerViewController(title: "اختر نقطة", hint: "حرك الخريطة لتحديد النقطة المختارة",
@@ -99,8 +97,9 @@ final class MikshatResponsivePresentationTests: XCTestCase {
         XCTAssertEqual(panelRect.midX, menuSafe.midX, accuracy: 1,
                        "The native menu must center after \(name)-\(orientation)")
         XCTAssertFalse(panel.hasAmbiguousLayout)
-        XCTAssertGreaterThan(menu.tableView.numberOfSections, 0)
-        XCTAssertGreaterThan(menu.tableView.numberOfRows(inSection: 0), 0)
+        XCTAssertEqual(menu.tableView.numberOfSections, 2)
+        XCTAssertEqual(menu.tableView.numberOfRows(inSection: 0), 1)
+        XCTAssertEqual(menu.tableView.numberOfRows(inSection: 1), 6)
         XCTAssertFalse(menu.tableView.visibleCells.isEmpty)
         try attachPresentationScreenshot(menuHost.container.view, name: "menu-\(name)-\(orientation)")
 
@@ -230,8 +229,32 @@ private final class PresentationUIKitHost {
   }
 }
 
-private final class PresentationMenuDelegate: NSObject, BottomMenuDelegate {
-  func actionDownloadMaps(_ mode: MWMMapDownloaderMode) {}
-  func addPlace() {}
-  func didFinishAddingPlace() {}
+private final class PresentationMenuRows: NSObject, BottomMenuPresenterProtocol {
+  private let items: [(UIImage, String)] = [
+    (UIImage(resource: .icMenuAddPlace), L("placepage_add_place_button")),
+    (UIImage(resource: .icMenuTrackRecording), L("start_track_recording")),
+    (UIImage(resource: .icMenuDownload), L("download_maps")),
+    (UIImage(resource: .icMenuDonate), L("donate")),
+    (UIImage(resource: .icMenuSettings), L("settings")),
+    (UIImage(resource: .icMenuShare), L("share_my_location")),
+  ]
+
+  func onClosePressed() {}
+  func cellToHighlightIndexPath() -> IndexPath? { nil }
+  func numberOfSections(in tableView: UITableView) -> Int { 2 }
+  func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+    section == 0 ? 1 : items.count
+  }
+
+  func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+    if indexPath.section == 0 {
+      let cell = tableView.dequeueReusableCell(cell: BottomMenuLayersCell.self)!
+      cell.addSeparator(.bottom)
+      return cell
+    }
+    let cell = tableView.dequeueReusableCell(cell: BottomMenuItemCell.self)!
+    let (image, title) = items[indexPath.row]
+    cell.configure(image: image, title: title)
+    return cell
+  }
 }

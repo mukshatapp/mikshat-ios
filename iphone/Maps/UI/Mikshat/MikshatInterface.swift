@@ -64,6 +64,8 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
   private var qiblaHeightConstraint: NSLayoutConstraint?
   private var compassHeightConstraint: NSLayoutConstraint?
   private var speedHeightConstraint: NSLayoutConstraint?
+  private var horizontalControlConstraints: [NSLayoutConstraint] = []
+  private var viewportObserver: UIView?
   private var layoutMode = 0
   private var nativeButtonSize: CGFloat = 52
   private var nativeHorizontal = false
@@ -81,6 +83,45 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
 
   @objc static var mapControlButtonSize: CGFloat { installedControls?.nativeButtonSize ?? 52 }
   @objc static var mapControlsHorizontal: Bool { installedControls?.nativeHorizontal ?? false }
+
+  // A centered card can move on rotation without changing its own bounds. Observe
+  // the container so placement does not depend on UIKit laying out that card again.
+  private final class ViewportObserver: UIView {
+    private let onChange: () -> Void
+    private var lastBounds = CGRect.null
+    private var lastSafeArea = UIEdgeInsets.zero
+
+    init(in parent: UIView, onChange: @escaping () -> Void) {
+      self.onChange = onChange
+      super.init(frame: .zero)
+      isUserInteractionEnabled = false
+      accessibilityElementsHidden = true
+      translatesAutoresizingMaskIntoConstraints = false
+      parent.addSubview(self)
+      NSLayoutConstraint.activate([
+        leadingAnchor.constraint(equalTo: parent.leadingAnchor), trailingAnchor.constraint(equalTo: parent.trailingAnchor),
+        topAnchor.constraint(equalTo: parent.topAnchor), bottomAnchor.constraint(equalTo: parent.bottomAnchor),
+      ])
+    }
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    override func layoutSubviews() {
+      super.layoutSubviews()
+      guard let parent = superview,
+            lastBounds != parent.bounds || lastSafeArea != parent.safeAreaInsets else { return }
+      lastBounds = parent.bounds
+      lastSafeArea = parent.safeAreaInsets
+      onChange()
+    }
+    override func safeAreaInsetsDidChange() {
+      super.safeAreaInsetsDidChange()
+      setNeedsLayout()
+    }
+  }
+
+  static func observeViewport(in parent: UIView, onChange: @escaping () -> Void) -> UIView {
+    ViewportObserver(in: parent, onChange: onChange)
+  }
 
   @objc(updateNavigationObstruction:frame:)
   static func updateNavigationObstruction(_ view: UIView, frame: CGRect) {
@@ -226,6 +267,10 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
     controls.qiblaHeightConstraint = qibla.heightAnchor.constraint(equalToConstant: 64)
     controls.compassHeightConstraint = compass.heightAnchor.constraint(equalToConstant: 64)
     controls.speedHeightConstraint = speedCard.heightAnchor.constraint(equalToConstant: 76)
+    controls.horizontalControlConstraints = [
+      speedCard.widthAnchor.constraint(equalToConstant: 76),
+      compass.widthAnchor.constraint(equalToConstant: 44), qibla.widthAnchor.constraint(equalToConstant: 44),
+    ]
     speedCard.widthAnchor.constraint(greaterThanOrEqualToConstant: 76).isActive = true
     compass.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
     qibla.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
@@ -234,6 +279,7 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
       kaaba.centerXAnchor.constraint(equalTo: qibla.centerXAnchor), kaaba.centerYAnchor.constraint(equalTo: qibla.centerYAnchor),
       kaaba.widthAnchor.constraint(equalToConstant: 36), kaaba.heightAnchor.constraint(equalTo: kaaba.widthAnchor),
     ])
+    controls.viewportObserver = observeViewport(in: view) { [weak controls] in controls?.setNeedsLayout() }
     bindMapControls()
   }
 
@@ -276,6 +322,8 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
     nativeButtonSize = buttonSize
     nativeHorizontal = mode >= 2
     axis = mode >= 2 ? .horizontal : .vertical
+    if mode >= 2 { NSLayoutConstraint.activate(horizontalControlConstraints) }
+    else { NSLayoutConstraint.deactivate(horizontalControlConstraints) }
     alignment = mode >= 2 ? .center : .fill
     spacing = 8
     distribution = .fill
@@ -291,6 +339,7 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
     speed.font = mode == 3 ? .systemFont(ofSize: 18) : UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: landscape ? 28 : 32), maximumPointSize: 32, compatibleWith: traitCollection)
     units.font = mode == 3 ? .systemFont(ofSize: 10) : UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: landscape ? 14 : 17), maximumPointSize: 17, compatibleWith: traitCollection)
     if previousMode != mode { Self.bindMapControls() }
+    Self.navigationInformationCard?.setNeedsLayout()
     Self.mapControls?.setNeedsLayout()
   }
 
@@ -432,6 +481,7 @@ final class MikshatCompassViewController: UIViewController, MWMLocationObserver 
   private var wideDialHeight: NSLayoutConstraint!
   private var lastLayout: (wide: Bool, compact: Bool, scrolling: Bool, category: UIContentSizeCategory)?
   private var renderedLocation: CLLocation?
+  private var preferredCoordinateFont = UIFont.systemFont(ofSize: 20)
 
   init(target: CLLocationCoordinate2D?, name: String, general: Bool = false, onClose: (() -> Void)? = nil) {
     self.general = general
@@ -587,8 +637,8 @@ final class MikshatCompassViewController: UIViewController, MWMLocationObserver 
       coordinates.semanticContentAttribute = .forceLeftToRight
       coordinates.accessibilityIdentifier = "mikshat.compass.coordinates"
       coordinates.numberOfLines = 2
-      coordinates.adjustsFontSizeToFitWidth = true
-      coordinates.minimumScaleFactor = 0.75
+      coordinates.adjustsFontForContentSizeCategory = false
+      coordinates.lineBreakMode = .byClipping
       coordinates.textAlignment = .left
       let locationTitle = MikshatStyle.label(L("mikshat_current_location"), size: 14, color: MikshatStyle.green)
       cardTitles.append(locationTitle)
@@ -683,6 +733,30 @@ final class MikshatCompassViewController: UIViewController, MWMLocationObserver 
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
     updateResponsiveLayout()
+    fitCoordinateText()
+  }
+
+  private func fitCoordinateText() {
+    guard !isQibla, coordinates.bounds.width > 1, let text = coordinates.text, !text.isEmpty else { return }
+    let lines = text.components(separatedBy: "\n")
+    func width(_ font: UIFont) -> CGFloat {
+      lines.map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
+    }
+    let longestLine = width(preferredCoordinateFont)
+    guard longestLine > 0 else { return }
+    // Coordinates have two deliberate LTR lines. Fit both together rather than
+    // allowing a multiline label to wrap or truncate one of the components.
+    let availableWidth = coordinates.bounds.width - 1
+    let scale = min(1, availableWidth / longestLine)
+    var font = preferredCoordinateFont.withSize(preferredCoordinateFont.pointSize * scale)
+    // Recheck the chosen size because the system font's optical metrics can
+    // change as its point size changes.
+    for _ in 0..<3 {
+      let measuredWidth = width(font)
+      guard measuredWidth > availableWidth else { break }
+      font = font.withSize(font.pointSize * availableWidth / measuredWidth * 0.99)
+    }
+    if abs(coordinates.font.pointSize - font.pointSize) > 0.01 { coordinates.font = font }
   }
 
   override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
@@ -715,9 +789,11 @@ final class MikshatCompassViewController: UIViewController, MWMLocationObserver 
     scroll.isScrollEnabled = scrolling
     scroll.showsVerticalScrollIndicator = scrolling
     if !scrolling { scroll.setContentOffset(.zero, animated: false) }
-    coordinateActions?.axis = scrolling ? .vertical : .horizontal
-    coordinateActions?.alignment = scrolling ? .fill : .center
-    coordinates.minimumScaleFactor = scrolling ? 0.4 : 0.75
+    // Keep copy adjacent to the complete pair at every text size. A vertical
+    // fill stack would inherit the button's required intrinsic width and make
+    // the coordinates only as wide as its title, even on a tablet.
+    coordinateActions?.axis = .horizontal
+    coordinateActions?.alignment = .center
     content.spacing = compact ? 6 : 10
     details.spacing = compact ? 6 : 8
     header.layoutMargins = UIEdgeInsets(top: compact ? 4 : 8, left: 8, bottom: compact ? 4 : 8, right: 8)
@@ -731,7 +807,8 @@ final class MikshatCompassViewController: UIViewController, MWMLocationObserver 
     font(distanceValue, compact ? 20 : 28)
     font(durationValue, compact ? 17 : 21)
     font(arrivalValue, compact ? 20 : 25)
-    font(coordinates, compact ? 17 : 20)
+    preferredCoordinateFont = UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: compact ? 17 : 20), compatibleWith: traitCollection)
+    coordinates.font = preferredCoordinateFont
     font(status, compact ? 12 : 15)
     if let hint = qiblaHint { font(hint, compact ? 14 : 18) }
     cardTitles.forEach { font($0, compact ? 12 : 14) }
