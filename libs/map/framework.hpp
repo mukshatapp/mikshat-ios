@@ -349,6 +349,8 @@ public:
   place_page::Info const & GetCurrentPlacePageInfo() const;
   place_page::Info & GetCurrentPlacePageInfo();
   void BuildAndSetPlacePageInfo(place_page::BuildInfo const & buildInfo) { OnTapEvent(buildInfo); }
+  /// Select an exact coordinate with a supplied display title after navigation has ended.
+  void ShowPointSelection(m2::PointD const & point, std::string const & title);
 
   void InvalidateRendering();
   void EnableDebugRectRendering(bool enabled);

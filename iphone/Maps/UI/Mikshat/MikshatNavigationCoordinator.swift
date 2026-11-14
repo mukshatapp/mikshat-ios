@@ -5,6 +5,7 @@ enum MikshatNavigationCoordinator {
   static var compassSelected = false
   static private(set) var directView: MikshatDirectGuidanceView?
   private static var actions: MikshatNavigationActionsView?
+  private static var directDestination: (coordinate: CLLocationCoordinate2D, title: String?)?
   static var isDirectActive: Bool { directView != nil }
   static let visibilityChanged = Notification.Name("MikshatDirectVisibilityChanged")
 
@@ -17,7 +18,10 @@ enum MikshatNavigationCoordinator {
     }
     let destination = CLLocationCoordinate2D(latitude: point.latitude, longitude: point.longitude)
     if compassSelected {
-      let controller = MikshatCompassViewController(target: destination, name: point.title)
+      let title = point.title
+      let controller = MikshatCompassViewController(target: destination, name: title, onClose: {
+        restoreDestinationSelection(coordinate: destination, title: title)
+      })
       controller.modalPresentationStyle = .overFullScreen
       map.present(controller, animated: true)
       return true
@@ -27,14 +31,11 @@ enum MikshatNavigationCoordinator {
       return false
     }
     let hud = MikshatDirectGuidanceView(target: destination, origin: origin)
+    directDestination = (destination, point.title)
     directView = hud
     hud.translatesAutoresizingMaskIntoConstraints = false
     map.view.insertSubview(hud, belowSubview: map.placePageContainer)
-    NSLayoutConstraint.activate([
-      hud.leftAnchor.constraint(equalTo: map.view.safeAreaLayoutGuide.leftAnchor),
-      hud.rightAnchor.constraint(equalTo: map.view.safeAreaLayoutGuide.rightAnchor),
-      hud.bottomAnchor.constraint(equalTo: map.view.safeAreaLayoutGuide.bottomAnchor),
-    ])
+    hud.installPlacement(in: map.view)
     let tools = MikshatNavigationActionsView()
     tools.install(in: map.view, above: hud)
     actions = tools
@@ -47,6 +48,8 @@ enum MikshatNavigationCoordinator {
 
   static func stopDirectNavigation(stopRouter: Bool = true) {
     guard let hud = directView else { return }
+    let destination = directDestination
+    directDestination = nil
     hud.stop()
     hud.removeFromSuperview()
     actions?.removeFromSuperview()
@@ -55,7 +58,26 @@ enum MikshatNavigationCoordinator {
     MWMRouter.endMikshatDirect()
     NotificationCenter.default.post(name: visibilityChanged, object: nil)
     MapsAppDelegate.theApp().enableStandby()
-    if stopRouter { MWMRouter.stopRouting() }
+    if stopRouter {
+      MWMRouter.stopRouting()
+      if let destination {
+        restoreDestinationSelection(coordinate: destination.coordinate, title: destination.title)
+      }
+    } else if let destination, !MWMRouter.isRoutingActive(), MWMRouter.pointsCount() == 0 {
+      restoreDestinationSelection(coordinate: destination.coordinate, title: destination.title)
+    }
+  }
+
+  static func restoreDestinationSelection(coordinate: CLLocationCoordinate2D, title: String?) {
+    guard CLLocationCoordinate2DIsValid(coordinate) else { return }
+    // Capture callers' destination before clearing routing; current GPS is never a fallback.
+    stopDirectNavigation(stopRouter: false)
+    if MWMRouter.isRoutingActive() || MWMRouter.pointsCount() > 0 { MWMRouter.stopRouting() }
+    DispatchQueue.main.async {
+      // A newly started route takes precedence over a dismissal still finishing its animation.
+      guard !MWMRouter.isRoutingActive(), MWMRouter.pointsCount() == 0 else { return }
+      MWMRouter.restoreMikshatDestination(coordinate, title: title)
+    }
   }
 }
 
@@ -64,6 +86,8 @@ final class MikshatNavigationActionsView: UIStackView {
   private var leftConstraint: NSLayoutConstraint?
   private var compactLayout: Bool?
   private var buttonSizes: [NSLayoutConstraint] = []
+  private var bottomConstraint: NSLayoutConstraint?
+  private var landscapeBottomConstraint: NSLayoutConstraint?
 
   init() {
     super.init(frame: .zero)
@@ -127,8 +151,11 @@ final class MikshatNavigationActionsView: UIStackView {
     let compact = container.bounds.width > container.bounds.height
     if compactLayout != compact {
       compactLayout = compact
+      axis = compact ? .horizontal : .vertical
       spacing = compact ? 6 : 9
       buttonSizes.forEach { $0.constant = compact ? 44 : 52 }
+      bottomConstraint?.isActive = !compact
+      landscapeBottomConstraint?.isActive = compact
     }
     let original = CGRect(x: container.safeAreaInsets.left + 12, y: frame.minY, width: frame.width, height: frame.height)
     let globe = MikshatSatelliteController.shared.buttonFrame(in: container)
@@ -143,9 +170,11 @@ final class MikshatNavigationActionsView: UIStackView {
       container.insertSubview(self, belowSubview: map.placePageContainer)
     } else { container.addSubview(self) }
     leftConstraint = leftAnchor.constraint(equalTo: container.safeAreaLayoutGuide.leftAnchor, constant: 12)
+    bottomConstraint = bottomAnchor.constraint(equalTo: card.topAnchor, constant: -12)
+    landscapeBottomConstraint = bottomAnchor.constraint(equalTo: container.safeAreaLayoutGuide.bottomAnchor, constant: -12)
     NSLayoutConstraint.activate([
       leftConstraint!,
-      bottomAnchor.constraint(equalTo: card.topAnchor, constant: -12),
+      bottomConstraint!,
     ])
   }
 }
@@ -164,12 +193,22 @@ final class MikshatDirectGuidanceView: UIStackView, MWMLocationObserver {
   private var lastPosition: CLLocation?
   private var lastKnownPosition: CLLocation?
   private var lastRefresh: TimeInterval = 0
-  private var lastHeight: CGFloat = 0
+  private var lastInsets = UIEdgeInsets.zero
+  private var placementConstraints: [NSLayoutConstraint] = []
+  private var placementSize = CGSize.zero
+  private var placementSafeArea = UIEdgeInsets.zero
+  private var placementRailWidth: CGFloat = 0
+  private var metricLegends: [UILabel] = []
+  private var lastMetricsLayout: (width: CGFloat, category: UIContentSizeCategory)?
 
   init(target: CLLocationCoordinate2D, origin: CLLocation) {
     self.target = target
     lastKnownPosition = origin
     super.init(frame: .zero)
+    accessibilityIdentifier = "navigation.directInfoCard"
+    speedValue.accessibilityIdentifier = "navigation.direct.speedValue"
+    distanceValue.accessibilityIdentifier = "navigation.direct.distanceValue"
+    timeValue.accessibilityIdentifier = "navigation.direct.timeValue"
     axis = .vertical
     spacing = 12
     backgroundColor = .white
@@ -199,7 +238,10 @@ final class MikshatDirectGuidanceView: UIStackView, MWMLocationObserver {
       value.minimumScaleFactor = 0.5
       return stack
     }
-    let row = UIStackView(arrangedSubviews: [column(distanceValue, distanceUnit), column(timeValue, timeLegend), column(speedValue, MikshatStyle.label(L("mikshat_kmh"), size: 18, color: .gray))])
+    let speedUnit = MikshatStyle.label(L("mikshat_kmh"), size: 18, color: .gray)
+    speedUnit.accessibilityIdentifier = "navigation.direct.speedUnit"
+    metricLegends = [distanceUnit, timeLegend, speedUnit]
+    let row = UIStackView(arrangedSubviews: [column(distanceValue, distanceUnit), column(timeValue, timeLegend), column(speedValue, speedUnit)])
     row.semanticContentAttribute = .forceLeftToRight
     row.distribution = .fillEqually
     row.spacing = 8
@@ -211,15 +253,20 @@ final class MikshatDirectGuidanceView: UIStackView, MWMLocationObserver {
     config.baseForegroundColor = .white
     config.cornerStyle = .medium
     stopButton.configuration = config
+    stopButton.titleLabel?.numberOfLines = 1
+    stopButton.titleLabel?.adjustsFontSizeToFitWidth = true
+    stopButton.titleLabel?.minimumScaleFactor = 0.5
     stopButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 54).withPriority(.required - 1).isActive = true
     stopButton.addAction(UIAction { _ in MikshatNavigationCoordinator.stopDirectNavigation() }, for: .touchUpInside)
     stopButton.isHidden = true
     addArrangedSubview(stopButton)
     addGestureRecognizer(UIPanGestureRecognizer(target: self, action: #selector(panned(_:))))
     handle.isAccessibilityElement = true
+    handle.accessibilityIdentifier = "navigation.direct.expand"
     handle.accessibilityLabel = L("mikshat_show_stop")
     handle.accessibilityTraits = .button
     handle.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(toggleExpanded)))
+    stopButton.accessibilityIdentifier = "navigation.direct.stop"
     accessibilityCustomActions = [UIAccessibilityCustomAction(name: L("mikshat_stop_navigation"), target: self, selector: #selector(accessibleStop))]
   }
   @available(*, unavailable)
@@ -237,9 +284,58 @@ final class MikshatDirectGuidanceView: UIStackView, MWMLocationObserver {
   }
   override func layoutSubviews() {
     super.layoutSubviews()
-    guard bounds.height > 0, bounds.height != lastHeight else { return }
-    lastHeight = bounds.height
-    MapViewController.shared()?.updateVisibleAreaInsets(for: self, insets: UIEdgeInsets(top: 0, left: 0, bottom: bounds.height, right: 0), updatingViewport: true)
+    guard let parent = superview else { return }
+    installPlacement(in: parent)
+    MikshatHomeControls.updateNavigationInformationCard(self, visible: true)
+    updateResponsiveMetrics()
+    let landscape = parent.bounds.width > parent.bounds.height
+    let insets = UIEdgeInsets(top: 0, left: 0, bottom: landscape ? 0 : parent.bounds.maxY - frame.minY, right: 0)
+    guard bounds.height > 0, insets != lastInsets else { return }
+    lastInsets = insets
+    MapViewController.shared()?.updateVisibleAreaInsets(for: self, insets: insets, updatingViewport: true)
+  }
+
+  override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+    super.traitCollectionDidChange(previousTraitCollection)
+    if previousTraitCollection?.preferredContentSizeCategory != traitCollection.preferredContentSizeCategory { setNeedsLayout() }
+  }
+
+  private func updateResponsiveMetrics() {
+    let category = traitCollection.preferredContentSizeCategory
+    if let previous = lastMetricsLayout, previous.width == bounds.width, previous.category == category { return }
+    lastMetricsLayout = (bounds.width, category)
+    let columnWidth = max(1, (bounds.width - 48) / 3)
+    let valueLimit = max(24, min(56, columnWidth * 0.65))
+    let legendLimit = max(12, min(24, columnWidth * 0.36))
+    for label in [distanceValue, speedValue, timeValue] {
+      label.adjustsFontForContentSizeCategory = false
+      label.font = UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: 38), maximumPointSize: valueLimit, compatibleWith: traitCollection)
+    }
+    for label in metricLegends {
+      label.adjustsFontForContentSizeCategory = false
+      label.font = UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: 18), maximumPointSize: legendLimit, compatibleWith: traitCollection)
+      label.configureSingleLineAutoScaling()
+    }
+  }
+
+  func installPlacement(in parent: UIView) {
+    let railWidth = MikshatHomeControls.landscapeRailWidth(in: parent)
+    guard placementConstraints.isEmpty || placementSize != parent.bounds.size || placementSafeArea != parent.safeAreaInsets || placementRailWidth != railWidth else { return }
+    placementSize = parent.bounds.size
+    placementSafeArea = parent.safeAreaInsets
+    placementRailWidth = railWidth
+    NSLayoutConstraint.deactivate(placementConstraints)
+    let safe = parent.safeAreaLayoutGuide
+    let landscape = parent.bounds.width > parent.bounds.height
+    if landscape {
+      let width = min(560, max(180, safe.layoutFrame.width - 2 * (railWidth + 8)))
+      placementConstraints = [centerXAnchor.constraint(equalTo: safe.centerXAnchor), centerYAnchor.constraint(equalTo: safe.centerYAnchor), widthAnchor.constraint(equalToConstant: width)]
+      layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+    } else {
+      placementConstraints = [leadingAnchor.constraint(equalTo: safe.leadingAnchor), trailingAnchor.constraint(equalTo: safe.trailingAnchor), bottomAnchor.constraint(equalTo: safe.bottomAnchor)]
+      layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+    }
+    NSLayoutConstraint.activate(placementConstraints)
   }
   func start() {
     timer?.invalidate()
@@ -248,6 +344,7 @@ final class MikshatDirectGuidanceView: UIStackView, MWMLocationObserver {
     refresh()
   }
   func stop() {
+    MikshatHomeControls.updateNavigationInformationCard(self, visible: false)
     timer?.invalidate()
     timer = nil
     LocationManager.remove(observer: self)

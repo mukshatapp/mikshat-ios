@@ -114,6 +114,14 @@ char const kMikshatBaseline[] = "mikshat-direct-baseline";
   GetFramework().GetDrapeApi().RemoveLine(kMikshatBaseline);
 }
 
++ (void)restoreMikshatDestination:(CLLocationCoordinate2D)coordinate title:(NSString *)title
+{
+  if (!CLLocationCoordinate2DIsValid(coordinate) || [self isRoutingActive] || [self pointsCount] != 0)
+    return;
+  GetFramework().ShowPointSelection(mercator::FromLatLon(coordinate.latitude, coordinate.longitude),
+                                    title ? title.UTF8String : "");
+}
+
 
 + (MWMRouter *)router
 {

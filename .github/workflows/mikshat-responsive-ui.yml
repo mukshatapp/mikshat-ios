@@ -1,0 +1,290 @@
+name: Mikshat responsive iPhone and iPad validation
+'on':
+  push:
+    branches:
+    - feature/responsive-ios-ui
+  workflow_dispatch: null
+permissions:
+  contents: read
+concurrency:
+  group: mikshat-responsive-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  native:
+    name: Responsive UIKit, search and GPS regressions (${{ matrix.device }})
+    runs-on: xcode-27
+    timeout-minutes: 70
+    env:
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+      MIKSHAT_TEST_DEVICE: ${{ matrix.device }}
+    steps:
+    - name: Check out responsive app sources
+      uses: actions/checkout@v4
+    - name: Record toolchain and available simulators
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p build/search-diagnostics
+        xcodebuild -version | tee build/search-diagnostics/toolchain.txt
+        printf 'MIKSHAT_XCODE_CACHE_ID=%s\n' "$(xcodebuild -version | tr -cs '[:alnum:]' '-')" >> "$GITHUB_ENV"
+        xcrun --sdk iphonesimulator --show-sdk-version | tee -a build/search-diagnostics/toolchain.txt
+        uname -m | tee -a build/search-diagnostics/toolchain.txt
+        xcrun simctl list --json runtimes > build/search-diagnostics/runtimes.json
+        xcrun simctl list --json devicetypes > build/search-diagnostics/device-types.json
+    - name: Fetch pinned submodules
+      shell: bash
+      run: |
+        set -euo pipefail
+        git submodule update --init --recursive --depth 1 --jobs 8
+    - name: Prepare app resources
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 mikshat/prepare_branding.py
+        python3 mikshat/prepare_satellite.py
+    - name: Ensure Metal compiler is available
+      shell: bash
+      run: |
+        set -euo pipefail
+        if ! xcrun metal -v >/dev/null 2>&1; then
+          xcodebuild -downloadComponent MetalToolchain
+          xcrun -k
+        fi
+        xcrun metal -v
+    - name: Restore compiled objects for this Xcode toolchain
+      id: derived-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: build/SearchDerivedData
+        key: mikshat-search-derived-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.MIKSHAT_XCODE_CACHE_ID }}-${{ github.sha
+          }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.device }}
+        restore-keys: |
+          mikshat-search-derived-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.MIKSHAT_XCODE_CACHE_ID }}-
+    - name: Restore unchanged build input timestamps
+      shell: bash
+      run: |
+        set -euo pipefail
+        cat > build/search-diagnostics/cache-input-mtimes.py <<'PY'
+        from pathlib import Path
+        import hashlib
+        import json
+        import os
+        import sys
+
+        manifest = Path('build/SearchDerivedData/mikshat-input-mtimes.json')
+        roots = ('iphone', 'libs', 'xcode', 'data', '3party', 'private')
+        def inputs():
+            for root in roots:
+                if not Path(root).is_dir():
+                    continue
+                for directory, children, files in os.walk(root):
+                    children[:] = [name for name in children if name not in ('.git', '__pycache__', 'node_modules')]
+                    yield Path(directory)
+                    for name in files:
+                        if name != '.git':
+                            yield Path(directory) / name
+        def digest(path):
+            if path.is_dir():
+                names = sorted(child.name for child in path.iterdir() if child.name != '.git')
+                return hashlib.sha256('\n'.join(names).encode()).hexdigest()
+            result = hashlib.sha256()
+            with path.open('rb') as stream:
+                for block in iter(lambda: stream.read(1024 * 1024), b''):
+                    result.update(block)
+            return result.hexdigest()
+        if sys.argv[1] == 'restore':
+            restored = 0
+            if manifest.exists():
+                for item in json.loads(manifest.read_text()):
+                    path = Path(item['path'])
+                    if path.exists() and not path.is_symlink() and digest(path) == item['sha256']:
+                        os.utime(path, ns=(path.stat().st_atime_ns, item['mtime_ns']))
+                        restored += 1
+            print(f'Restored timestamps for {restored} unchanged build inputs')
+        else:
+            entries = []
+            for path in inputs():
+                if path.exists() and not path.is_symlink():
+                    entries.append(dict(path=str(path), sha256=digest(path), mtime_ns=path.stat().st_mtime_ns))
+            manifest.parent.mkdir(parents=True, exist_ok=True)
+            manifest.write_text(json.dumps(entries))
+            print(f'Recorded {len(entries)} build input timestamps')
+        PY
+        python3 build/search-diagnostics/cache-input-mtimes.py restore
+    - name: Boot exact matching iOS runtime
+      shell: bash
+      run: |-
+        set -euo pipefail
+        mkdir -p build/arrow-geometry
+        xcodebuild -version | tee build/arrow-geometry/toolchain.txt
+        xcrun simctl list --json runtimes > build/arrow-geometry/runtimes.json
+        python3 - <<'PYCODE'
+        import json,os,subprocess
+        from pathlib import Path
+        def simctl(*args):
+            return subprocess.check_output(['xcrun','simctl',*args],text=True)
+        runtimes=json.loads(simctl('list','--json','runtimes'))['runtimes']
+        matching=[r for r in runtimes if r.get('isAvailable') and r.get('version')=='27.0' and 'iOS' in r.get('identifier','')]
+        if len(matching)!=1:raise SystemExit('Exactly iOS 27.0 is required; no silent runtime substitution')
+        runtime=matching[0]
+        device=os.environ['MIKSHAT_TEST_DEVICE']
+        types=json.loads(simctl('list','--json','devicetypes'))['devicetypes']
+        if device=='iPhone 16':
+            device_type=next(t for t in types if t['identifier']=='com.apple.CoreSimulator.SimDeviceType.iPhone-16')
+        else:
+            pads=[t for t in types if t['name'].startswith('iPad')]
+            preferred=[t for t in pads if 'Air 11' in t['name'] and 'M3' in t['name']]
+            device_type=(preferred or pads)[-1]
+        udid=simctl('create','Mikshat Responsive '+device+' iOS 27',device_type['identifier'],runtime['identifier']).strip()
+        simctl('boot',udid)
+        subprocess.run(['xcrun','simctl','bootstatus',udid,'-b'],check=True)
+        selection={'udid':udid,'device':device_type,'runtime':runtime}
+        Path('build/arrow-geometry/simulator.json').write_text(json.dumps(selection,indent=2)+'\n')
+        with open(os.environ['GITHUB_ENV'],'a') as f:f.write('MIKSHAT_SIMULATOR_UDID='+udid+'\n')
+        print(json.dumps(selection))
+        PYCODE
+    - name: Run responsive UIKit, copy, navigation, search and GPS ownership tests
+      id: search-tests
+      timeout-minutes: 55
+      shell: bash
+      run: |
+        set -euo pipefail
+        xcodebuild test \
+          -workspace xcode/omim.xcworkspace \
+          -scheme OMaps \
+          -configuration Debug \
+          -sdk iphonesimulator \
+          -destination "id=$MIKSHAT_SIMULATOR_UDID" \
+          -destination-timeout 120 \
+          -derivedDataPath build/SearchDerivedData \
+          -resultBundlePath build/SearchRegressions.xcresult \
+          -testLanguage ar \
+          -testRegion SA \
+          -parallel-testing-enabled NO \
+          -maximum-concurrent-test-simulator-destinations 1 \
+          -test-timeouts-enabled YES \
+          -default-test-execution-time-allowance 120 \
+          -maximum-test-execution-time-allowance 180 \
+          -only-testing:OMapsTests/MikshatResponsiveCompassTests \
+                  -only-testing:OMapsTests/MikshatResponsivePlaceCoordinatesTests \
+                  -only-testing:OMapsTests/MikshatResponsiveNavigationTests \
+          -only-testing:OMapsTests/MikshatResponsivePresentationTests \
+          -only-testing:OMapsTests/MikshatMapControlLayoutTests \
+                  -only-testing:OMapsTests/MikshatWeatherViewTests \
+                  -only-testing:OMapsTests/SearchThemeWindowLifecycleTests \
+                  -only-testing:OMapsTests/SearchHistoryOnlyTests \
+          -only-testing:OMapsTests/MikshatSearchDirectionIndicatorTests \
+          -only-testing:OMapsTests/MikshatHeadingCacheLifecycleTests \
+          ARCHS="$(uname -m)" \
+          ONLY_ACTIVE_ARCH=YES \
+          CODE_SIGNING_REQUIRED=NO \
+          CODE_SIGNING_ALLOWED=NO \
+          2>&1 | tee build/search-diagnostics/xcodebuild-search-tests.log
+    - name: Require real native test execution
+      if: always()
+      run: |-
+        python3 - <<'PYCODE'
+        from pathlib import Path
+        import importlib.util,json
+        spec=importlib.util.spec_from_file_location('native_results','mikshat/tests/weather-data/verify-native-results.py')
+        m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+        m.EXPECTED_CLASSES={'MikshatResponsiveCompassTests':3,'MikshatResponsivePlaceCoordinatesTests':3,'MikshatResponsiveNavigationTests':4,'MikshatResponsivePresentationTests':2,'MikshatMapControlLayoutTests':1,'MikshatWeatherViewTests':6,'SearchThemeWindowLifecycleTests':4,'SearchHistoryOnlyTests':8,'MikshatSearchDirectionIndicatorTests':3,'MikshatHeadingCacheLifecycleTests':2}
+        p=Path('build/search-diagnostics/xcodebuild-search-tests.log')
+        report=m.analyze(p.read_text(errors='replace') if p.exists() else '')
+        p.with_suffix('.summary.json').write_text(json.dumps(report,indent=2)+'\n')
+        print(json.dumps(report))
+        if not report['passed']:raise SystemExit('All 36 native tests must execute once and pass without skips or cancellation')
+        PYCODE
+    - name: Collect app crash reports and simulator log
+      if: always()
+      shell: bash
+      run: |
+        mkdir -p build/search-diagnostics/crash-reports
+        python3 - <<'PY'
+        from pathlib import Path
+        import shutil
+        source = Path.home() / 'Library/Logs/DiagnosticReports'
+        destination = Path('build/search-diagnostics/crash-reports')
+        if source.exists():
+            for report in source.rglob('*'):
+                if report.is_file() and report.suffix in ('.ips', '.crash', '.hang'):
+                    if any(name in report.name.lower() for name in ('organic', 'omaps')):
+                        shutil.copy2(report, destination / report.name)
+        PY
+        if [[ -n "${MIKSHAT_SIMULATOR_UDID:-}" ]]; then
+          xcrun simctl spawn "$MIKSHAT_SIMULATOR_UDID" log show --last 3m --style compact \
+            --predicate 'process CONTAINS[c] "Organic" OR process CONTAINS[c] "OMaps"' \
+            > build/search-diagnostics/simulator-app.log 2>&1 || true
+        fi
+    - name: Export actual UIKit screenshot attachments
+      if: always()
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [[ -d build/SearchRegressions.xcresult ]]; then
+          xcrun xcresulttool export attachments --path build/SearchRegressions.xcresult --output-path build/responsive-screenshots
+        fi
+    - name: Prepare small previews for visual review
+      if: always()
+      shell: bash
+      run: |
+        python3 - <<'PYCODE'
+        from pathlib import Path
+        import base64,json,os,subprocess
+        udid=os.environ.get('MIKSHAT_SIMULATOR_UDID')
+        if not udid:raise SystemExit(0)
+        container=subprocess.run(['xcrun','simctl','get_app_container',udid,'com.mikshat.maps.debug','data'],text=True,capture_output=True)
+        if container.returncode:raise SystemExit(0)
+        source=Path(container.stdout.strip())/'Documents'
+        target=Path('build/responsive-screenshots/previews');target.mkdir(parents=True,exist_ok=True)
+        files=sorted([*source.glob('responsive-*-fixture.png'),*source.glob('weather-*-fixture.png')])
+        print('MIKSHAT_UI_IMAGES '+json.dumps([p.name for p in files]))
+        preferred=['compass-destination-compact-phone-landscape','compass-general-tablet-landscape',
+                   'navigation-joint-native-phone-expanded','navigation-joint-direct-compact-phone-collapsed',
+                   'place-preview','weather-light-landscape','weather-saved-after-failed-refresh']
+        selected=[]
+        for token in preferred:
+            matches=[p for p in files if token in p.name]
+            if matches:selected.append(matches[0])
+        for image in selected:
+            preview=target/image.name
+            subprocess.run(['sips','-Z','700',str(image),'--out',str(preview)],check=True,stdout=subprocess.DEVNULL)
+            data=preview.read_bytes()
+            if len(data)<=300000:
+                print('MIKSHAT_UI_PREVIEW '+json.dumps({'name':preview.name,'pngBase64':base64.b64encode(data).decode()}))
+        PYCODE
+    - name: Upload native test results, layout screenshots and diagnostics
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: mikshat-responsive-${{ matrix.device }}-ios27
+        retention-days: 7
+        if-no-files-found: warn
+        path: |-
+          build/search-diagnostics/
+          build/weather-screenshots/
+          build/SearchRegressions.xcresult/
+          build/responsive-screenshots/
+    - name: Record current source timestamps for the next incremental build
+      if: always()
+      shell: bash
+      run: |
+        if [[ -f build/search-diagnostics/cache-input-mtimes.py && -d build/SearchDerivedData/Build ]]; then
+          python3 build/search-diagnostics/cache-input-mtimes.py record
+        fi
+    - name: Save compiled objects even when a test or test compilation fails
+      if: always() && hashFiles('build/SearchDerivedData/mikshat-input-mtimes.json') != ''
+      timeout-minutes: 4
+      uses: actions/cache/save@v4
+      with:
+        path: build/SearchDerivedData
+        key: mikshat-search-derived-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.MIKSHAT_XCODE_CACHE_ID }}-${{ github.sha
+          }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.device }}
+    strategy:
+      fail-fast: false
+      matrix:
+        device:
+        - iPhone 16
+        - iPad

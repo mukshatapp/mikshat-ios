@@ -859,7 +859,7 @@
 /* iOS dialog for the case when recent track recording is on and the app comes back from background */
 "recent_track_background_dialog_title" = "最近の走行ルートの記録を無効にしますか？";
 "off_recent_track_background_button" = "無効にする";
-"recent_track_background_dialog_message" = "Organic Mapsは、あなたの位置情報をバックグラウンドで使用して最近の走行ルートを記録します。";
+"recent_track_background_dialog_message" = "Mikshatは、あなたの位置情報をバックグラウンドで使用して最近の走行ルートを記録します。";
 "general_settings" = "一般設定";
 
 /* "traffic" as in road congestion */
@@ -1287,3 +1287,7 @@
 "mikshat_weather_wind_w" = "west";
 
 "mikshat_kmh" = "km/h";
+"mikshat_collapsed" = "Collapsed";
+"mikshat_coordinate_formats" = "Coordinate formats";
+"mikshat_copy_coordinates_format" = "Copy coordinates in %@ format";
+"mikshat_expanded" = "Expanded";

@@ -479,10 +479,12 @@ final class MikshatMapControlLayoutTests: XCTestCase {
     let map = try XCTUnwrap(MapViewController.shared())
     map.loadViewIfNeeded()
     let home = try XCTUnwrap(map.view.subviews.compactMap { $0 as? MikshatHomeControls }.first)
-    let buttons = MWMSideButtons().view!
+    let buttons = try XCTUnwrap(MWMSideButtons().view)
     XCTAssertFalse(buttons.superview === home.superview, "Regression covers the actual separate containers")
     defer { MWMSideButtons.updateAvailableArea(map.view.bounds) }
     let heights: [CGFloat] = [map.view.bounds.height, 80, 240, map.view.bounds.height]
+    var originalTools: CGRect?
+    var originalUpperTools: CGRect?
     for areaHeight in heights {
       MWMSideButtons.updateAvailableArea(CGRect(x: 0, y: 0, width: map.view.bounds.width, height: areaHeight))
       map.view.setNeedsLayout()
@@ -490,12 +492,38 @@ final class MikshatMapControlLayoutTests: XCTestCase {
       map.view.layoutIfNeeded()
       let tools = buttons.convert(buttons.bounds, to: map.view)
       let upperTools = home.convert(home.bounds, to: map.view)
-      XCTAssertEqual(tools.minY, upperTools.maxY + 12, accuracy: 1)
-      XCTAssertEqual(tools.midX, upperTools.midX, accuracy: 1)
-      let nativeButtons = buttons.subviews.compactMap { $0 as? UIButton }.sorted { $0.frame.minY < $1.frame.minY }
+      XCTAssertFalse(tools.intersects(upperTools), "Native and custom map controls must stay separate")
+      XCTAssertTrue(map.view.bounds.insetBy(dx: -1, dy: -1).contains(tools))
+      XCTAssertTrue(map.view.bounds.insetBy(dx: -1, dy: -1).contains(upperTools))
+      if tools.minY >= upperTools.maxY {
+        XCTAssertGreaterThanOrEqual(tools.minY, upperTools.maxY + 7)
+        XCTAssertTrue(abs(tools.midX - upperTools.midX) <= 1 || abs(tools.maxX - upperTools.maxX) <= 1,
+                      "The lower native row aligns with the custom controls")
+      } else {
+        XCTAssertGreaterThanOrEqual(tools.minX, upperTools.maxX + 7)
+        XCTAssertEqual(tools.minY, upperTools.minY, accuracy: 1)
+      }
+      if let originalTools, let originalUpperTools {
+        XCTAssertEqual(tools, originalTools, "Changing the sheet's available area must not move the native rail")
+        XCTAssertEqual(upperTools, originalUpperTools, "Changing the sheet's available area must not move the compass/Qibla controls")
+      } else {
+        originalTools = tools
+        originalUpperTools = upperTools
+      }
+      let horizontal = buttons.bounds.width > buttons.bounds.height
+      let nativeButtons = buttons.subviews.compactMap { $0 as? UIButton }.sorted {
+        horizontal ? $0.frame.minX < $1.frame.minX : $0.frame.minY < $1.frame.minY
+      }
       XCTAssertEqual(nativeButtons.count, 3)
+      XCTAssertEqual(nativeButtons.map(\.accessibilityIdentifier), ["map.zoomIn", "map.zoomOut", "map.location"])
+      for button in nativeButtons {
+        XCTAssertGreaterThanOrEqual(button.bounds.width, 44)
+        XCTAssertGreaterThanOrEqual(button.bounds.height, 44)
+        XCTAssertTrue(buttons.bounds.insetBy(dx: -1, dy: -1).contains(button.frame))
+      }
       for pair in zip(nativeButtons, nativeButtons.dropFirst()) {
-        XCTAssertGreaterThanOrEqual(pair.1.frame.minY, pair.0.frame.maxY + 7)
+        if horizontal { XCTAssertGreaterThanOrEqual(pair.1.frame.minX, pair.0.frame.maxX + 7) }
+        else { XCTAssertGreaterThanOrEqual(pair.1.frame.minY, pair.0.frame.maxY + 7) }
       }
     }
   }

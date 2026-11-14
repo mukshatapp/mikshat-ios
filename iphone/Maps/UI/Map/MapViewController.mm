@@ -31,7 +31,6 @@ extern NSString * const kMap2FBLoginSegue = @"Map2FBLogin";
 extern NSString * const kMap2GoogleLoginSegue = @"Map2GoogleLogin";
 
 static CGFloat kPlacePageCompactWidth = 350;
-static CGFloat const kPlacePageLeadingOffset = 20;
 
 typedef NS_ENUM(NSUInteger, UserTouchesAction) {
   UserTouchesActionNone,
@@ -120,6 +119,7 @@ NSString * const kCategorySelectorSegue = @"MapToCategorySelectorSegue";
 @property(nonatomic) NSLayoutConstraint * placePageWidthConstraint;
 @property(nonatomic) NSLayoutConstraint * placePageLeadingConstraint;
 @property(nonatomic) NSLayoutConstraint * placePageTrailingConstraint;
+@property(nonatomic) NSLayoutConstraint * placePageCenterXConstraint;
 
 @property(nonatomic, readwrite) BOOL isMapVisible;
 
@@ -178,15 +178,15 @@ NSString * const kCategorySelectorSegue = @"MapToCategorySelectorSegue";
   [self.view bringSubviewToFront:self.placePageContainer];
 
   self.placePageLeadingConstraint =
-      [self.placePageContainer.leadingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.leadingAnchor
-                                                            constant:IPAD ? kPlacePageLeadingOffset : 0];
-  if (IPAD)
-    self.placePageLeadingConstraint.priority = UILayoutPriorityDefaultLow;
+      [self.placePageContainer.leadingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.leadingAnchor];
 
   self.placePageWidthConstraint =
       [self.placePageContainer.widthAnchor constraintEqualToConstant:kPlacePageCompactWidth];
+  self.placePageWidthConstraint.priority = UILayoutPriorityRequired - 1;
   self.placePageTrailingConstraint =
       [self.placePageContainer.trailingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.trailingAnchor];
+  self.placePageCenterXConstraint =
+      [self.placePageContainer.centerXAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.centerXAnchor];
 
   NSLayoutConstraint * topConstraint =
       [self.placePageContainer.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor];
@@ -198,7 +198,7 @@ NSString * const kCategorySelectorSegue = @"MapToCategorySelectorSegue";
     bottomConstraint = [self.placePageContainer.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor];
 
   [NSLayoutConstraint activateConstraints:@[
-    self.placePageLeadingConstraint,
+    [self.placePageContainer.widthAnchor constraintLessThanOrEqualToAnchor:self.view.safeAreaLayoutGuide.widthAnchor],
     topConstraint,
     bottomConstraint,
   ]];
@@ -221,28 +221,20 @@ NSString * const kCategorySelectorSegue = @"MapToCategorySelectorSegue";
 
 - (void)updatePlacePageContainerConstraints
 {
-  const BOOL isLimitedWidth = IPAD || self.traitCollection.verticalSizeClass == UIUserInterfaceSizeClassCompact;
-
-  if (IPAD)
-  {
-    if (self.searchViewAvailableArea)
-    {
-      NSLayoutConstraint * leadingToSearchConstraint = [self.placePageContainer.leadingAnchor
-          constraintGreaterThanOrEqualToAnchor:self.searchViewAvailableArea.trailingAnchor
-                                      constant:kPlacePageLeadingOffset];
-      leadingToSearchConstraint.priority = UILayoutPriorityDefaultHigh;
-      leadingToSearchConstraint.active = isLimitedWidth;
-    }
-  }
+  const BOOL isLimitedWidth = IPAD || CGRectGetWidth(self.view.bounds) > CGRectGetHeight(self.view.bounds);
 
   if (isLimitedWidth)
   {
+    [self.placePageLeadingConstraint setActive:NO];
     [self.placePageTrailingConstraint setActive:NO];
+    [self.placePageCenterXConstraint setActive:YES];
     [self.placePageWidthConstraint setActive:YES];
   }
   else
   {
+    [self.placePageCenterXConstraint setActive:NO];
     [self.placePageWidthConstraint setActive:NO];
+    [self.placePageLeadingConstraint setActive:YES];
     [self.placePageTrailingConstraint setActive:YES];
   }
   [self.view layoutIfNeeded];
@@ -564,6 +556,9 @@ NSString * const kCategorySelectorSegue = @"MapToCategorySelectorSegue";
 - (void)viewDidLayoutSubviews
 {
   [super viewDidLayoutSubviews];
+  const BOOL isLimitedPlacePageWidth = IPAD || CGRectGetWidth(self.view.bounds) > CGRectGetHeight(self.view.bounds);
+  if (self.placePageContainer && self.placePageCenterXConstraint.isActive != isLimitedPlacePageWidth)
+    [self updatePlacePageContainerConstraints];
   if (!self.mapView.drapeEngineCreated && !MapsAppDelegate.isTestsEnvironment)
     [self.mapView createDrapeEngine];
 }

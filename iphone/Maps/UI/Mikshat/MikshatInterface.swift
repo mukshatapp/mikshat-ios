@@ -60,14 +60,65 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
   private let units = MikshatStyle.label(L("mikshat_kmh"), size: 17, color: MikshatStyle.green)
   private var widthConstraint: NSLayoutConstraint?
   private var topConstraint: NSLayoutConstraint?
+  private var rightConstraint: NSLayoutConstraint?
   private var qiblaHeightConstraint: NSLayoutConstraint?
   private var compassHeightConstraint: NSLayoutConstraint?
-  private var lastLandscape: Bool?
+  private var speedHeightConstraint: NSLayoutConstraint?
+  private var layoutMode = 0
+  private var nativeButtonSize: CGFloat = 52
+  private var nativeHorizontal = false
+  private var lastControlStyle: (mode: Int, landscape: Bool, buttonSize: CGFloat, category: UIContentSizeCategory)?
   private var timer: Timer?
 
   private static weak var installedControls: MikshatHomeControls?
   private static weak var mapControls: UIView?
+  private static weak var navigationObstruction: UIView?
+  private static var navigationObstructionFrame = CGRect.zero
+  private static var obstructionViewport: (bounds: CGRect, safeInsets: UIEdgeInsets, frame: CGRect)?
+  private static weak var navigationInformationCard: UIView?
+  private static var informationCardFrame = CGRect.zero
   private static var mapControlConstraints: [NSLayoutConstraint] = []
+
+  @objc static var mapControlButtonSize: CGFloat { installedControls?.nativeButtonSize ?? 52 }
+  @objc static var mapControlsHorizontal: Bool { installedControls?.nativeHorizontal ?? false }
+
+  @objc(updateNavigationObstruction:frame:)
+  static func updateNavigationObstruction(_ view: UIView, frame: CGRect) {
+    let source: UIView? = frame.isEmpty ? nil : view
+    let container = installedControls?.superview
+    let viewportBounds = container?.bounds ?? .zero
+    let safeInsets = container?.safeAreaInsets ?? .zero
+    let occupied = source.map { $0.convert(frame, to: container) } ?? .zero
+    guard navigationObstruction !== source || navigationObstructionFrame != frame ||
+            obstructionViewport?.bounds != viewportBounds || obstructionViewport?.safeInsets != safeInsets ||
+            obstructionViewport?.frame != occupied else { return }
+    navigationObstruction = source
+    navigationObstructionFrame = frame
+    obstructionViewport = (viewportBounds, safeInsets, occupied)
+    installedControls?.setNeedsLayout()
+  }
+
+  static func updateNavigationInformationCard(_ view: UIView, visible: Bool) {
+    if visible {
+      guard navigationInformationCard !== view || informationCardFrame != view.frame else { return }
+      navigationInformationCard = view
+      informationCardFrame = view.frame
+    } else {
+      guard navigationInformationCard === view else { return }
+      navigationInformationCard = nil
+      informationCardFrame = .zero
+    }
+    installedControls?.setNeedsLayout()
+  }
+
+  static func landscapeRailWidth(in view: UIView) -> CGFloat {
+    // Reserve room on both sides of a centered card so the right rail remains reachable.
+    guard let controls = installedControls, let container = controls.superview,
+          view === container || view.isDescendant(of: container) else { return 0 }
+    let nativeWidth = controls.nativeHorizontal ? 3 * controls.nativeButtonSize + 16 : controls.nativeButtonSize
+    let customWidth: CGFloat = controls.layoutMode >= 2 ? 180 : 76
+    return 14 + (controls.layoutMode == 1 ? customWidth + 8 + nativeWidth : max(customWidth, nativeWidth))
+  }
 
   @objc(attachMapControls:)
   static func attachMapControls(_ view: UIView) {
@@ -85,10 +136,22 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
     while let candidate = ancestor, !controls.isDescendant(of: candidate) { ancestor = candidate.superview }
     guard ancestor != nil else { return }
     buttons.translatesAutoresizingMaskIntoConstraints = false
-    mapControlConstraints = [
-      buttons.topAnchor.constraint(equalTo: controls.bottomAnchor, constant: 12),
-      buttons.centerXAnchor.constraint(equalTo: controls.centerXAnchor),
-    ]
+    if controls.layoutMode == 1 {
+      mapControlConstraints = [
+        buttons.topAnchor.constraint(equalTo: controls.topAnchor),
+        buttons.leadingAnchor.constraint(equalTo: controls.trailingAnchor, constant: 8),
+      ]
+    } else if controls.layoutMode == 0 {
+      mapControlConstraints = [
+        buttons.topAnchor.constraint(equalTo: controls.bottomAnchor, constant: 12),
+        buttons.centerXAnchor.constraint(equalTo: controls.centerXAnchor),
+      ]
+    } else {
+      mapControlConstraints = [
+        buttons.topAnchor.constraint(equalTo: controls.bottomAnchor, constant: 8),
+        buttons.trailingAnchor.constraint(equalTo: controls.trailingAnchor),
+      ]
+    }
     NSLayoutConstraint.activate(mapControlConstraints)
   }
 
@@ -101,20 +164,33 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
       return
     }
     let controls = MikshatHomeControls()
+    controls.accessibilityIdentifier = "map.rightControls"
+    controls.semanticContentAttribute = .forceLeftToRight
     controls.axis = .vertical
     controls.spacing = 10
     controls.translatesAutoresizingMaskIntoConstraints = false
     let speedCard = UIStackView(arrangedSubviews: [controls.speed, controls.units])
+    speedCard.accessibilityIdentifier = "map.speedCard"
+    controls.speed.accessibilityIdentifier = "map.speedValue"
+    controls.units.accessibilityIdentifier = "map.speedUnit"
+    controls.speed.numberOfLines = 1
+    controls.speed.adjustsFontSizeToFitWidth = true
+    controls.speed.minimumScaleFactor = 0.6
+    controls.units.numberOfLines = 1
+    controls.units.adjustsFontSizeToFitWidth = true
     speedCard.axis = .vertical
     speedCard.alignment = .center
     speedCard.backgroundColor = .white
     speedCard.layer.cornerRadius = 20
     speedCard.isLayoutMarginsRelativeArrangement = true
-    speedCard.layoutMargins = UIEdgeInsets(top: 8, left: 4, bottom: 8, right: 4)
+    speedCard.layoutMargins = UIEdgeInsets(top: 6, left: 6, bottom: 6, right: 6)
+    controls.speed.widthAnchor.constraint(lessThanOrEqualTo: speedCard.layoutMarginsGuide.widthAnchor).isActive = true
+    controls.units.widthAnchor.constraint(lessThanOrEqualTo: speedCard.layoutMarginsGuide.widthAnchor).isActive = true
     let qibla = UIButton(type: .custom)
     qibla.backgroundColor = .white
     qibla.layer.cornerRadius = 20
     qibla.accessibilityLabel = L("mikshat_qibla")
+    qibla.accessibilityIdentifier = "map.qibla"
     qibla.addAction(UIAction { _ in
       guard let map = MapViewController.shared() else { return }
       let controller = MikshatCompassViewController(target: nil, name: L("mikshat_qibla"))
@@ -133,6 +209,7 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
     compass.tintColor = MikshatStyle.green
     compass.setImage(MikshatSymbols.image(named: "safari"), for: .normal)
     compass.accessibilityLabel = L("mikshat_heading")
+    compass.accessibilityIdentifier = "map.compass"
     compass.addAction(UIAction { _ in
       guard let map = MapViewController.shared() else { return }
       let controller = MikshatCompassViewController(target: nil, name: L("mikshat_heading"), general: true)
@@ -143,15 +220,19 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
     controls.addArrangedSubview(qibla)
     view.addSubview(controls)
     installedControls = controls
-    controls.widthConstraint = controls.widthAnchor.constraint(equalToConstant: 68)
+    controls.widthConstraint = controls.widthAnchor.constraint(equalToConstant: 88)
     controls.topConstraint = controls.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 64)
+    controls.rightConstraint = controls.rightAnchor.constraint(equalTo: view.safeAreaLayoutGuide.rightAnchor, constant: -14)
     controls.qiblaHeightConstraint = qibla.heightAnchor.constraint(equalToConstant: 64)
     controls.compassHeightConstraint = compass.heightAnchor.constraint(equalToConstant: 64)
+    controls.speedHeightConstraint = speedCard.heightAnchor.constraint(equalToConstant: 76)
+    speedCard.widthAnchor.constraint(greaterThanOrEqualToConstant: 76).isActive = true
+    compass.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+    qibla.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
     NSLayoutConstraint.activate([
-      controls.rightAnchor.constraint(equalTo: view.safeAreaLayoutGuide.rightAnchor, constant: -14),
-      controls.topConstraint!, controls.widthConstraint!, controls.qiblaHeightConstraint!, controls.compassHeightConstraint!,
+      controls.rightConstraint!, controls.topConstraint!, controls.widthConstraint!, controls.qiblaHeightConstraint!, controls.compassHeightConstraint!, controls.speedHeightConstraint!,
       kaaba.centerXAnchor.constraint(equalTo: qibla.centerXAnchor), kaaba.centerYAnchor.constraint(equalTo: qibla.centerYAnchor),
-      kaaba.widthAnchor.constraint(equalToConstant: 48), kaaba.heightAnchor.constraint(equalTo: kaaba.widthAnchor),
+      kaaba.widthAnchor.constraint(equalToConstant: 36), kaaba.heightAnchor.constraint(equalTo: kaaba.widthAnchor),
     ])
     bindMapControls()
   }
@@ -160,22 +241,62 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
     super.layoutSubviews()
     guard let parent = superview else { return }
     let landscape = parent.bounds.width > parent.bounds.height
+    let safe = parent.bounds.inset(by: parent.safeAreaInsets)
+    let obstruction = Self.navigationObstruction.map { $0.convert(Self.navigationObstructionFrame, to: parent) } ?? .zero
+    let top = obstruction.isEmpty ? safe.minY + (landscape ? 4 : 64) : max(safe.minY + 4, obstruction.maxY + 12)
+    let cardTop = Self.navigationInformationCard.flatMap { card -> CGFloat? in
+      guard !landscape, card.isDescendant(of: parent) else { return nil }
+      return card.convert(card.bounds, to: parent).minY - 8
+    }
+    let cardSpace = min(safe.maxY, cardTop ?? safe.maxY) - top - 8
+    // An expanded card already dims the map; keep its covered tools below the maneuver until it collapses.
+    let availableHeight = max(0, cardSpace >= 96 ? cardSpace : safe.maxY - top - 8)
+    let buttonSize: CGFloat = landscape || availableHeight < 420 ? 44 : 52
+    var speedHeight: CGFloat = landscape ? 64 : 76
+    let customButtonHeight: CGFloat = landscape || availableHeight < 420 ? 44 : 64
+    let customHeight = speedHeight + 2 * customButtonHeight + 16
+    let nativeHeight = 3 * buttonSize + 16
+    let mode: Int
+    if customHeight + 12 + nativeHeight <= availableHeight { mode = 0 }
+    else if max(customHeight, nativeHeight) <= availableHeight { mode = 1 }
+    else if speedHeight + 8 + buttonSize <= availableHeight { mode = 2 }
+    else {
+      mode = 3
+      speedHeight = 44
+    }
+    let topInset = top - safe.minY
+    if topConstraint?.constant != topInset { topConstraint?.constant = topInset }
+    let category = traitCollection.preferredContentSizeCategory
+    if let previous = lastControlStyle, previous.mode == mode, previous.landscape == landscape,
+       previous.buttonSize == buttonSize, previous.category == category { return }
+    lastControlStyle = (mode, landscape, buttonSize, category)
     MikshatSatelliteController.shared.updateLayout(in: parent)
-    guard landscape != lastLandscape else { return }
-    lastLandscape = landscape
-    Self.mapControls?.setNeedsLayout()
-    axis = .vertical
+    let previousMode = layoutMode
+    layoutMode = mode
+    nativeButtonSize = buttonSize
+    nativeHorizontal = mode >= 2
+    axis = mode >= 2 ? .horizontal : .vertical
+    alignment = mode >= 2 ? .center : .fill
+    spacing = 8
     distribution = .fill
-    widthConstraint?.constant = landscape ? 52 : 68
-    topConstraint?.constant = landscape ? 4 : 64
-    qiblaHeightConstraint?.constant = landscape ? 44 : 64
-    compassHeightConstraint?.constant = landscape ? 44 : 64
-    units.isHidden = landscape
-    speed.font = UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: landscape ? 24 : 32))
+    widthConstraint?.constant = mode >= 2 ? 76 + 2 * 44 + 16 : (landscape ? 76 : 88)
+    let nativeWidth = nativeHorizontal ? 3 * buttonSize + 16 : buttonSize
+    rightConstraint?.constant = -14 - (mode == 1 ? nativeWidth + 8 : 0)
+    qiblaHeightConstraint?.constant = customButtonHeight
+    compassHeightConstraint?.constant = customButtonHeight
+    speedHeightConstraint?.constant = speedHeight
+    units.isHidden = false
+    speed.adjustsFontForContentSizeCategory = false
+    units.adjustsFontForContentSizeCategory = false
+    speed.font = mode == 3 ? .systemFont(ofSize: 18) : UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: landscape ? 28 : 32), maximumPointSize: 32, compatibleWith: traitCollection)
+    units.font = mode == 3 ? .systemFont(ofSize: 10) : UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: landscape ? 14 : 17), maximumPointSize: 17, compatibleWith: traitCollection)
+    if previousMode != mode { Self.bindMapControls() }
+    Self.mapControls?.setNeedsLayout()
   }
 
   override func didMoveToWindow() {
     super.didMoveToWindow()
+    setNeedsLayout()
     timer?.invalidate()
     if window != nil {
       LocationManager.add(observer: self)
@@ -183,10 +304,19 @@ final class MikshatHomeControls: UIStackView, MWMLocationObserver {
       refresh()
     } else { LocationManager.remove(observer: self) }
   }
+  override func safeAreaInsetsDidChange() {
+    super.safeAreaInsetsDidChange()
+    setNeedsLayout()
+  }
+  override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+    super.traitCollectionDidChange(previousTraitCollection)
+    if previousTraitCollection?.preferredContentSizeCategory != traitCollection.preferredContentSizeCategory { setNeedsLayout() }
+  }
   func onLocationUpdate(_ location: CLLocation) { refresh() }
   private func refresh() {
     guard let fix = LocationManager.lastLocation(), fix.horizontalAccuracy >= 0,
-          abs(fix.timestamp.timeIntervalSinceNow) < 15, fix.speed >= 0 else { speed.text = "—"; return }
+          abs(fix.timestamp.timeIntervalSinceNow) < 15, fix.speed.isFinite, fix.speed >= 0,
+          fix.speed * 3.6 < Double(Int.max) else { speed.text = "—"; return }
     speed.text = String(Int((fix.speed * 3.6).rounded()))
   }
 }
@@ -267,6 +397,7 @@ final class MikshatCompassViewController: UIViewController, MWMLocationObserver 
   private let target: CLLocationCoordinate2D?
   private let destinationName: String
   private let general: Bool
+  private let onClose: (() -> Void)?
   private var isQibla: Bool { target == nil && !general }
   private let coordinates = MikshatStyle.label("—", size: 24, color: MikshatStyle.green)
   private weak var copyButton: UIButton?
@@ -281,10 +412,31 @@ final class MikshatCompassViewController: UIViewController, MWMLocationObserver 
   private var estimate = MikshatTravelEstimate()
   private var lastCompassRefresh: TimeInterval = 0
   private var usesHeadingSensor = false
+  private let scroll = UIScrollView()
+  private let content = UIStackView()
+  private let body = UIStackView()
+  private let details = UIStackView()
+  private let dialContainer = UIView()
+  private var header: UIStackView!
+  private var titleLabel: UILabel!
+  private var destinationCoordinates: UILabel?
+  private var cardTitles: [UILabel] = []
+  private var cards: [UIStackView] = []
+  private var metricRows: [UIStackView] = []
+  private var coordinateActions: UIStackView?
+  private var qiblaHint: UILabel?
+  private var viewportHeight: NSLayoutConstraint!
+  private var minimumContentHeight: NSLayoutConstraint!
+  private var minimumDialHeight: NSLayoutConstraint!
+  private var wideDetailsWidth: NSLayoutConstraint!
+  private var wideDialHeight: NSLayoutConstraint!
+  private var lastLayout: (wide: Bool, compact: Bool, scrolling: Bool, category: UIContentSizeCategory)?
+  private var renderedLocation: CLLocation?
 
-  init(target: CLLocationCoordinate2D?, name: String, general: Bool = false) {
+  init(target: CLLocationCoordinate2D?, name: String, general: Bool = false, onClose: (() -> Void)? = nil) {
     self.general = general
     self.target = target
+    self.onClose = onClose
     destinationName = name
     super.init(nibName: nil, bundle: nil)
   }
@@ -303,140 +455,304 @@ final class MikshatCompassViewController: UIViewController, MWMLocationObserver 
     if !qibla {
       [status, speedValue, distanceValue, durationValue, arrivalValue].forEach { $0.textColor = MikshatStyle.green }
     }
-    let close = MikshatStyle.button("", symbol: "xmark") { [weak self] in self?.dismiss(animated: true) }
+    let close = MikshatStyle.button("", symbol: "xmark") { [weak self] in self?.closeCompass() }
     close.configuration?.baseForegroundColor = qibla ? MikshatStyle.gold : MikshatStyle.green
     close.accessibilityLabel = L("close")
+    close.accessibilityIdentifier = "mikshat.compass.close"
     close.heightAnchor.constraint(equalToConstant: 44).isActive = true
     close.widthAnchor.constraint(equalToConstant: 44).isActive = true
-    let title = MikshatStyle.label(qibla ? L("mikshat_qibla_title") : destinationName, size: 25, color: qibla ? MikshatStyle.gold : MikshatStyle.green)
-    let titleBlock = UIStackView(arrangedSubviews: [title])
+    titleLabel = MikshatStyle.label(qibla ? L("mikshat_qibla_title") : destinationName, size: 25, color: qibla ? MikshatStyle.gold : MikshatStyle.green)
+    titleLabel.accessibilityIdentifier = "mikshat.compass.title"
+    titleLabel.numberOfLines = 2
+    titleLabel.adjustsFontSizeToFitWidth = true
+    titleLabel.minimumScaleFactor = 0.75
+    let titleBlock = UIStackView(arrangedSubviews: [titleLabel!])
     titleBlock.axis = .vertical
-    titleBlock.spacing = 8
+    titleBlock.spacing = 3
     if let target {
       let value = String(format: "%.6f, %.6f", locale: Locale(identifier: "en_US_POSIX"), target.latitude, target.longitude)
       let subtitle = MikshatStyle.label(value, size: 17, color: MikshatStyle.green)
       subtitle.semanticContentAttribute = .forceLeftToRight
+      subtitle.numberOfLines = 1
+      subtitle.adjustsFontSizeToFitWidth = true
+      subtitle.minimumScaleFactor = 0.7
+      destinationCoordinates = subtitle
       titleBlock.addArrangedSubview(subtitle)
     }
-    let header = UIStackView(arrangedSubviews: qibla ? [UIView(), close] : [close, titleBlock])
-    header.spacing = 10
+    let balance = UIView()
+    balance.widthAnchor.constraint(equalToConstant: 44).isActive = true
+    header = UIStackView(arrangedSubviews: [close, titleBlock, balance])
+    header.alignment = .center
+    header.spacing = 6
     header.semanticContentAttribute = .forceLeftToRight
+    header.setContentHuggingPriority(.required, for: .vertical)
+    header.setContentCompressionResistancePriority(.required, for: .vertical)
     if !qibla {
       header.backgroundColor = UIColor.white.withAlphaComponent(0.92)
       header.layer.cornerRadius = 18
       header.layer.borderWidth = 1
       header.layer.borderColor = MikshatStyle.green.cgColor
       header.isLayoutMarginsRelativeArrangement = true
-      header.layoutMargins = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
+      header.layoutMargins = UIEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
     }
-    let scroll = UIScrollView()
+    scroll.accessibilityIdentifier = "mikshat.compass.scroll"
     scroll.translatesAutoresizingMaskIntoConstraints = false
+    scroll.alwaysBounceVertical = false
+    scroll.showsVerticalScrollIndicator = false
+    scroll.contentInsetAdjustmentBehavior = .never
     view.addSubview(scroll)
-    let stack = UIStackView(arrangedSubviews: [header])
-    stack.axis = .vertical
-    stack.spacing = 20
-    stack.translatesAutoresizingMaskIntoConstraints = false
-    scroll.addSubview(stack)
+    content.accessibilityIdentifier = "mikshat.compass.content"
+    content.axis = .vertical
+    content.spacing = 10
+    content.translatesAutoresizingMaskIntoConstraints = false
+    scroll.addSubview(content)
+    content.addArrangedSubview(header)
+    content.addArrangedSubview(body)
+    body.axis = .vertical
+    body.spacing = 10
+    body.addArrangedSubview(dialContainer)
+    body.addArrangedSubview(details)
+    details.axis = .vertical
+    details.spacing = 8
+    details.setContentHuggingPriority(.required, for: .vertical)
+    details.setContentCompressionResistancePriority(.required, for: .vertical)
+    dialContainer.setContentHuggingPriority(.defaultLow, for: .vertical)
     dial.backgroundColor = .clear
     dial.qibla = qibla
     dial.general = general
-    if qibla {
-      stack.addArrangedSubview(title)
-      stack.addArrangedSubview(status)
-      let container = UIView()
-      dial.translatesAutoresizingMaskIntoConstraints = false
-      container.addSubview(dial)
-      NSLayoutConstraint.activate([
-        dial.widthAnchor.constraint(equalTo: container.widthAnchor, multiplier: 0.94),
-        dial.centerXAnchor.constraint(equalTo: container.centerXAnchor),
-        dial.topAnchor.constraint(equalTo: container.topAnchor),
-        dial.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-      ])
-      stack.addArrangedSubview(container)
-    } else { stack.addArrangedSubview(dial) }
-    dial.heightAnchor.constraint(equalTo: dial.widthAnchor).isActive = true
+    dial.translatesAutoresizingMaskIntoConstraints = false
+    dialContainer.addSubview(dial)
+    let preferredDialWidth = dial.widthAnchor.constraint(equalTo: dialContainer.widthAnchor)
+    preferredDialWidth.priority = .defaultHigh
+    let preferredDialHeight = dial.heightAnchor.constraint(equalTo: dialContainer.heightAnchor)
+    preferredDialHeight.priority = UILayoutPriority(749)
+    NSLayoutConstraint.activate([
+      dial.centerXAnchor.constraint(equalTo: dialContainer.centerXAnchor),
+      dial.centerYAnchor.constraint(equalTo: dialContainer.centerYAnchor),
+      dial.widthAnchor.constraint(equalTo: dial.heightAnchor),
+      dial.widthAnchor.constraint(lessThanOrEqualTo: dialContainer.widthAnchor),
+      dial.heightAnchor.constraint(lessThanOrEqualTo: dialContainer.heightAnchor),
+      dial.widthAnchor.constraint(lessThanOrEqualToConstant: 520),
+      preferredDialWidth, preferredDialHeight,
+    ])
     dial.isAccessibilityElement = true
     dial.accessibilityLabel = L(qibla ? "mikshat_qibla" : "mikshat_heading")
+    dial.accessibilityIdentifier = "mikshat.compass.dial"
+    status.accessibilityIdentifier = "mikshat.compass.status"
+    speedValue.accessibilityIdentifier = "mikshat.compass.speed"
+    speedValue.numberOfLines = 1
+    speedValue.adjustsFontSizeToFitWidth = true
+    speedValue.minimumScaleFactor = 0.7
+    distanceValue.accessibilityIdentifier = "mikshat.compass.distance"
+    durationValue.accessibilityIdentifier = "mikshat.compass.duration"
+    arrivalValue.accessibilityIdentifier = "mikshat.compass.arrival"
     if qibla {
       let kaaba = MikshatKaabaView()
       kaaba.backgroundColor = .clear
       kaaba.translatesAutoresizingMaskIntoConstraints = false
       dial.addSubview(kaaba)
       NSLayoutConstraint.activate([kaaba.centerXAnchor.constraint(equalTo: dial.centerXAnchor), kaaba.centerYAnchor.constraint(equalTo: dial.centerYAnchor), kaaba.widthAnchor.constraint(equalToConstant: 40), kaaba.heightAnchor.constraint(equalToConstant: 44)])
-      stack.addArrangedSubview(MikshatStyle.label(L("mikshat_qibla_hint"), size: 18, color: .white))
+      details.addArrangedSubview(status)
+      let hint = MikshatStyle.label(L("mikshat_qibla_hint"), size: 18, color: .white)
+      qiblaHint = hint
+      details.addArrangedSubview(hint)
       let settings = MikshatStyle.button(L("mikshat_location_settings"), symbol: "location") {
         guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
         UIApplication.shared.open(url)
       }
       settings.configuration?.baseForegroundColor = MikshatStyle.gold
-      stack.addArrangedSubview(settings)
+      settings.accessibilityIdentifier = "mikshat.compass.settings"
+      details.addArrangedSubview(settings)
     } else {
       func card(_ key: String, _ value: UILabel) -> UIView {
-        let box = UIStackView(arrangedSubviews: [MikshatStyle.label(L(key), size: 16, color: MikshatStyle.green), value])
+        let label = MikshatStyle.label(L(key), size: 14, color: MikshatStyle.green)
+        cardTitles.append(label)
+        let box = UIStackView(arrangedSubviews: [label, value])
         box.axis = .vertical
-        box.spacing = 8
-        box.backgroundColor = UIColor.white.withAlphaComponent(0.92)
-        box.layer.cornerRadius = 18
-        box.layer.borderWidth = 1
-        box.layer.borderColor = MikshatStyle.green.cgColor
-        box.isLayoutMarginsRelativeArrangement = true
-        box.layoutMargins = UIEdgeInsets(top: 14, left: 8, bottom: 14, right: 8)
+        box.spacing = 3
+        styleCard(box)
         return box
       }
       if !general {
       for pair in [[card("mikshat_speed", speedValue), card("mikshat_remaining_distance", distanceValue)],
                    [card("mikshat_remaining_time", durationValue), card("mikshat_arrival", arrivalValue)]] {
         let row = UIStackView(arrangedSubviews: pair)
-        row.spacing = 10
+        row.spacing = 8
         row.distribution = .fillEqually
-        stack.addArrangedSubview(row)
+        metricRows.append(row)
+        details.addArrangedSubview(row)
       }
       }
-      else { stack.addArrangedSubview(speedValue) }
+      else { details.addArrangedSubview(card("mikshat_speed", speedValue)) }
       coordinates.semanticContentAttribute = .forceLeftToRight
-      let locationCard = UIStackView(arrangedSubviews: [MikshatStyle.label(L("mikshat_current_location"), size: 18, color: MikshatStyle.green), coordinates])
-      locationCard.backgroundColor = UIColor.white.withAlphaComponent(0.92)
+      coordinates.accessibilityIdentifier = "mikshat.compass.coordinates"
+      coordinates.numberOfLines = 2
+      coordinates.adjustsFontSizeToFitWidth = true
+      coordinates.minimumScaleFactor = 0.75
+      coordinates.textAlignment = .left
+      let locationTitle = MikshatStyle.label(L("mikshat_current_location"), size: 14, color: MikshatStyle.green)
+      cardTitles.append(locationTitle)
+      let locationHeading = UIStackView(arrangedSubviews: [locationTitle])
+      locationHeading.alignment = .center
+      locationHeading.spacing = 8
+      let locationCard = UIStackView(arrangedSubviews: [locationHeading])
       locationCard.axis = .vertical
-      locationCard.spacing = 12
-      locationCard.layer.cornerRadius = 18
-      locationCard.layer.borderWidth = 1
-      locationCard.layer.borderColor = MikshatStyle.green.cgColor
-      locationCard.isLayoutMarginsRelativeArrangement = true
-      locationCard.layoutMargins = UIEdgeInsets(top: 14, left: 12, bottom: 12, right: 12)
-      let copy = MikshatStyle.button(L("mikshat_copy"), symbol: "doc.on.doc") {
-        guard let fix = MikshatHeading.currentLocation else { return }
+      locationCard.spacing = 6
+      styleCard(locationCard)
+      let copy = compactAction(L("mikshat_copy"), filled: true) { [weak self] in
+        guard let fix = self?.renderedLocation, MikshatHeading.isFresh(fix), MikshatHeading.currentLocation != nil else { return }
         UIPasteboard.general.string = MikshatNavigationMath.coordinatePairs(latitude: fix.coordinate.latitude, longitude: fix.coordinate.longitude)[1]
         Toast.show(withText: L("copied_to_clipboard"))
       }
+      copy.accessibilityIdentifier = "mikshat.compass.copy"
       copyButton = copy
-      var buttons = [copy]
+      let coordinateRow = UIStackView(arrangedSubviews: [coordinates, copy])
+      coordinateRow.semanticContentAttribute = .forceLeftToRight
+      coordinateRow.alignment = .center
+      coordinateRow.spacing = 10
+      coordinateActions = coordinateRow
+      locationCard.addArrangedSubview(coordinateRow)
       if general {
-        let save = MikshatStyle.button(L("save"), symbol: "star") { [weak self] in
+        let save = compactAction(L("save"), filled: false) { [weak self] in
           guard let self else { return }
           MikshatLocationActions.saveCurrent(from: self)
         }
+        save.accessibilityIdentifier = "mikshat.compass.save"
         saveButton = save
-        buttons.insert(save, at: 0)
+        locationHeading.addArrangedSubview(save)
       }
-      for button in buttons {
-        button.layer.cornerRadius = 14
-        button.layer.borderWidth = 1
-        button.layer.borderColor = MikshatStyle.green.cgColor
-        button.heightAnchor.constraint(greaterThanOrEqualToConstant: 48).isActive = true
-      }
-      let actions = UIStackView(arrangedSubviews: buttons)
-      actions.spacing = 8
-      actions.distribution = .fillEqually
-      locationCard.addArrangedSubview(actions)
-      stack.addArrangedSubview(locationCard)
-      stack.addArrangedSubview(status)
+      details.addArrangedSubview(locationCard)
+      details.addArrangedSubview(status)
     }
+    let preferredWidth = content.widthAnchor.constraint(equalTo: scroll.frameLayoutGuide.widthAnchor, constant: -28)
+    preferredWidth.priority = UILayoutPriority(999)
+    viewportHeight = content.heightAnchor.constraint(equalTo: scroll.frameLayoutGuide.heightAnchor, constant: -24)
+    minimumContentHeight = content.heightAnchor.constraint(greaterThanOrEqualTo: scroll.frameLayoutGuide.heightAnchor, constant: -24)
+    minimumDialHeight = dialContainer.heightAnchor.constraint(greaterThanOrEqualToConstant: 220)
+    wideDetailsWidth = details.widthAnchor.constraint(equalTo: body.widthAnchor, multiplier: 0.48)
+    wideDialHeight = dialContainer.heightAnchor.constraint(equalTo: body.heightAnchor)
     NSLayoutConstraint.activate([
       scroll.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor), scroll.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor), scroll.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor), scroll.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-      stack.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor, constant: 16), stack.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor, constant: -20),
-      stack.centerXAnchor.constraint(equalTo: scroll.frameLayoutGuide.centerXAnchor), stack.widthAnchor.constraint(equalTo: scroll.frameLayoutGuide.widthAnchor, constant: -28),
+      content.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor, constant: 12), content.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor, constant: -12),
+      content.centerXAnchor.constraint(equalTo: scroll.frameLayoutGuide.centerXAnchor),
+      content.widthAnchor.constraint(lessThanOrEqualTo: scroll.frameLayoutGuide.widthAnchor, constant: -28),
+      content.widthAnchor.constraint(lessThanOrEqualToConstant: 1080), preferredWidth, viewportHeight,
+      scroll.contentLayoutGuide.widthAnchor.constraint(equalTo: scroll.frameLayoutGuide.widthAnchor),
     ])
+    updateResponsiveLayout()
   }
+
+  private func styleCard(_ card: UIStackView) {
+    card.backgroundColor = UIColor.white.withAlphaComponent(0.92)
+    card.layer.cornerRadius = 16
+    card.layer.borderWidth = 1
+    card.layer.borderColor = MikshatStyle.green.cgColor
+    card.isLayoutMarginsRelativeArrangement = true
+    card.layoutMargins = UIEdgeInsets(top: 8, left: 10, bottom: 8, right: 10)
+    cards.append(card)
+  }
+
+  private func compactAction(_ title: String, filled: Bool, action: @escaping () -> Void) -> UIButton {
+    let button = UIButton(type: .system)
+    var configuration = filled ? UIButton.Configuration.filled() : UIButton.Configuration.plain()
+    configuration.title = title
+    configuration.baseForegroundColor = filled ? .white : MikshatStyle.green
+    configuration.baseBackgroundColor = filled ? MikshatStyle.green : .clear
+    configuration.cornerStyle = .medium
+    configuration.contentInsets = NSDirectionalEdgeInsets(top: 6, leading: 12, bottom: 6, trailing: 12)
+    configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+      var result = incoming
+      result.font = UIFont.preferredFont(forTextStyle: .caption1)
+      return result
+    }
+    button.configuration = configuration
+    if !filled {
+      button.layer.cornerRadius = 8
+      button.layer.borderWidth = 1
+      button.layer.borderColor = MikshatStyle.green.cgColor
+    }
+    button.accessibilityLabel = title
+    button.setContentHuggingPriority(.required, for: .horizontal)
+    button.setContentCompressionResistancePriority(.required, for: .horizontal)
+    button.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+    button.widthAnchor.constraint(greaterThanOrEqualToConstant: 64).isActive = true
+    button.addAction(UIAction { _ in action() }, for: .touchUpInside)
+    return button
+  }
+
+  override func viewDidLayoutSubviews() {
+    super.viewDidLayoutSubviews()
+    updateResponsiveLayout()
+  }
+
+  override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+    super.traitCollectionDidChange(previousTraitCollection)
+    view.setNeedsLayout()
+  }
+
+  private func updateResponsiveLayout() {
+    let size = view.safeAreaLayoutGuide.layoutFrame.size
+    guard size.width > 0, size.height > 0 else { return }
+    let category = traitCollection.preferredContentSizeCategory
+    // Large accessibility text keeps every reading and action reachable. Normal
+    // phone/iPad layouts use the viewport itself as the height budget.
+    let scrolling = category.isAccessibilityCategory
+    let wide = !scrolling && size.width >= 500 && size.width > size.height
+    let compact = !scrolling && (size.height < 650 || (wide && size.height < 700))
+    if let previous = lastLayout, previous.wide == wide, previous.compact == compact,
+       previous.scrolling == scrolling, previous.category == category { return }
+    lastLayout = (wide, compact, scrolling, category)
+    wideDetailsWidth.isActive = false
+    wideDialHeight.isActive = false
+    body.axis = wide ? .horizontal : .vertical
+    body.alignment = wide ? .center : .fill
+    body.spacing = compact ? 8 : 12
+    wideDetailsWidth.isActive = wide
+    wideDialHeight.isActive = wide
+    viewportHeight.isActive = !scrolling
+    minimumContentHeight.isActive = scrolling
+    minimumDialHeight.isActive = scrolling
+    scroll.isScrollEnabled = scrolling
+    scroll.showsVerticalScrollIndicator = scrolling
+    if !scrolling { scroll.setContentOffset(.zero, animated: false) }
+    coordinateActions?.axis = scrolling ? .vertical : .horizontal
+    coordinateActions?.alignment = scrolling ? .fill : .center
+    coordinates.minimumScaleFactor = scrolling ? 0.4 : 0.75
+    content.spacing = compact ? 6 : 10
+    details.spacing = compact ? 6 : 8
+    header.layoutMargins = UIEdgeInsets(top: compact ? 4 : 8, left: 8, bottom: compact ? 4 : 8, right: 8)
+    titleLabel.numberOfLines = scrolling ? 0 : (compact ? 1 : 2)
+    func font(_ label: UILabel, _ size: CGFloat) {
+      label.font = UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: size), compatibleWith: traitCollection)
+    }
+    font(titleLabel, compact ? 20 : 25)
+    if let subtitle = destinationCoordinates { font(subtitle, compact ? 13 : 15) }
+    font(speedValue, compact ? 20 : 28)
+    font(distanceValue, compact ? 20 : 28)
+    font(durationValue, compact ? 17 : 21)
+    font(arrivalValue, compact ? 20 : 25)
+    font(coordinates, compact ? 17 : 20)
+    font(status, compact ? 12 : 15)
+    if let hint = qiblaHint { font(hint, compact ? 14 : 18) }
+    cardTitles.forEach { font($0, compact ? 12 : 14) }
+    cards.forEach {
+      $0.spacing = compact ? 2 : 4
+      $0.layoutMargins = UIEdgeInsets(top: compact ? 5 : 8, left: 10, bottom: compact ? 5 : 8, right: 10)
+    }
+    metricRows.forEach { $0.spacing = compact ? 6 : 8 }
+  }
+
+  private func closeCompass() {
+    let destination = target
+    let title = destinationName
+    let completion = onClose
+    dismiss(animated: true) {
+      guard let destination else { return }
+      if let completion { completion() }
+      else { MikshatNavigationCoordinator.restoreDestinationSelection(coordinate: destination, title: title) }
+    }
+  }
+
   @objc private func updateTransparency() {
     guard isViewLoaded, !isQibla else { return }
     let alpha = MikshatCompassAppearance.enabled ? 1 - CGFloat(MikshatCompassAppearance.percentage) / 100 : 1
@@ -503,6 +819,7 @@ final class MikshatCompassViewController: UIViewController, MWMLocationObserver 
     dial.alpha = general && valid ? 1 : 0.35
     dial.accessibilityValue = valid && general ? String(format: "%.0f°", dial.heading) : headingStatus
     guard let fix = position, CLLocationCoordinate2DIsValid(fix.coordinate) else {
+      renderedLocation = nil
       coordinates.text = "—"
       distanceValue.text = "—"
       copyButton?.isEnabled = false; saveButton?.isEnabled = false
@@ -511,6 +828,7 @@ final class MikshatCompassViewController: UIViewController, MWMLocationObserver 
       status.text = general ? headingStatus : (valid ? headingStatus + "\n" + L("mikshat_location_unavailable") : headingStatus)
       return
     }
+    renderedLocation = fix
     let locationStatus = fresh ? "" : "\n" + L("mikshat_cached_location")
     coordinates.text = MikshatNavigationMath.coordinatePairs(latitude: fix.coordinate.latitude, longitude: fix.coordinate.longitude)[1]
     // These actions deliberately keep their existing fresh-location requirement.
@@ -518,8 +836,7 @@ final class MikshatCompassViewController: UIViewController, MWMLocationObserver 
     copyButton?.isEnabled = canUseCurrentLocation; saveButton?.isEnabled = canUseCurrentLocation
     if general {
       speedValue.text = speedText(for: fresh ? fix : nil, multiline: false)
-      if !fresh { coordinates.text = (coordinates.text ?? "") + locationStatus }
-      status.text = headingStatus + (valid ? " • " + L("mikshat_fixed_arrow") : "")
+      status.text = headingStatus + (valid ? " • " + L("mikshat_fixed_arrow") : "") + locationStatus
       return
     }
     let destination = target ?? CLLocationCoordinate2D(latitude: 21.422487, longitude: 39.826206)
@@ -532,7 +849,7 @@ final class MikshatCompassViewController: UIViewController, MWMLocationObserver 
     } else {
       let distance = fix.distance(from: CLLocation(latitude: destination.latitude, longitude: destination.longitude))
       distanceValue.text = DistanceFormatter.distanceString(fromMeters: distance)
-      speedValue.text = speedText(for: fresh ? fix : nil, multiline: true)
+      speedValue.text = speedText(for: fresh ? fix : nil, multiline: false)
       if !fresh { estimate = MikshatTravelEstimate() }
       let seconds = fresh ? estimate.update(distance: distance, speed: fix.speed, timestamp: fix.timestamp.timeIntervalSince1970, now: Date().timeIntervalSince1970) : nil
       if let seconds {

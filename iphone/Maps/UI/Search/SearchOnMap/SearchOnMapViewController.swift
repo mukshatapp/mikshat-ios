@@ -23,6 +23,7 @@ final class SearchOnMapViewController: UIViewController {
   }
 
   private var isUpdatingFrame = false
+  private var presentationContainerSize = CGSize.zero
   private var isClosing = false
   private var lastRenderedModel: ViewModel?
   var interactor: SearchOnMapInteractor?
@@ -92,6 +93,14 @@ final class SearchOnMapViewController: UIViewController {
     headerView.setIsSearching(false)
   }
 
+  override func viewDidLayoutSubviews() {
+    super.viewDidLayoutSubviews()
+    // iPad rotation and window resizing can keep both size classes and insets.
+    if presentationContainerSize != view.bounds.size {
+      updateFrameOfPresentedViewInContainerView()
+    }
+  }
+
   override func viewSafeAreaInsetsDidChange() {
     super.viewSafeAreaInsetsDidChange()
     guard availableAreaView.superview != nil else { return }
@@ -114,6 +123,7 @@ final class SearchOnMapViewController: UIViewController {
   // MARK: - Private methods
 
   private func setupViews() {
+    availableAreaView.accessibilityIdentifier = "search.sheet"
     if isiPad {
       availableAreaView.setStyleAndApply(.sideMenuBackground)
       contentView.setStyleAndApply(.sideMenuContent)
@@ -274,6 +284,7 @@ final class SearchOnMapViewController: UIViewController {
     guard !isUpdatingFrame, !isClosing else { return }
     isUpdatingFrame = true
     defer { isUpdatingFrame = false }
+    presentationContainerSize = view.bounds.size
     presentationStepsController.updateFrame()
     view.setNeedsLayout()
   }
@@ -311,8 +322,8 @@ final class SearchOnMapViewController: UIViewController {
   private func visibleAreaInsets(for frame: CGRect) -> UIEdgeInsets {
     let isCompact = traitCollection.verticalSizeClass == .compact
     let bottom = (isCompact || isiPad) ? 0 : frame.height - frame.origin.y
-    let left = isiPad ? frame.origin.x + frame.width : 0
-    return UIEdgeInsets(top: 0, left: left, bottom: bottom, right: 0)
+    // A centered search overlay has no left-edge occlusion to subtract from the map.
+    return UIEdgeInsets(top: 0, left: 0, bottom: bottom, right: 0)
   }
 
   private func updateDimView(for frame: CGRect) {
@@ -443,11 +454,14 @@ extension SearchOnMapViewController: SearchOnMapView {
 
 extension SearchOnMapViewController: ModallyPresentedViewController {
   func presentationFrameDidChange(_ frame: CGRect) {
-    let translationY = frame.origin.y
-    resultsTableView.contentInset.bottom = translationY
-    historyViewController.presentationFrameDidChange(frame)
-    searchNoResultsView.presentationFrameDidChange(frame)
-    searchingActivityView.presentationFrameDidChange(frame)
+    // Content callbacks use the amount below the viewport. A bounded centered
+    // sheet has no overflow even when its safe-area origin is greater than zero.
+    var contentFrame = frame
+    contentFrame.origin.y = max(0, frame.maxY - view.bounds.maxY)
+    resultsTableView.contentInset.bottom = contentFrame.origin.y
+    historyViewController.presentationFrameDidChange(contentFrame)
+    searchNoResultsView.presentationFrameDidChange(contentFrame)
+    searchingActivityView.presentationFrameDidChange(contentFrame)
   }
 }
 

@@ -46,8 +46,10 @@ final class NavigationControlView: SolidTouchView {
   weak var delegate: RouteNavigationControlsDelegate!
 
   private weak var navigationInfo: MWMNavigationDashboardEntity?
-  private var extendedConstraint: NSLayoutConstraint!
-  private var notExtendedConstraint: NSLayoutConstraint!
+  private var placementConstraints: [NSLayoutConstraint] = []
+  private var placementSize = CGSize.zero
+  private var placementSafeArea = UIEdgeInsets.zero
+  private var placementRailWidth: CGFloat = 0
   private let diminishSelector = #selector(diminish)
 
   var isVisible = false {
@@ -73,13 +75,7 @@ final class NavigationControlView: SolidTouchView {
       extendedView.isHidden = !isExtended
       superview!.animateConstraints(animations: { [weak self] in
         guard let self else { return }
-        if self.isExtended {
-          self.notExtendedConstraint.isActive = false
-          self.extendedConstraint.isActive = true
-        } else {
-          self.extendedConstraint.isActive = false
-          self.notExtendedConstraint.isActive = true
-        }
+        self.superview?.layoutIfNeeded()
       })
     }
   }
@@ -93,12 +89,17 @@ final class NavigationControlView: SolidTouchView {
   }
 
   private var mikshatActions: MikshatNavigationActionsView?
-  private var lastViewportHeight: CGFloat = 0
+  private var lastViewportInsets = UIEdgeInsets.zero
   private var legacyViews: [UIView] = []
   private let timeLegend = MikshatStyle.label(size: 18, color: .gray)
+  private var navigationActionsRow: UIStackView!
+  private var secondaryActionsRow: UIStackView?
+  private var narrowActions = false
+  private var lastMetricsLayout: (width: CGFloat, category: UIContentSizeCategory)?
 
   override func awakeFromNib() {
     super.awakeFromNib()
+    accessibilityIdentifier = "navigation.infoCard"
     buildMikshatPanel()
 
     for label in metricsLabels {
@@ -123,6 +124,13 @@ final class NavigationControlView: SolidTouchView {
     let distance = distanceLabel!, distanceUnit = distanceLegendLabel!, speed = speedLabel!, speedUnit = speedLegendLabel!, time = timeLabel!
     let speedBox = speedBackground!, progress = progressView!, extended = extendedView!
     let stop = stopButton!, voice = ttsButton!, settings = settingsButton!
+    distance.accessibilityIdentifier = "navigation.distanceValue"
+    speed.accessibilityIdentifier = "navigation.speedValue"
+    speedUnit.accessibilityIdentifier = "navigation.speedUnit"
+    time.accessibilityIdentifier = "navigation.timeValue"
+    stop.accessibilityIdentifier = "navigation.stop"
+    voice.accessibilityIdentifier = "navigation.sound"
+    settings.accessibilityIdentifier = "navigation.settings"
     legacyViews = [distanceWithLegendLabel, speedWithLegendLabel, timePageControl, extendButton, trackRecordingButton]
     let retained: [UIView] = [distance, distanceUnit, speed, speedUnit, time, speedBox, progress, extended, stop, voice, settings] + legacyViews
     NSLayoutConstraint.deactivate(constraints)
@@ -146,6 +154,7 @@ final class NavigationControlView: SolidTouchView {
       grip.centerXAnchor.constraint(equalTo: handle.centerXAnchor), grip.centerYAnchor.constraint(equalTo: handle.centerYAnchor),
     ])
     handle.isAccessibilityElement = true
+    handle.accessibilityIdentifier = "navigation.expand"
     handle.accessibilityLabel = L("mikshat_show_stop")
     handle.accessibilityTraits = .button
     handle.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(extendAction)))
@@ -181,8 +190,12 @@ final class NavigationControlView: SolidTouchView {
     actions.semanticContentAttribute = .forceLeftToRight
     actions.spacing = 14
     actions.translatesAutoresizingMaskIntoConstraints = false
-    voice.widthAnchor.constraint(equalToConstant: 50).isActive = true
-    settings.widthAnchor.constraint(equalToConstant: 50).isActive = true
+    voice.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+    settings.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+    voice.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+    settings.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+    stop.heightAnchor.constraint(greaterThanOrEqualToConstant: 54).isActive = true
+    navigationActionsRow = actions
     extended.addSubview(actions)
     NSLayoutConstraint.activate([
       actions.topAnchor.constraint(equalTo: extended.topAnchor, constant: 8), actions.bottomAnchor.constraint(equalTo: extended.bottomAnchor, constant: -8).withPriority(.required - 1),
@@ -211,7 +224,7 @@ final class NavigationControlView: SolidTouchView {
 
   private func configureMetricLabel(_ label: UILabel, font: UIFont) {
     label.font = font
-    label.adjustsFontForContentSizeCategory = true
+    label.adjustsFontForContentSizeCategory = false
     label.clipsToBounds = true
     label.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
     label.configureSingleLineAutoScaling()
@@ -230,6 +243,8 @@ final class NavigationControlView: SolidTouchView {
   private func configureStopButton(_ button: UIButton) {
     button.titleLabel?.adjustsFontForContentSizeCategory = true
     button.titleLabel?.numberOfLines = 1
+    button.titleLabel?.adjustsFontSizeToFitWidth = true
+    button.titleLabel?.minimumScaleFactor = 0.5
     button.setContentCompressionResistancePriority(.required, for: .vertical)
     button.contentEdgeInsets = UIEdgeInsets(top: 10, left: 22, bottom: 10, right: 22)
   }
@@ -245,24 +260,91 @@ final class NavigationControlView: SolidTouchView {
 
   override func layoutSubviews() {
     super.layoutSubviews()
-    guard isVisible, superview != nil, frame.height != lastViewportHeight else { return }
-    lastViewportHeight = frame.height
+    guard isVisible, let parent = superview else { return }
+    updatePlacement(in: parent)
+    updateResponsiveMetrics()
+    updateActionsLayout()
+    MikshatHomeControls.updateNavigationInformationCard(self, visible: true)
     updateVisibleViewportArea()
+  }
+
+  private func updateResponsiveMetrics() {
+    let category = traitCollection.preferredContentSizeCategory
+    if let previous = lastMetricsLayout, previous.width == bounds.width, previous.category == category { return }
+    lastMetricsLayout = (bounds.width, category)
+    let columnWidth = max(1, (bounds.width - 48) / 3)
+    let valueLimit = max(24, min(56, columnWidth * 0.65))
+    let legendLimit = max(12, min(24, columnWidth * 0.36))
+    let metrics = UIFontMetrics.default
+    for label in [distanceLabel!, speedLabel!, timeLabel!] {
+      label.font = metrics.scaledFont(for: .systemFont(ofSize: 38), maximumPointSize: valueLimit, compatibleWith: traitCollection)
+    }
+    for label in [distanceLegendLabel!, speedLegendLabel!, timeLegend] {
+      label.adjustsFontForContentSizeCategory = false
+      label.font = metrics.scaledFont(for: .systemFont(ofSize: 18), maximumPointSize: legendLimit, compatibleWith: traitCollection)
+      label.configureSingleLineAutoScaling()
+    }
+    stopButton.titleLabel?.adjustsFontForContentSizeCategory = false
+    stopButton.titleLabel?.font = metrics.scaledFont(for: .systemFont(ofSize: 18), maximumPointSize: 22, compatibleWith: traitCollection)
+  }
+
+  private func updateActionsLayout() {
+    let narrow = bounds.width < 360
+    guard narrow != narrowActions else { return }
+    narrowActions = narrow
+    let actions = navigationActionsRow!
+    if narrow {
+      for button in [ttsButton!, settingsButton!] {
+        actions.removeArrangedSubview(button)
+        button.removeFromSuperview()
+      }
+      let secondary = UIStackView(arrangedSubviews: [ttsButton!, settingsButton!])
+      secondary.semanticContentAttribute = .forceLeftToRight
+      secondary.distribution = .fillEqually
+      secondary.spacing = 14
+      secondaryActionsRow = secondary
+      actions.axis = .vertical
+      actions.spacing = 8
+      actions.addArrangedSubview(secondary)
+    } else {
+      if let secondary = secondaryActionsRow {
+        [ttsButton!, settingsButton!].forEach { secondary.removeArrangedSubview($0); $0.removeFromSuperview() }
+        actions.removeArrangedSubview(secondary)
+        secondary.removeFromSuperview()
+      }
+      secondaryActionsRow = nil
+      actions.axis = .horizontal
+      actions.spacing = 14
+      actions.addArrangedSubview(ttsButton)
+      actions.addArrangedSubview(settingsButton)
+    }
+  }
+
+  private func updatePlacement(in parent: UIView) {
+    let railWidth = MikshatHomeControls.landscapeRailWidth(in: parent)
+    guard placementConstraints.isEmpty || placementSize != parent.bounds.size || placementSafeArea != parent.safeAreaInsets || placementRailWidth != railWidth else { return }
+    placementSize = parent.bounds.size
+    placementSafeArea = parent.safeAreaInsets
+    placementRailWidth = railWidth
+    NSLayoutConstraint.deactivate(placementConstraints)
+    let safe = parent.safeAreaLayoutGuide
+    let landscape = parent.bounds.width > parent.bounds.height
+    if landscape {
+      let width = min(560, max(180, safe.layoutFrame.width - 2 * (railWidth + 8)))
+      placementConstraints = [centerXAnchor.constraint(equalTo: safe.centerXAnchor), centerYAnchor.constraint(equalTo: safe.centerYAnchor), widthAnchor.constraint(equalToConstant: width)]
+      layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+    } else {
+      placementConstraints = [leadingAnchor.constraint(equalTo: safe.leadingAnchor), trailingAnchor.constraint(equalTo: safe.trailingAnchor), bottomAnchor.constraint(equalTo: safe.bottomAnchor)]
+      layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+    }
+    NSLayoutConstraint.activate(placementConstraints)
   }
 
   private func addView() {
     guard superview != ownerView, !ownerView.subviews.contains(self) else { return }
+    translatesAutoresizingMaskIntoConstraints = false
     ownerView.addSubview(self)
-
-    let lg = ownerView.safeAreaLayoutGuide
-    leadingAnchor.constraint(equalTo: lg.leadingAnchor).isActive = true
-    trailingAnchor.constraint(equalTo: lg.trailingAnchor).isActive = true
-
-    extendedConstraint = bottomAnchor.constraint(equalTo: ownerView.bottomAnchor)
-    extendedConstraint.isActive = false
-
-    notExtendedConstraint = progressView.bottomAnchor.constraint(equalTo: lg.bottomAnchor)
-    notExtendedConstraint.isActive = true
+    updatePlacement(in: ownerView)
 
     let actions = MikshatNavigationActionsView()
     actions.install(in: ownerView, above: self)
@@ -271,6 +353,7 @@ final class NavigationControlView: SolidTouchView {
   }
 
   private func removeView() {
+    MikshatHomeControls.updateNavigationInformationCard(self, visible: false)
     // Cancel diminish timer on remove, otherwise performSelector keeps the view alive ~5s after close, blocking deinit.
     cancelDiminishTimer()
     mikshatActions?.removeFromSuperview()
@@ -278,13 +361,19 @@ final class NavigationControlView: SolidTouchView {
     updateVisibleViewportArea(onClose: true)
     dimBackground.setVisible(false, completion: { [weak self] in
       guard let self, !self.isVisible else { return }
+      NSLayoutConstraint.deactivate(self.placementConstraints)
+      self.placementConstraints = []
       self.removeFromSuperview()
     })
   }
 
   private func updateVisibleViewportArea(onClose: Bool = false) {
-    let bottom = frame.height / 2
-    let insets = UIEdgeInsets(top: 0, left: 0, bottom: onClose ? 0 : bottom, right: 0)
+    let parent = superview ?? ownerView
+    let landscape = (parent?.bounds.width ?? 0) > (parent?.bounds.height ?? 0)
+    let bottom = max(0, (parent?.bounds.maxY ?? 0) - frame.minY)
+    let insets = UIEdgeInsets(top: 0, left: 0, bottom: onClose || landscape ? 0 : bottom, right: 0)
+    guard onClose || insets != lastViewportInsets else { return }
+    lastViewportInsets = insets
     MapViewController.shared()?.updateVisibleAreaInsets(for: self, insets: insets, updatingViewport: true)
   }
 

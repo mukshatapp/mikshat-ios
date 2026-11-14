@@ -31,10 +31,15 @@ final class MikshatWeatherViewTests: XCTestCase {
     defer { try? FileManager.default.removeItem(at: directory) }
     let repository = MikshatWeatherRepository(cacheDirectory: directory, client: WeatherFixtureClient())
     let cases: [(String, CGSize, UIUserInterfaceStyle)] = [
+      ("compact-phone-portrait", CGSize(width: 320, height: 568), .light),
+      ("compact-phone-landscape", CGSize(width: 568, height: 320), .light),
       ("light-portrait", CGSize(width: 390, height: 844), .light),
       ("dark-portrait", CGSize(width: 390, height: 844), .dark),
       ("light-landscape", CGSize(width: 844, height: 390), .light),
       ("dark-landscape", CGSize(width: 844, height: 390), .dark),
+      ("large-phone-portrait", CGSize(width: 430, height: 932), .light),
+      ("ipad-portrait", CGSize(width: 768, height: 1024), .light),
+      ("ipad-landscape", CGSize(width: 1024, height: 768), .dark),
     ]
     for (name, size, style) in cases {
       let weather = MikshatWeatherViewController(name: "روضة التنهات", latitude: 24.65, longitude: 46.71,
@@ -46,15 +51,11 @@ final class MikshatWeatherViewTests: XCTestCase {
           && (try? self.element("weather.refresh", in: weather.view) as? UIButton)?.isEnabled == true
       }
       layout(container)
+      try assertNormalForecastFits(in: weather.view, context: name)
       let hours = try XCTUnwrap(try element("weather.hours", in: weather.view) as? UIScrollView)
       let cards = try XCTUnwrap(hours.subviews.compactMap { $0 as? UIStackView }.first).arrangedSubviews
-      XCTAssertEqual(cards.count, 12)
-      XCTAssertEqual(hours.semanticContentAttribute, .forceRightToLeft)
-      XCTAssertGreaterThan(try XCTUnwrap(cards.first).frame.minX, try XCTUnwrap(cards.last).frame.minX)
+      try assertHorizontalHours(in: hours)
       XCTAssertEqual(hours.contentOffset.x, max(0, hours.contentSize.width - hours.bounds.width), accuracy: 1)
-      XCTAssertGreaterThan(hours.bounds.height, 100)
-      XCTAssertFalse(hours.hasAmbiguousLayout)
-      XCTAssertTrue(cards.allSatisfy { $0.isAccessibilityElement && !($0.accessibilityLabel ?? "").isEmpty })
       let temperature = try label("weather.current.temperature", in: weather.view)
       XCTAssertEqual((temperature.text ?? "").components(separatedBy: "°C").count - 1, 1)
       let icon = try XCTUnwrap(try element("weather.current.icon", in: weather.view) as? UIImageView)
@@ -65,10 +66,13 @@ final class MikshatWeatherViewTests: XCTestCase {
       weather.overrideUserInterfaceStyle = .unspecified
       layout(container)
       try writeScreenshot(container.view, name: name)
-      let page = try XCTUnwrap(descendants(weather.view).compactMap { $0 as? UIScrollView }.first { $0 !== hours })
+      let page = try XCTUnwrap(try element("weather.scroll", in: weather.view) as? UIScrollView)
       page.setContentOffset(CGPoint(x: 0, y: max(0, page.contentSize.height - page.bounds.height)), animated: false)
       layout(container)
       try writeScreenshot(container.view, name: name + "-forecast")
+      hours.setContentOffset(.zero, animated: false)
+      layout(container)
+      try assertVisible(try XCTUnwrap(cards.last), in: hours, context: name + "-twelfth-hour")
 
       // Keep the same visible hour and fraction when data rebuilds and the viewport resizes.
       hours.setContentOffset(CGPoint(x: hours.contentSize.width - hours.bounds.width - 300, y: 0), animated: false)
@@ -86,6 +90,9 @@ final class MikshatWeatherViewTests: XCTestCase {
       container.view.frame = window.bounds
       layout(container)
       try assertHourlyAnchor(identifier, fraction: fraction, in: hours)
+      try assertNormalForecastFits(in: weather.view, context: name + "-rotated")
+      try assertHorizontalHours(in: hours)
+      try writeScreenshot(container.view, name: name + "-rotated")
 
       // Returning to the first hour keeps it pinned after resizing back.
       hours.setContentOffset(CGPoint(x: hours.contentSize.width - hours.bounds.width, y: 0), animated: false)
@@ -102,26 +109,49 @@ final class MikshatWeatherViewTests: XCTestCase {
     let directory = temporaryDirectory()
     defer { try? FileManager.default.removeItem(at: directory) }
     let repository = MikshatWeatherRepository(cacheDirectory: directory, client: WeatherFixtureClient())
-    let weather = MikshatWeatherViewController(name: "الموقع المحدد على الخريطة", latitude: 24.65, longitude: 46.71,
-                                              repository: repository)
-    let (window, container) = host(weather, size: CGSize(width: 320, height: 568),
-                                   category: .accessibilityExtraExtraExtraLarge)
-    defer { window.isHidden = true }
-    try await waitUntil("Large type forecast rendered") {
-      self.descendants(weather.view).contains { $0.accessibilityIdentifier == "weather.current" }
+    let cases: [(String, CGSize)] = [
+      ("small-phone", CGSize(width: 320, height: 568)),
+      ("large-phone", CGSize(width: 430, height: 932)),
+      ("ipad", CGSize(width: 768, height: 1024)),
+    ]
+    for (name, size) in cases {
+      let weather = MikshatWeatherViewController(name: "الموقع المحدد على الخريطة", latitude: 24.65, longitude: 46.71,
+                                                repository: repository)
+      let (window, container) = host(weather, size: size, category: .accessibilityExtraExtraExtraLarge)
+      defer { window.isHidden = true }
+      try await waitUntil("Large type forecast rendered") {
+        self.descendants(weather.view).contains { $0.accessibilityIdentifier == "weather.current" }
+      }
+      for (orientation, viewport) in [("portrait", size), ("landscape", CGSize(width: size.height, height: size.width))] {
+        window.frame = CGRect(origin: .zero, size: viewport)
+        container.view.frame = window.bounds
+        layout(container)
+        let page = try XCTUnwrap(try element("weather.scroll", in: weather.view) as? UIScrollView)
+        if name == "small-phone" { XCTAssertGreaterThan(page.contentSize.height, page.bounds.height) }
+        XCTAssertTrue(page.isScrollEnabled)
+        XCTAssertFalse(weather.view.hasAmbiguousLayout)
+        XCTAssertFalse(try element("weather.current", in: weather.view).hasAmbiguousLayout)
+        XCTAssertEqual(weather.traitCollection.preferredContentSizeCategory, .accessibilityExtraExtraExtraLarge)
+        let close = try element("weather.close", in: weather.view)
+        XCTAssertGreaterThanOrEqual(close.bounds.height, 44)
+        try assertVisible(close, in: weather.view)
+        page.setContentOffset(CGPoint(x: 0, y: -page.adjustedContentInset.top), animated: false)
+        layout(container)
+        try writeScreenshot(container.view, name: "large-type-\(name)-\(orientation)")
+        let hours = try XCTUnwrap(try element("weather.hours", in: weather.view) as? UIScrollView)
+        try assertHorizontalHours(in: hours)
+        let refresh = try element("weather.refresh", in: weather.view)
+        page.scrollRectToVisible(refresh.convert(refresh.bounds, to: page), animated: false)
+        layout(container)
+        try assertVisible(refresh, in: weather.view)
+        let attribution = try element("weather.attribution", in: weather.view)
+        page.scrollRectToVisible(attribution.convert(attribution.bounds, to: page), animated: false)
+        layout(container)
+        try assertVisible(attribution, in: weather.view)
+        try writeScreenshot(container.view, name: "large-type-\(name)-\(orientation)-forecast")
+      }
+      window.isHidden = true
     }
-    layout(container)
-    let page = try XCTUnwrap(descendants(weather.view).compactMap { $0 as? UIScrollView }
-      .first { $0.accessibilityIdentifier != "weather.hours" })
-    XCTAssertGreaterThan(page.contentSize.height, page.bounds.height)
-    XCTAssertFalse(weather.view.hasAmbiguousLayout)
-    XCTAssertFalse(try element("weather.current", in: weather.view).hasAmbiguousLayout)
-    XCTAssertEqual(weather.traitCollection.preferredContentSizeCategory, .accessibilityExtraExtraExtraLarge)
-    XCTAssertGreaterThanOrEqual(try element("weather.close", in: weather.view).bounds.height, 44)
-    try writeScreenshot(container.view, name: "large-type-small-phone")
-    page.setContentOffset(CGPoint(x: 0, y: max(0, page.contentSize.height - page.bounds.height)), animated: false)
-    layout(container)
-    try writeScreenshot(container.view, name: "large-type-small-phone-forecast")
   }
 
   @MainActor
@@ -206,6 +236,117 @@ final class MikshatWeatherViewTests: XCTestCase {
 
   @MainActor
   private func descendants(_ root: UIView) -> [UIView] { [root] + root.subviews.flatMap { descendants($0) } }
+
+  @MainActor
+  private func assertNormalForecastFits(in root: UIView, context: String,
+                                       file: StaticString = #filePath, line: UInt = #line) throws {
+    let page = try XCTUnwrap(try element("weather.scroll", in: root) as? UIScrollView, file: file, line: line)
+    XCTAssertLessThanOrEqual(page.contentSize.height + page.adjustedContentInset.top + page.adjustedContentInset.bottom,
+                             page.bounds.height + 1, "Normal forecast must fit without vertical scrolling: \(context)",
+                             file: file, line: line)
+    let identifiers = ["weather.title", "weather.close", "weather.location", "weather.coordinates", "weather.current",
+                       "weather.current.condition", "weather.current.temperature", "weather.current.icon", "weather.updated",
+                       "weather.hours", "weather.refresh", "weather.notice", "weather.attribution"]
+    for identifier in identifiers {
+      let view = try element(identifier, in: root, file: file, line: line)
+      try assertVisible(view, in: root, context: context, file: file, line: line)
+      if view.isDescendant(of: page) {
+        try assertVisible(view, in: page, context: context, file: file, line: line)
+      }
+    }
+    let title = try element("weather.title", in: root)
+    let close = try element("weather.close", in: root)
+    XCTAssertFalse(title.convert(title.bounds, to: root).intersects(close.convert(close.bounds, to: root)),
+                   "Title and close action overlap: \(context)", file: file, line: line)
+    let current = try element("weather.current", in: root)
+    let hours = try element("weather.hours", in: root)
+    XCTAssertFalse(current.convert(current.bounds, to: root).intersects(hours.convert(hours.bounds, to: root)),
+                   "Current forecast and hourly strip overlap: \(context)", file: file, line: line)
+    for label in descendants(current).compactMap({ $0 as? UILabel }) where !isHiddenInHierarchy(label, upTo: current) {
+      try assertVisible(label, in: current, context: context, file: file, line: line)
+    }
+    XCTAssertGreaterThanOrEqual(try element("weather.refresh", in: root).bounds.height, 44, file: file, line: line)
+    XCTAssertFalse(try element("weather.content", in: root).hasAmbiguousLayout, file: file, line: line)
+  }
+
+  @MainActor
+  private func assertHorizontalHours(in hours: UIScrollView,
+                                     file: StaticString = #filePath, line: UInt = #line) throws {
+    let stack = try XCTUnwrap(hours.subviews.compactMap { $0 as? UIStackView }.first, file: file, line: line)
+    let cards = stack.arrangedSubviews
+    XCTAssertEqual(cards.count, 12, file: file, line: line)
+    XCTAssertEqual(stack.axis, .horizontal, file: file, line: line)
+    XCTAssertEqual(hours.semanticContentAttribute, .forceRightToLeft, file: file, line: line)
+    XCTAssertGreaterThan(hours.contentSize.width, hours.bounds.width, file: file, line: line)
+    XCTAssertLessThanOrEqual(hours.contentSize.height, hours.bounds.height + 1,
+                             "Hourly forecast must scroll horizontally without a vertical clipping area", file: file, line: line)
+    XCTAssertGreaterThan(hours.bounds.height, 0, file: file, line: line)
+    XCTAssertFalse(hours.hasAmbiguousLayout, file: file, line: line)
+    XCTAssertEqual(Set(cards.compactMap(\.accessibilityIdentifier)).count, 12, file: file, line: line)
+    for (index, card) in cards.enumerated() {
+      XCTAssertFalse(card.isHidden, file: file, line: line)
+      XCTAssertFalse(card.hasAmbiguousLayout, file: file, line: line)
+      XCTAssertTrue(card.isAccessibilityElement, file: file, line: line)
+      XCTAssertFalse((card.accessibilityLabel ?? "").isEmpty, file: file, line: line)
+      XCTAssertTrue((card.accessibilityIdentifier ?? "").hasPrefix("weather.hour."), file: file, line: line)
+      XCTAssertGreaterThan(card.bounds.width, 0, file: file, line: line)
+      XCTAssertGreaterThan(card.bounds.height, 0, file: file, line: line)
+      let rect = card.convert(card.bounds, to: stack)
+      XCTAssertGreaterThanOrEqual(rect.minY, -1, file: file, line: line)
+      XCTAssertLessThanOrEqual(rect.maxY, stack.bounds.height + 1, file: file, line: line)
+      for label in descendants(card).compactMap({ $0 as? UILabel }) where !isHiddenInHierarchy(label, upTo: card) {
+        try assertVisible(label, in: card, file: file, line: line)
+      }
+      if index > 0 {
+        let previous = cards[index - 1].convert(cards[index - 1].bounds, to: stack)
+        XCTAssertLessThanOrEqual(rect.maxX, previous.minX + 1, "Future hours must run right to left without overlap",
+                                 file: file, line: line)
+        XCTAssertEqual(rect.midY, previous.midY, accuracy: 1, file: file, line: line)
+      }
+    }
+  }
+
+  @MainActor
+  private func assertVisible(_ view: UIView, in root: UIView, context: String = "",
+                             file: StaticString = #filePath, line: UInt = #line) throws {
+    let identifier = view.accessibilityIdentifier ?? String(describing: type(of: view))
+    XCTAssertFalse(isHiddenInHierarchy(view, upTo: root), "Hidden \(identifier): \(context)", file: file, line: line)
+    let rect = view.convert(view.bounds, to: root)
+    XCTAssertGreaterThan(rect.width, 0, "Zero width \(identifier): \(context)", file: file, line: line)
+    XCTAssertGreaterThan(rect.height, 0, "Zero height \(identifier): \(context)", file: file, line: line)
+    XCTAssertTrue(root.bounds.insetBy(dx: -1, dy: -1).contains(rect),
+                  "Clipped \(identifier) \(rect) outside \(root.bounds): \(context)", file: file, line: line)
+    if let label = view as? UILabel, !(label.text ?? label.attributedText?.string ?? "").isEmpty {
+      if label.numberOfLines == 1 {
+        let natural = label.textRect(forBounds: CGRect(x: 0, y: 0, width: 10_000, height: 10_000),
+                                      limitedToNumberOfLines: 1)
+        let permittedScale = label.adjustsFontSizeToFitWidth ? label.minimumScaleFactor : 1
+        XCTAssertLessThanOrEqual(natural.width * permittedScale, label.bounds.width + 1,
+                                 "Truncated single-line \(identifier): \(context)", file: file, line: line)
+        XCTAssertLessThanOrEqual(natural.height * permittedScale, label.bounds.height + 1,
+                                 "Clipped single-line \(identifier): \(context)", file: file, line: line)
+      } else {
+        let fullText = label.textRect(forBounds: CGRect(x: 0, y: 0, width: label.bounds.width, height: 10_000),
+                                       limitedToNumberOfLines: 0)
+        XCTAssertLessThanOrEqual(fullText.height, label.bounds.height + 1,
+                                 "Clipped multiline \(identifier): \(context)", file: file, line: line)
+      }
+    } else if let text = view as? UITextView, !text.isScrollEnabled {
+      XCTAssertLessThanOrEqual(text.sizeThatFits(CGSize(width: text.bounds.width, height: 10_000)).height,
+                               text.bounds.height + 1, "Clipped text \(identifier): \(context)", file: file, line: line)
+    }
+  }
+
+  @MainActor
+  private func isHiddenInHierarchy(_ view: UIView, upTo root: UIView) -> Bool {
+    var candidate: UIView? = view
+    while let current = candidate {
+      if current.isHidden || current.alpha < 0.01 { return true }
+      if current === root { return false }
+      candidate = current.superview
+    }
+    return true
+  }
 
   @MainActor
   private func assertHourlyAnchor(_ identifier: String, fraction: CGFloat, in hours: UIScrollView,

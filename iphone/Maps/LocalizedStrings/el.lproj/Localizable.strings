@@ -859,7 +859,7 @@
 /* iOS dialog for the case when recent track recording is on and the app comes back from background */
 "recent_track_background_dialog_title" = "Θέλετε να απενεργοποιήσετε την καταγραφή της πρόσφατης διαδρομής σας;";
 "off_recent_track_background_button" = "Απενεργοποίηση";
-"recent_track_background_dialog_message" = "Το Organic Maps χρησιμοποιεί την τοποθεσία σας στο παρασκήνιο για την καταγραφή των πρόσφατων διαδρομών σας.";
+"recent_track_background_dialog_message" = "Το Mikshat χρησιμοποιεί την τοποθεσία σας στο παρασκήνιο για την καταγραφή των πρόσφατων διαδρομών σας.";
 "general_settings" = "Γενικές ρυθμίσεις";
 
 /* "traffic" as in road congestion */
@@ -1287,3 +1287,7 @@
 "mikshat_weather_wind_w" = "west";
 
 "mikshat_kmh" = "km/h";
+"mikshat_collapsed" = "Collapsed";
+"mikshat_coordinate_formats" = "Coordinate formats";
+"mikshat_copy_coordinates_format" = "Copy coordinates in %@ format";
+"mikshat_expanded" = "Expanded";
