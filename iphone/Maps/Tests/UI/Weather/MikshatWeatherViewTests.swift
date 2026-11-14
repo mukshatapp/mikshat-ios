@@ -86,9 +86,7 @@ final class MikshatWeatherViewTests: XCTestCase {
       try await waitUntil("Refreshed forecast completed") { refresh.isEnabled }
       layout(container)
       try assertHourlyAnchor(identifier, fraction: fraction, in: hours)
-      window.frame = CGRect(origin: .zero, size: CGSize(width: size.height, height: size.width))
-      container.view.frame = window.bounds
-      layout(container)
+      resize(window: window, container: container, size: CGSize(width: size.height, height: size.width))
       try assertHourlyAnchor(identifier, fraction: fraction, in: hours)
       try assertNormalForecastFits(in: weather.view, context: name + "-rotated")
       try assertHorizontalHours(in: hours, context: name + "-rotated")
@@ -96,9 +94,7 @@ final class MikshatWeatherViewTests: XCTestCase {
 
       // Returning to the first hour keeps it pinned after resizing back.
       hours.setContentOffset(CGPoint(x: hours.contentSize.width - hours.bounds.width, y: 0), animated: false)
-      window.frame = CGRect(origin: .zero, size: size)
-      container.view.frame = window.bounds
-      layout(container)
+      resize(window: window, container: container, size: size)
       XCTAssertEqual(hours.contentOffset.x, max(0, hours.contentSize.width - hours.bounds.width), accuracy: 1)
       window.isHidden = true
     }
@@ -123,9 +119,7 @@ final class MikshatWeatherViewTests: XCTestCase {
         self.descendants(weather.view).contains { $0.accessibilityIdentifier == "weather.current" }
       }
       for (orientation, viewport) in [("portrait", size), ("landscape", CGSize(width: size.height, height: size.width))] {
-        window.frame = CGRect(origin: .zero, size: viewport)
-        container.view.frame = window.bounds
-        layout(container)
+        resize(window: window, container: container, size: viewport)
         let page = try XCTUnwrap(try element("weather.scroll", in: weather.view) as? UIScrollView)
         if name == "small-phone" { XCTAssertGreaterThan(page.contentSize.height, page.bounds.height) }
         XCTAssertTrue(page.isScrollEnabled)
@@ -365,7 +359,50 @@ final class MikshatWeatherViewTests: XCTestCase {
 
   @MainActor
   private func layout(_ container: UIViewController) {
-    for _ in 0..<3 { container.view.layoutIfNeeded(); container.children.forEach { $0.view.layoutIfNeeded() } }
+    for _ in 0..<4 {
+      container.parent?.view.setNeedsLayout()
+      container.view.setNeedsLayout()
+      container.children.forEach { $0.view.setNeedsLayout() }
+      container.parent?.view.layoutIfNeeded()
+      container.view.layoutIfNeeded()
+      container.children.forEach { $0.view.layoutIfNeeded() }
+    }
+    guard let weather = container.children.first else {
+      XCTFail("The measured weather fixture must contain its production controller")
+      return
+    }
+    let bounds = weather.view.bounds
+    XCTAssertEqual(container.view.frame.minX, ResponsiveFixtureViewport.margin, accuracy: 1)
+    XCTAssertEqual(container.view.frame.minY, ResponsiveFixtureViewport.margin, accuracy: 1)
+    XCTAssertEqual(bounds.width, container.view.bounds.width, accuracy: 1)
+    XCTAssertEqual(bounds.height, container.view.bounds.height, accuracy: 1)
+    ResponsiveFixtureViewport.assertInsets(of: container.view, equalTo: .zero)
+    ResponsiveFixtureViewport.assertInsets(of: weather.view,
+                                           equalTo: ResponsiveFixtureViewport.insets(for: container.view.bounds.size))
+  }
+
+  @MainActor
+  private func resize(window: UIWindow, container: UIViewController, size: CGSize) {
+    window.frame = CGRect(origin: .zero, size: ResponsiveFixtureViewport.canvasSize(for: size))
+    window.rootViewController?.view.frame = window.bounds
+    container.view.frame = CGRect(origin: CGPoint(x: ResponsiveFixtureViewport.margin, y: ResponsiveFixtureViewport.margin),
+                                  size: size)
+    for weather in container.children {
+      let category = weather.traitCollection.preferredContentSizeCategory
+      container.setOverrideTraitCollection(UITraitCollection(traitsFrom: [
+        UITraitCollection(preferredContentSizeCategory: category),
+        UITraitCollection(userInterfaceStyle: window.overrideUserInterfaceStyle),
+        UITraitCollection(layoutDirection: .rightToLeft),
+        UITraitCollection(userInterfaceIdiom: min(size.width, size.height) >= 600 ? .pad : .phone),
+        UITraitCollection(horizontalSizeClass: size.width >= 600 ? .regular : .compact),
+        UITraitCollection(verticalSizeClass: size.height < 500 ? .compact : .regular),
+      ]), forChild: weather)
+      weather.additionalSafeAreaInsets = ResponsiveFixtureViewport.insets(for: size)
+      weather.view.frame = container.view.bounds
+    }
+    layout(container)
+    XCTAssertEqual(container.view.bounds.width, size.width, accuracy: 1, "Weather fixture viewport width")
+    XCTAssertEqual(container.view.bounds.height, size.height, accuracy: 1, "Weather fixture viewport height")
   }
 
   @MainActor
@@ -382,14 +419,13 @@ final class MikshatWeatherViewTests: XCTestCase {
   private func host(_ weather: MikshatWeatherViewController, size: CGSize,
                     style: UIUserInterfaceStyle = .light,
                     category: UIContentSizeCategory = .large) -> (UIWindow, UIViewController) {
-    // Use the existing phone scene so UIKit delivers appearance callbacks in a scene-based app.
-    // The separate, non-key test window leaves the application's window and root controller untouched.
+    // Keep UIKit appearance callbacks while isolating each fixture from the scene's actual orientation.
     let foregroundScenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.filter {
       $0.session.role == .windowApplication &&
         ($0.activationState == .foregroundActive || $0.activationState == .foregroundInactive)
     }
     let scene = foregroundScenes.first { $0.activationState == .foregroundActive } ?? foregroundScenes.first
-    let frame = CGRect(origin: .zero, size: size)
+    let frame = CGRect(origin: .zero, size: ResponsiveFixtureViewport.canvasSize(for: size))
     let window: UIWindow
     if let scene {
       window = UIWindow(windowScene: scene)
@@ -398,23 +434,31 @@ final class MikshatWeatherViewTests: XCTestCase {
       window = UIWindow(frame: frame)
     }
     window.overrideUserInterfaceStyle = style
+    let canvas = UIViewController()
+    canvas.loadViewIfNeeded()
+    canvas.view.frame = window.bounds
     let container = UIViewController()
     container.loadViewIfNeeded()
-    container.view.frame = window.bounds
+    container.view.autoresizingMask = []
+    canvas.addChild(container)
+    container.view.frame = CGRect(origin: CGPoint(x: ResponsiveFixtureViewport.margin, y: ResponsiveFixtureViewport.margin),
+                                  size: size)
+    canvas.view.addSubview(container.view)
+    container.didMove(toParent: canvas)
     container.view.semanticContentAttribute = .forceRightToLeft
     container.addChild(weather)
+    container.setOverrideTraitCollection(UITraitCollection(traitsFrom: [
+      UITraitCollection(preferredContentSizeCategory: category), UITraitCollection(userInterfaceStyle: style),
+      UITraitCollection(layoutDirection: .rightToLeft),
+    ]), forChild: weather)
     weather.view.frame = container.view.bounds
     weather.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
     weather.view.semanticContentAttribute = .forceRightToLeft
     container.view.addSubview(weather.view)
     weather.didMove(toParent: container)
-    container.setOverrideTraitCollection(UITraitCollection(traitsFrom: [
-      UITraitCollection(preferredContentSizeCategory: category), UITraitCollection(userInterfaceStyle: style),
-      UITraitCollection(layoutDirection: .rightToLeft),
-    ]), forChild: weather)
-    window.rootViewController = container
+    window.rootViewController = canvas
     window.isHidden = false
-    layout(container)
+    resize(window: window, container: container, size: size)
     return (window, container)
   }
 

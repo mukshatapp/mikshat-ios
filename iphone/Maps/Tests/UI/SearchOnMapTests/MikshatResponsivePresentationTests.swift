@@ -171,6 +171,7 @@ private final class PresentationUIKitHost {
   let window: UIWindow
   let container = UIViewController()
   let controller: UIViewController
+  private let canvas = UIViewController()
 
   init(_ controller: UIViewController, size: CGSize) {
     self.controller = controller
@@ -179,45 +180,66 @@ private final class PresentationUIKitHost {
     if let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first {
       window = UIWindow(windowScene: scene)
     } else {
-      window = UIWindow(frame: CGRect(origin: .zero, size: size))
+      window = UIWindow(frame: CGRect(origin: .zero, size: ResponsiveFixtureViewport.canvasSize(for: size)))
     }
-    window.frame = CGRect(origin: .zero, size: size)
+    window.frame = CGRect(origin: .zero, size: ResponsiveFixtureViewport.canvasSize(for: size))
     window.overrideUserInterfaceStyle = .light
+    canvas.loadViewIfNeeded()
+    canvas.view.frame = window.bounds
+    canvas.addChild(container)
     container.loadViewIfNeeded()
-    container.view.frame = window.bounds
+    container.view.autoresizingMask = []
+    container.view.frame = CGRect(origin: CGPoint(x: ResponsiveFixtureViewport.margin, y: ResponsiveFixtureViewport.margin),
+                                  size: size)
     container.view.backgroundColor = .systemBackground
+    canvas.view.addSubview(container.view)
+    container.didMove(toParent: canvas)
     if controller.parent != nil {
       controller.willMove(toParent: nil)
       controller.view.removeFromSuperview()
       controller.removeFromParent()
     }
     container.addChild(controller)
-    controller.additionalSafeAreaInsets = UIEdgeInsets(top: 0, left: 27, bottom: 0, right: 9)
     controller.view.frame = container.view.bounds
     controller.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
     controller.view.semanticContentAttribute = .forceRightToLeft
     container.view.addSubview(controller.view)
     controller.didMove(toParent: container)
-    window.rootViewController = container
+    window.rootViewController = canvas
     window.isHidden = false
     resize(size)
   }
 
   func resize(_ size: CGSize) {
-    window.frame = CGRect(origin: .zero, size: size)
+    window.frame = CGRect(origin: .zero, size: ResponsiveFixtureViewport.canvasSize(for: size))
     container.setOverrideTraitCollection(UITraitCollection(traitsFrom: [
       UITraitCollection(layoutDirection: .rightToLeft), UITraitCollection(preferredContentSizeCategory: .large),
       UITraitCollection(horizontalSizeClass: size.width >= 600 ? .regular : .compact),
       UITraitCollection(verticalSizeClass: size.height < 500 ? .compact : .regular),
     ]), forChild: controller)
-    container.view.frame = window.bounds
+    canvas.view.frame = window.bounds
+    container.view.frame = CGRect(origin: CGPoint(x: ResponsiveFixtureViewport.margin, y: ResponsiveFixtureViewport.margin),
+                                  size: size)
+    let profile = ResponsiveFixtureViewport.insets(for: size)
+    let expected = UIEdgeInsets(top: profile.top, left: profile.left + 27, bottom: profile.bottom, right: profile.right + 9)
+    controller.additionalSafeAreaInsets = expected
     controller.view.frame = container.view.bounds
     for _ in 0..<4 {
+      canvas.view.setNeedsLayout()
       container.view.setNeedsLayout()
       controller.view.setNeedsLayout()
+      canvas.view.layoutIfNeeded()
       container.view.layoutIfNeeded()
       controller.view.layoutIfNeeded()
     }
+    XCTAssertEqual(container.view.bounds.width, size.width, accuracy: 1)
+    XCTAssertEqual(container.view.bounds.height, size.height, accuracy: 1)
+    XCTAssertEqual(container.view.frame.minX, ResponsiveFixtureViewport.margin, accuracy: 1)
+    XCTAssertEqual(container.view.frame.minY, ResponsiveFixtureViewport.margin, accuracy: 1)
+    XCTAssertEqual(controller.view.bounds.width, size.width, accuracy: 1)
+    XCTAssertEqual(controller.view.bounds.height, size.height, accuracy: 1)
+    ResponsiveFixtureViewport.assertInsets(of: container.view, equalTo: .zero)
+    ResponsiveFixtureViewport.assertInsets(of: controller.view, equalTo: expected)
   }
 
   func close() {
@@ -225,6 +247,9 @@ private final class PresentationUIKitHost {
     controller.willMove(toParent: nil)
     controller.view.removeFromSuperview()
     controller.removeFromParent()
+    container.willMove(toParent: nil)
+    container.view.removeFromSuperview()
+    container.removeFromParent()
     window.rootViewController = nil
   }
 }

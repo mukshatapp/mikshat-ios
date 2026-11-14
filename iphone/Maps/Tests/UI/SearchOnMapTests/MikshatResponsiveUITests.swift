@@ -613,33 +613,75 @@ private func assertSelectedCoordinateRow(_ format: String, in coordinates: UIVie
   XCTAssertFalse(copy.convert(copy.bounds, to: row).intersects(latitude.convert(latitude.bounds, to: row)), file: file, line: line)
 }
 
-/// Hosts production UIKit views in an on-screen, non-key window. Rotation resizes the same hierarchy.
+@MainActor
+enum ResponsiveFixtureViewport {
+  static let margin: CGFloat = 128
+
+  static func canvasSize(for size: CGSize) -> CGSize {
+    CGSize(width: size.width + 2 * margin, height: size.height + 2 * margin)
+  }
+
+  static func insets(for size: CGSize) -> UIEdgeInsets {
+    let shortestSide = min(size.width, size.height)
+    let landscape = size.width > size.height
+    if shortestSide <= 320 {
+      return landscape ? .zero : UIEdgeInsets(top: 20, left: 0, bottom: 0, right: 0)
+    }
+    if shortestSide < 600 {
+      return landscape ? UIEdgeInsets(top: 0, left: 59, bottom: 21, right: 59)
+        : UIEdgeInsets(top: 59, left: 0, bottom: 34, right: 0)
+    }
+    return UIEdgeInsets(top: 24, left: 0, bottom: 20, right: 0)
+  }
+
+  static func assertInsets(of view: UIView, equalTo expected: UIEdgeInsets,
+                           file: StaticString = #filePath, line: UInt = #line) {
+    let safe = view.safeAreaLayoutGuide.layoutFrame
+    let context = "Fixture \(view.bounds.size)"
+    XCTAssertEqual(safe.minY - view.bounds.minY, expected.top, accuracy: 1, "\(context) safe top", file: file, line: line)
+    XCTAssertEqual(safe.minX - view.bounds.minX, expected.left, accuracy: 1, "\(context) safe left", file: file, line: line)
+    XCTAssertEqual(view.bounds.maxY - safe.maxY, expected.bottom, accuracy: 1, "\(context) safe bottom", file: file, line: line)
+    XCTAssertEqual(view.bounds.maxX - safe.maxX, expected.right, accuracy: 1, "\(context) safe right", file: file, line: line)
+  }
+}
+
+/// Keeps the measured viewport inside a scene-backed canvas, away from the scene's real unsafe edges.
 @MainActor
 private final class ResponsiveUIKitHost {
   let window: UIWindow
   let container = UIViewController()
   let controller: UIViewController
+  private let canvas = UIViewController()
   private let fitContentHeight: Bool
   private let category: UIContentSizeCategory
+  private var size: CGSize
 
   init(_ controller: UIViewController, size: CGSize, category: UIContentSizeCategory = .large,
        fitContentHeight: Bool = false) {
     self.controller = controller
     self.fitContentHeight = fitContentHeight
     self.category = category
+    self.size = size
     let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
       .filter { $0.session.role == .windowApplication && $0.activationState != .background && $0.activationState != .unattached }
     if let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first {
       window = UIWindow(windowScene: scene)
     } else {
-      window = UIWindow(frame: CGRect(origin: .zero, size: size))
+      window = UIWindow(frame: CGRect(origin: .zero, size: ResponsiveFixtureViewport.canvasSize(for: size)))
     }
-    window.frame = CGRect(origin: .zero, size: size)
+    window.frame = CGRect(origin: .zero, size: ResponsiveFixtureViewport.canvasSize(for: size))
     window.overrideUserInterfaceStyle = .light
+    canvas.loadViewIfNeeded()
+    canvas.view.frame = window.bounds
+    canvas.addChild(container)
     container.loadViewIfNeeded()
     container.view.backgroundColor = .systemBackground
-    container.view.frame = window.bounds
+    container.view.autoresizingMask = []
+    container.view.frame = CGRect(origin: CGPoint(x: ResponsiveFixtureViewport.margin, y: ResponsiveFixtureViewport.margin),
+                                  size: size)
     container.view.semanticContentAttribute = .forceRightToLeft
+    canvas.view.addSubview(container.view)
+    container.didMove(toParent: canvas)
     container.addChild(controller)
     container.setOverrideTraitCollection(UITraitCollection(traitsFrom: [
       UITraitCollection(preferredContentSizeCategory: category), UITraitCollection(layoutDirection: .rightToLeft),
@@ -650,13 +692,14 @@ private final class ResponsiveUIKitHost {
     controller.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
     container.view.addSubview(controller.view)
     controller.didMove(toParent: container)
-    window.rootViewController = container
+    window.rootViewController = canvas
     window.isHidden = false
     resize(size)
   }
 
   func resize(_ size: CGSize) {
-    window.frame = CGRect(origin: .zero, size: size)
+    self.size = size
+    window.frame = CGRect(origin: .zero, size: ResponsiveFixtureViewport.canvasSize(for: size))
     container.setOverrideTraitCollection(UITraitCollection(traitsFrom: [
       UITraitCollection(preferredContentSizeCategory: category), UITraitCollection(layoutDirection: .rightToLeft),
       UITraitCollection(userInterfaceStyle: .light),
@@ -664,7 +707,10 @@ private final class ResponsiveUIKitHost {
       UITraitCollection(horizontalSizeClass: size.width >= 600 ? .regular : .compact),
       UITraitCollection(verticalSizeClass: size.height < 500 ? .compact : .regular),
     ]), forChild: controller)
-    container.view.frame = window.bounds
+    canvas.view.frame = window.bounds
+    container.view.frame = CGRect(origin: CGPoint(x: ResponsiveFixtureViewport.margin, y: ResponsiveFixtureViewport.margin),
+                                  size: size)
+    controller.additionalSafeAreaInsets = ResponsiveFixtureViewport.insets(for: size)
     controller.view.frame = container.view.bounds
     layout()
   }
@@ -677,11 +723,26 @@ private final class ResponsiveUIKitHost {
                                                               verticalFittingPriority: .fittingSizeLevel)
         controller.view.frame = CGRect(origin: .zero, size: fitting)
       }
+      canvas.view.setNeedsLayout()
       container.view.setNeedsLayout()
       controller.view.setNeedsLayout()
+      canvas.view.layoutIfNeeded()
       container.view.layoutIfNeeded()
       controller.view.layoutIfNeeded()
     }
+    XCTAssertEqual(container.view.bounds.width, size.width, accuracy: 1)
+    XCTAssertEqual(container.view.bounds.height, size.height, accuracy: 1)
+    XCTAssertEqual(container.view.frame.minX, ResponsiveFixtureViewport.margin, accuracy: 1)
+    XCTAssertEqual(container.view.frame.minY, ResponsiveFixtureViewport.margin, accuracy: 1)
+    XCTAssertEqual(controller.view.bounds.width, size.width, accuracy: 1)
+    if !fitContentHeight { XCTAssertEqual(controller.view.bounds.height, size.height, accuracy: 1) }
+    ResponsiveFixtureViewport.assertInsets(of: container.view, equalTo: .zero)
+    var expected = ResponsiveFixtureViewport.insets(for: size)
+    if fitContentHeight {
+      // Intrinsic content may extend below the viewport; UIKit includes that off-viewport area in its inset.
+      expected.bottom += max(0, controller.view.bounds.height - container.view.bounds.height)
+    }
+    ResponsiveFixtureViewport.assertInsets(of: controller.view, equalTo: expected)
   }
 
   func close() {
@@ -689,6 +750,9 @@ private final class ResponsiveUIKitHost {
     controller.willMove(toParent: nil)
     controller.view.removeFromSuperview()
     controller.removeFromParent()
+    container.willMove(toParent: nil)
+    container.view.removeFromSuperview()
+    container.removeFromParent()
     window.rootViewController = nil
   }
 }
