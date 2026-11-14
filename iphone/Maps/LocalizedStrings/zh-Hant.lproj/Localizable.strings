@@ -859,7 +859,7 @@
 /* iOS dialog for the case when recent track recording is on and the app comes back from background */
 "recent_track_background_dialog_title" = "取消記錄您最近去過的路線嗎？";
 "off_recent_track_background_button" = "禁用";
-"recent_track_background_dialog_message" = "Organic Maps 在後臺使用您的位置記錄您最近去過的路線。";
+"recent_track_background_dialog_message" = "Mikshat 在後臺使用您的位置記錄您最近去過的路線。";
 "general_settings" = "一般設定";
 
 /* "traffic" as in road congestion */
@@ -1287,3 +1287,7 @@
 "mikshat_weather_wind_w" = "west";
 
 "mikshat_kmh" = "km/h";
+"mikshat_collapsed" = "Collapsed";
+"mikshat_coordinate_formats" = "Coordinate formats";
+"mikshat_copy_coordinates_format" = "Copy coordinates in %@ format";
+"mikshat_expanded" = "Expanded";

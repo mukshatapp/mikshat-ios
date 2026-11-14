@@ -421,6 +421,10 @@ extension PlacePageInteractor: PlacePageHeaderViewControllerDelegate {
     didCopy(content)
   }
 
+  func previewDidChangeContentSize() {
+    presenter?.refreshContentSize()
+  }
+
   func previewDidFinishEditingTitle(_ newTitle: String) {
     switch placePageData.objectType {
     case .bookmark:

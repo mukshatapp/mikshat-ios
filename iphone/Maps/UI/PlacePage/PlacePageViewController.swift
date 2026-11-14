@@ -5,6 +5,7 @@ protocol PlacePageViewProtocol: AnyObject {
   func showNextStop()
   func scrollToReveal(_ anchor: UIView)
   func layoutIfNeeded()
+  func refreshContentSize()
   func updateWithLayout(_ layout: IPlacePageLayout)
   func showAlert(_ alert: UIAlertController)
 }
@@ -47,6 +48,7 @@ final class PlacePageScrollView: UIScrollView {
   private var isFirstOpening = true
   private var isVisible: Bool = false
   private var closingAnimator: UIViewPropertyAnimator?
+  private var previousLayoutSize: CGSize?
 
   var layout: IPlacePageLayout!
   var interactor: PlacePageInteractorProtocol?
@@ -70,6 +72,11 @@ final class PlacePageScrollView: UIScrollView {
     panGesture.isEnabled = alternativeSizeClass(iPhone: false, iPad: true)
     previousTraitCollection = traitCollection
     updateBackgroundViewFrame()
+    let size = view.bounds.size
+    if let previousLayoutSize, previousLayoutSize != size, isVisible {
+      DispatchQueue.main.async { [weak self] in self?.refreshContentSize() }
+    }
+    previousLayoutSize = size
   }
 
   override func viewDidAppear(_ animated: Bool) {
@@ -89,13 +96,12 @@ final class PlacePageScrollView: UIScrollView {
     // Update layout when the device was rotated but skip when the appearance was changed.
     if self.previousTraitCollection != nil, previousTraitCollection?.userInterfaceStyle == traitCollection.userInterfaceStyle, previousTraitCollection?.verticalSizeClass != traitCollection.verticalSizeClass {
       DispatchQueue.main.async {
-        self.updateSteps()
         if self.layout.headerViewController.isEditingTitle {
           self.updateContentOffsetForTitleEditing()
         } else {
-          self.showLastStop()
           self.scrollView.contentInset = self.alternativeSizeClass(iPhone: UIEdgeInsets(top: self.scrollView.height, left: 0, bottom: 0, right: 0),
                                                                    iPad: UIEdgeInsets.zero)
+          self.refreshContentSize()
         }
       }
     }
@@ -346,6 +352,38 @@ extension PlacePageViewController: PlacePageViewProtocol {
     view.layoutIfNeeded()
   }
 
+  func refreshContentSize() {
+    guard layout != nil, isViewLoaded else { return }
+    let oldOffset = scrollView.contentOffset.y
+    let oldPreviewOffset = scrollSteps.first { if case .preview = $0 { return true }; return false }?.offset
+    let wasAtFullStop = scrollSteps.last.map { abs(oldOffset - boundedOffset(for: $0)) < 1 } ?? false
+    let topInset: CGFloat = alternativeSizeClass(iPhone: scrollView.height, iPad: 0)
+    if scrollView.contentInset.top != topInset { scrollView.contentInset.top = topInset }
+    updateSteps()
+    guard isVisible, !beginDragging, !layout.headerViewController.isEditingTitle else { return }
+
+    let previewOffset = scrollSteps.first { if case .preview = $0 { return true }; return false }?.offset
+    let fullOffset = scrollSteps.last.map { boundedOffset(for: $0) } ?? oldOffset
+    var targetOffset = oldOffset
+    switch userDefinedStep {
+    case .preview:
+      targetOffset = previewOffset ?? oldOffset
+    case .previewPlus:
+      targetOffset = scrollSteps.first { if case .previewPlus = $0 { return true }; return false }?.offset ?? fullOffset
+    case .full:
+      targetOffset = wasAtFullStop ? fullOffset : oldOffset
+    case .closed:
+      return
+    case nil:
+      if wasAtFullStop {
+        targetOffset = fullOffset
+      } else if let previewOffset, let oldPreviewOffset {
+        targetOffset += previewOffset - oldPreviewOffset
+      }
+    }
+    scrollTo(CGPoint(x: 0, y: targetOffset), animated: !UIAccessibility.isReduceMotionEnabled)
+  }
+
   func updateWithLayout(_ layout: IPlacePageLayout) {
     currentScrollContentOffset = scrollView.contentOffset
     cleanupLayout()
@@ -361,15 +399,17 @@ extension PlacePageViewController: PlacePageViewProtocol {
   func updatePreviewOffset() {
     updateSteps()
     guard !beginDragging, isVisible else { return }
-    let estimatedYOffset = isPreviewPlus ? scrollSteps[2].offset : scrollSteps[1].offset + Constants.additionalPreviewOffset
+    let previewOffset = scrollSteps.first { if case .preview = $0 { return true }; return false }?.offset ?? scrollSteps.last?.offset ?? 0
+    let previewPlusOffset = scrollSteps.first { if case .previewPlus = $0 { return true }; return false }?.offset
+    let estimatedYOffset = isPreviewPlus ? previewPlusOffset ?? previewOffset : previewOffset + Constants.additionalPreviewOffset
     var offset = CGPoint(x: 0, y: estimatedYOffset)
     if let userDefinedStep {
       // Respect user defined offset if possible.
       switch userDefinedStep {
       case .preview:
-        offset.y = scrollSteps[1].offset
-      case .previewPlus(let yOffset):
-        offset.y = yOffset
+        offset.y = previewOffset
+      case .previewPlus:
+        offset.y = previewPlusOffset ?? previewOffset
       case .full:
         offset.y = currentScrollContentOffset?.y ?? scrollSteps.last?.offset ?? 0
       case .closed:

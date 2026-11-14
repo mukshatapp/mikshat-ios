@@ -859,7 +859,7 @@
 /* iOS dialog for the case when recent track recording is on and the app comes back from background */
 "recent_track_background_dialog_title" = "Tắt ghi lại tuyến đường đã đi gần đây của bạn?";
 "off_recent_track_background_button" = "Tắt";
-"recent_track_background_dialog_message" = "Organic Maps sử dụng định vị của bạn trong ứng dụng chạy nền để ghi lại tuyến đường đã đi gần đây của bạn.";
+"recent_track_background_dialog_message" = "Mikshat sử dụng định vị của bạn trong ứng dụng chạy nền để ghi lại tuyến đường đã đi gần đây của bạn.";
 "general_settings" = "Thiết lập chung";
 
 /* "traffic" as in road congestion */
@@ -1287,3 +1287,7 @@
 "mikshat_weather_wind_w" = "west";
 
 "mikshat_kmh" = "km/h";
+"mikshat_collapsed" = "Collapsed";
+"mikshat_coordinate_formats" = "Coordinate formats";
+"mikshat_copy_coordinates_format" = "Copy coordinates in %@ format";
+"mikshat_expanded" = "Expanded";

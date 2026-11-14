@@ -9,23 +9,28 @@ final class MikshatWeatherViewController: UIViewController {
   private let repository: MikshatWeatherRepository
   private let scrollView = UIScrollView()
   private let content = UIStackView()
+  private let currentColumn = UIStackView()
+  private let forecastColumn = UIStackView()
+  private let currentSummary = UIStackView()
   private let statusStack = UIStackView()
   private let spinner = UIActivityIndicatorView(style: .medium)
-  private let statusLabel = weatherLabel(style: .subheadline, secondary: true)
+  private let statusLabel = weatherLabel(style: .caption1, secondary: true)
   private let currentCard = WeatherCard()
   private let currentStack = UIStackView()
   private let currentIcon = UIImageView()
-  private let conditionLabel = weatherLabel(style: .title3)
+  private let conditionLabel = weatherLabel(style: .subheadline)
   private let temperatureLabel = weatherLabel(style: .largeTitle)
   private let windStack = UIStackView()
   private let cacheLabel = weatherLabel(style: .caption1, secondary: true)
   private let updatedLabel = weatherLabel(style: .caption1, secondary: true)
+  private let currentMetadata = UIStackView()
   private let hourlySection = UIStackView()
   private let hourlyScroll = WeatherHoursScrollView()
   private let hourlyStack = UIStackView()
   private let hourlyAvailability = weatherLabel(style: .footnote, secondary: true)
   private let refreshButton = UIButton(type: .system)
   private let attribution = UITextView()
+  private let sourceFooter = UIStackView()
   private var snapshot: MikshatWeatherSnapshot?
   private var showingCache = false
   private var fetchFailed = false
@@ -38,6 +43,10 @@ final class MikshatWeatherViewController: UIViewController {
   private var pathMonitor: NWPathMonitor?
   private var displayTimer: Timer?
   private var lastLayoutWidth: CGFloat = 0
+  private var contentMaximumWidth: NSLayoutConstraint?
+  private var hourlyHeight: NSLayoutConstraint?
+  private var usesColumns = false
+  private var usesStatusColumns = false
 
   init(name: String?, latitude: Double, longitude: Double,
        repository: MikshatWeatherRepository = .shared) {
@@ -84,7 +93,8 @@ final class MikshatWeatherViewController: UIViewController {
 
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
-    let availableWidth = scrollView.bounds.width
+    updateResponsiveLayout()
+    let availableWidth = hourlySection.bounds.width
     if abs(lastLayoutWidth - availableWidth) > 1 {
       lastLayoutWidth = availableWidth
       if let snapshot { rebuildHourly(snapshot) }
@@ -94,6 +104,7 @@ final class MikshatWeatherViewController: UIViewController {
   override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
     super.traitCollectionDidChange(previousTraitCollection)
     if previousTraitCollection?.preferredContentSizeCategory != traitCollection.preferredContentSizeCategory {
+      updateResponsiveLayout()
       updateDisplayedForecast()
       configureAttribution()
     }
@@ -122,39 +133,66 @@ final class MikshatWeatherViewController: UIViewController {
     header.translatesAutoresizingMaskIntoConstraints = false
     view.addSubview(header)
     scrollView.translatesAutoresizingMaskIntoConstraints = false
-    scrollView.alwaysBounceVertical = true
+    scrollView.alwaysBounceVertical = false
+    scrollView.contentInsetAdjustmentBehavior = .never
+    scrollView.accessibilityIdentifier = "weather.scroll"
     scrollView.keyboardDismissMode = .onDrag
     view.addSubview(scrollView)
     content.axis = .vertical
-    content.spacing = 18
+    content.spacing = 8
+    content.accessibilityIdentifier = "weather.content"
     content.translatesAutoresizingMaskIntoConstraints = false
-    scrollView.addSubview(content)
+    let canvas = UIView()
+    canvas.translatesAutoresizingMaskIntoConstraints = false
+    scrollView.addSubview(canvas)
+    canvas.addSubview(content)
+    // The canvas grows when text needs more room, while shorter pages stay centered in the
+    // actual presentation bounds (including a resizable sheet or an iPad split view).
+    let viewportHeight = canvas.heightAnchor.constraint(equalTo: scrollView.frameLayoutGuide.heightAnchor)
+    viewportHeight.priority = UILayoutPriority(249)
+    let preferredWidth = content.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -24)
+    preferredWidth.priority = UILayoutPriority(999)
+    let maximumWidth = content.widthAnchor.constraint(lessThanOrEqualToConstant: 560)
+    contentMaximumWidth = maximumWidth
     NSLayoutConstraint.activate([
-      header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 10),
-      header.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 20),
-      header.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -16),
+      header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 2),
+      header.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 16),
+      header.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -12),
       close.widthAnchor.constraint(greaterThanOrEqualToConstant: 44),
       close.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
-      scrollView.topAnchor.constraint(equalTo: header.bottomAnchor, constant: 8),
+      scrollView.topAnchor.constraint(equalTo: header.bottomAnchor),
       scrollView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
       scrollView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
       scrollView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-      content.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor, constant: 10),
-      content.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: 18),
-      content.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -18),
-      content.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -24),
-      content.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -36),
+      canvas.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+      canvas.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+      canvas.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+      canvas.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+      canvas.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
+      canvas.heightAnchor.constraint(greaterThanOrEqualTo: scrollView.frameLayoutGuide.heightAnchor),
+      viewportHeight,
+      content.centerXAnchor.constraint(equalTo: canvas.centerXAnchor),
+      content.centerYAnchor.constraint(equalTo: canvas.centerYAnchor),
+      content.topAnchor.constraint(greaterThanOrEqualTo: canvas.topAnchor, constant: 4),
+      content.bottomAnchor.constraint(lessThanOrEqualTo: canvas.bottomAnchor, constant: -4),
+      preferredWidth,
+      maximumWidth,
     ])
-    let location = weatherLabel(style: .title3)
+    for column in [currentColumn, forecastColumn] {
+      column.axis = .vertical
+      column.spacing = 4
+      content.addArrangedSubview(column)
+    }
+    let location = weatherLabel(style: .headline)
     location.text = locationName
     location.accessibilityIdentifier = "weather.location"
     location.accessibilityTraits.insert(.header)
-    let coordinates = weatherLabel(style: .subheadline, secondary: true)
+    let coordinates = weatherLabel(style: .caption1, secondary: true)
     coordinates.text = coordinateText
     coordinates.accessibilityIdentifier = "weather.coordinates"
     coordinates.semanticContentAttribute = .forceLeftToRight
     coordinates.accessibilityLabel = String(format: L("mikshat_weather_coordinates"), coordinateText)
-    content.addArrangedSubview(verticalStack([location, coordinates], spacing: 6))
+    currentColumn.addArrangedSubview(verticalStack([location, coordinates], spacing: 2))
     statusStack.axis = .horizontal
     statusStack.alignment = .center
     statusStack.spacing = 10
@@ -162,10 +200,10 @@ final class MikshatWeatherViewController: UIViewController {
     statusStack.addArrangedSubview(statusLabel)
     statusLabel.accessibilityTraits.insert(.updatesFrequently)
     statusLabel.accessibilityIdentifier = "weather.status"
-    content.addArrangedSubview(statusStack)
+    currentColumn.addArrangedSubview(statusStack)
     currentStack.axis = .vertical
     currentStack.alignment = .fill
-    currentStack.spacing = 14
+    currentStack.spacing = 4
     let currentTitle = weatherLabel(style: .headline)
     currentTitle.text = L("mikshat_weather_current")
     currentTitle.accessibilityTraits.insert(.header)
@@ -181,33 +219,45 @@ final class MikshatWeatherViewController: UIViewController {
       currentIcon.centerXAnchor.constraint(equalTo: iconContainer.centerXAnchor),
       currentIcon.topAnchor.constraint(equalTo: iconContainer.topAnchor),
       currentIcon.bottomAnchor.constraint(equalTo: iconContainer.bottomAnchor),
-      currentIcon.widthAnchor.constraint(equalToConstant: 68),
-      currentIcon.heightAnchor.constraint(equalToConstant: 64),
+      currentIcon.widthAnchor.constraint(equalToConstant: 38),
+      currentIcon.heightAnchor.constraint(equalToConstant: 32),
     ])
-    currentStack.addArrangedSubview(iconContainer)
     conditionLabel.accessibilityIdentifier = "weather.current.condition"
-    currentStack.addArrangedSubview(conditionLabel)
-    temperatureLabel.font = UIFontMetrics(forTextStyle: .largeTitle).scaledFont(for: .systemFont(ofSize: 48, weight: .semibold))
+    let condition = verticalStack([iconContainer, conditionLabel], spacing: 2)
+    currentSummary.axis = .horizontal
+    currentSummary.alignment = .center
+    currentSummary.distribution = .fillEqually
+    currentSummary.spacing = 8
+    currentSummary.accessibilityIdentifier = "weather.current.summary"
+    currentSummary.addArrangedSubview(condition)
+    currentSummary.addArrangedSubview(temperatureLabel)
+    currentStack.addArrangedSubview(currentSummary)
+    temperatureLabel.font = UIFontMetrics(forTextStyle: .largeTitle).scaledFont(for: .systemFont(ofSize: 40, weight: .semibold))
     temperatureLabel.textColor = WeatherPalette.accent
     temperatureLabel.numberOfLines = 1
     temperatureLabel.adjustsFontSizeToFitWidth = true
     temperatureLabel.minimumScaleFactor = 0.65
     temperatureLabel.semanticContentAttribute = .forceLeftToRight
     temperatureLabel.accessibilityIdentifier = "weather.current.temperature"
-    currentStack.addArrangedSubview(temperatureLabel)
-    windStack.spacing = 12
+    windStack.spacing = 6
     windStack.distribution = .fillEqually
     currentStack.addArrangedSubview(windStack)
-    cacheLabel.font = .preferredFont(forTextStyle: .headline)
+    cacheLabel.font = .preferredFont(forTextStyle: .subheadline)
     cacheLabel.textColor = WeatherPalette.accent
-    currentStack.addArrangedSubview(verticalStack([cacheLabel, updatedLabel], spacing: 4))
-    currentCard.install(currentStack)
+    cacheLabel.setContentCompressionResistancePriority(UILayoutPriority(751), for: .horizontal)
+    currentMetadata.axis = .horizontal
+    currentMetadata.alignment = .center
+    currentMetadata.spacing = 4
+    currentMetadata.addArrangedSubview(cacheLabel)
+    currentMetadata.addArrangedSubview(updatedLabel)
+    currentStack.addArrangedSubview(currentMetadata)
+    currentCard.install(currentStack, inset: 8)
     currentCard.accessibilityIdentifier = "weather.current"
     cacheLabel.accessibilityIdentifier = "weather.saved"
     updatedLabel.accessibilityIdentifier = "weather.updated"
     currentCard.isHidden = true
     hourlySection.axis = .vertical
-    hourlySection.spacing = 10
+    hourlySection.spacing = 5
     let hourlyTitle = weatherLabel(style: .headline)
     hourlyTitle.text = L("mikshat_weather_next_12_hours")
     hourlyTitle.accessibilityTraits.insert(.header)
@@ -231,6 +281,9 @@ final class MikshatWeatherViewController: UIViewController {
       hourlyStack.heightAnchor.constraint(equalTo: hourlyScroll.frameLayoutGuide.heightAnchor, constant: -10),
     ])
     hourlySection.addArrangedSubview(hourlyScroll)
+    let measuredHeight = hourlyScroll.heightAnchor.constraint(equalToConstant: 150)
+    measuredHeight.isActive = true
+    hourlyHeight = measuredHeight
     hourlySection.addArrangedSubview(hourlyAvailability)
     hourlySection.isHidden = true
     var configuration = UIButton.Configuration.filled()
@@ -240,7 +293,7 @@ final class MikshatWeatherViewController: UIViewController {
     configuration.baseBackgroundColor = WeatherPalette.accent
     configuration.baseForegroundColor = WeatherPalette.buttonText
     configuration.cornerStyle = .large
-    configuration.contentInsets = NSDirectionalEdgeInsets(top: 14, leading: 18, bottom: 14, trailing: 18)
+    configuration.contentInsets = NSDirectionalEdgeInsets(top: 8, leading: 14, bottom: 8, trailing: 14)
     configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attributes in
       var result = attributes
       result.font = UIFont.preferredFont(forTextStyle: .headline)
@@ -250,11 +303,12 @@ final class MikshatWeatherViewController: UIViewController {
     refreshButton.accessibilityIdentifier = "weather.refresh"
     refreshButton.titleLabel?.numberOfLines = 0
     refreshButton.titleLabel?.adjustsFontForContentSizeCategory = true
-    refreshButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 48).isActive = true
+    refreshButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
     refreshButton.addTarget(self, action: #selector(refreshForecast), for: .touchUpInside)
-    content.addArrangedSubview(refreshButton)
-    let notice = weatherLabel(style: .footnote, secondary: true)
+    forecastColumn.addArrangedSubview(refreshButton)
+    let notice = weatherLabel(style: .caption1, secondary: true)
     notice.text = L("mikshat_weather_model_notice")
+    notice.accessibilityIdentifier = "weather.notice"
     attribution.isEditable = false
     attribution.isSelectable = true
     attribution.isScrollEnabled = false
@@ -262,8 +316,48 @@ final class MikshatWeatherViewController: UIViewController {
     attribution.textContainerInset = .zero
     attribution.textContainer.lineFragmentPadding = 0
     attribution.adjustsFontForContentSizeCategory = true
+    attribution.accessibilityIdentifier = "weather.attribution"
     configureAttribution()
-    content.addArrangedSubview(verticalStack([notice, attribution], spacing: 6))
+    sourceFooter.axis = .vertical
+    sourceFooter.spacing = 2
+    sourceFooter.addArrangedSubview(notice)
+    sourceFooter.addArrangedSubview(attribution)
+    forecastColumn.addArrangedSubview(sourceFooter)
+  }
+
+  private func updateResponsiveLayout() {
+    guard isViewLoaded else { return }
+    let available = view.safeAreaLayoutGuide.layoutFrame.size
+    let accessibility = traitCollection.preferredContentSizeCategory.isAccessibilityCategory
+    let columns = available.width > available.height && available.width >= 480 && !accessibility
+    let statusColumns = columns && !statusStack.isHidden
+    currentSummary.axis = accessibility ? .vertical : .horizontal
+    currentSummary.alignment = accessibility ? .fill : .center
+    currentSummary.distribution = accessibility ? .fill : .fillEqually
+    currentMetadata.axis = accessibility ? .vertical : .horizontal
+    currentMetadata.alignment = accessibility ? .fill : .center
+    contentMaximumWidth?.constant = columns ? 1000 : 560
+    guard columns != usesColumns || statusColumns != usesStatusColumns else { return }
+    usesColumns = columns
+    usesStatusColumns = statusColumns
+    content.axis = columns ? .horizontal : .vertical
+    content.alignment = columns ? .center : .fill
+    content.distribution = columns ? .fillEqually : .fill
+    content.spacing = columns ? 14 : 8
+    // Balance the extra offline/updating copy across the two columns as it appears. The
+    // action and licensing links remain visible without reserving empty status space.
+    (refreshButton.superview as? UIStackView)?.removeArrangedSubview(refreshButton)
+    refreshButton.removeFromSuperview()
+    (attribution.superview as? UIStackView)?.removeArrangedSubview(attribution)
+    attribution.removeFromSuperview()
+    if statusColumns {
+      currentColumn.addArrangedSubview(attribution)
+      forecastColumn.insertArrangedSubview(refreshButton, at: hourlySection.superview == nil ? 0 : 1)
+    } else {
+      sourceFooter.addArrangedSubview(attribution)
+      if columns { currentColumn.addArrangedSubview(refreshButton) }
+      else { forecastColumn.insertArrangedSubview(refreshButton, at: hourlySection.superview == nil ? 0 : 1) }
+    }
   }
 
   private var coordinateText: String {
@@ -275,7 +369,7 @@ final class MikshatWeatherViewController: UIViewController {
     let paragraph = NSMutableParagraphStyle()
     paragraph.alignment = .center
     let attributed = NSMutableAttributedString(string: text, attributes: [
-      .font: UIFont.preferredFont(forTextStyle: .footnote), .foregroundColor: UIColor.secondaryLabel,
+      .font: UIFont.preferredFont(forTextStyle: .caption1, compatibleWith: traitCollection), .foregroundColor: UIColor.secondaryLabel,
       .paragraphStyle: paragraph,
     ])
     attributed.addAttribute(.link, value: "https://open-meteo.com/", range: (text as NSString).range(of: "Open-Meteo"))
@@ -372,7 +466,7 @@ final class MikshatWeatherViewController: UIViewController {
     if let value, value.isFinite {
       let accessibilitySize = traitCollection.preferredContentSizeCategory.isAccessibilityCategory
       temperatureLabel.font = UIFontMetrics(forTextStyle: .largeTitle).scaledFont(
-        for: .systemFont(ofSize: 48, weight: .semibold), maximumPointSize: 100, compatibleWith: traitCollection)
+        for: .systemFont(ofSize: 40, weight: .semibold), maximumPointSize: 100, compatibleWith: traitCollection)
       temperatureLabel.numberOfLines = accessibilitySize ? 2 : 1
       temperatureLabel.text = temperature(value).replacingOccurrences(of: "\u{00a0}",
                                                                      with: accessibilitySize ? "\n" : "\u{00a0}")
@@ -385,14 +479,14 @@ final class MikshatWeatherViewController: UIViewController {
 
   private func setForecastVisible(_ visible: Bool) {
     if visible {
-      if !content.arrangedSubviews.contains(currentCard) { content.insertArrangedSubview(currentCard, at: 2) }
-      if !content.arrangedSubviews.contains(hourlySection) { content.insertArrangedSubview(hourlySection, at: 3) }
+      if !currentColumn.arrangedSubviews.contains(currentCard) { currentColumn.insertArrangedSubview(currentCard, at: 2) }
+      if !forecastColumn.arrangedSubviews.contains(hourlySection) { forecastColumn.insertArrangedSubview(hourlySection, at: 0) }
       currentCard.isHidden = false
       hourlySection.isHidden = false
     } else {
       // Detach empty sections so UIStackView never imposes zero height on measured cards.
       for section in [currentCard, hourlySection] as [UIView] {
-        content.removeArrangedSubview(section)
+        (section.superview as? UIStackView)?.removeArrangedSubview(section)
         section.removeFromSuperview()
         section.isHidden = true
       }
@@ -426,39 +520,78 @@ final class MikshatWeatherViewController: UIViewController {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = snapshot.timeZone
     let now = Date()
+    var maximumCardHeight: CGFloat = 0
+    let accessibility = traitCollection.preferredContentSizeCategory.isAccessibilityCategory
+    let scaledWidth = UIFontMetrics(forTextStyle: .body).scaledValue(for: 216, compatibleWith: traitCollection)
+    let availableWidth = hourlySection.bounds.width > 0 ? hourlySection.bounds.width : max(166, view.bounds.width - 24)
+    let cardWidth = min(scaledWidth, max(166, availableWidth - 24))
     for sample in hours {
       let condition = MikshatWeatherCondition(code: sample.weatherCode, isDay: sample.isDay)
       let card = WeatherCard()
-      let timeLabel = weatherLabel(style: .headline)
+      let timeLabel = forecastLabel(style: .subheadline)
       timeLabel.text = time.string(from: sample.time)
-      let dateLabel = weatherLabel(style: .caption1, secondary: true)
+      let dateLabel = forecastLabel(style: .caption1, secondary: true)
       dateLabel.text = calendar.isDate(sample.time, inSameDayAs: now) ? nil : day.string(from: sample.time)
       dateLabel.isHidden = dateLabel.text == nil
       let icon = UIImageView(image: weatherImage(condition.symbolName))
       icon.contentMode = .scaleAspectFit
       icon.tintColor = WeatherPalette.accent
       icon.isAccessibilityElement = false
-      icon.heightAnchor.constraint(equalToConstant: 36).isActive = true
-      let description = weatherLabel(style: .subheadline)
+      icon.translatesAutoresizingMaskIntoConstraints = false
+      NSLayoutConstraint.activate([
+        icon.heightAnchor.constraint(equalToConstant: 26),
+        icon.widthAnchor.constraint(equalToConstant: 30),
+      ])
+      let description = forecastLabel(style: .subheadline)
       description.text = L(condition.localizationKey)
-      let degrees = weatherLabel(style: .title2)
+      let degrees = forecastLabel(style: .title3)
       degrees.text = temperature(sample.temperatureC)
       degrees.numberOfLines = 1
       degrees.adjustsFontSizeToFitWidth = true
       degrees.minimumScaleFactor = 0.65
       degrees.semanticContentAttribute = .forceLeftToRight
-      let speed = weatherLabel(style: .subheadline)
+      let speed = forecastLabel(style: .caption1)
       speed.text = String(format: L("mikshat_weather_hour_wind"), windSpeed(sample.windSpeedKmh))
-      var items: [UIView] = [timeLabel, dateLabel, icon, description, degrees, speed, windSource(sample, compact: true)]
-      if let gusts = sample.windGustsKmh {
-        let gust = weatherLabel(style: .caption1, secondary: true)
-        gust.text = String(format: L("mikshat_weather_hour_gusts"), windSpeed(gusts))
-        items.append(gust)
+      // A compact horizontal heading reduces card height without omitting any of the 12 hours
+      // or their wind and condition fields. Accessibility sizes retain generous vertical rows.
+      let itemsHeader: [UIView]
+      if accessibility {
+        itemsHeader = [timeLabel, dateLabel, icon, description, degrees]
+      } else {
+        let timeAndTemperature = UIStackView(arrangedSubviews: [verticalStack([timeLabel, dateLabel], spacing: 2), degrees])
+        timeAndTemperature.alignment = .center
+        timeAndTemperature.spacing = 4
+        timeAndTemperature.distribution = .fillEqually
+        let conditionRow = UIStackView(arrangedSubviews: [icon, description])
+        conditionRow.alignment = .center
+        conditionRow.spacing = 4
+        itemsHeader = [timeAndTemperature, conditionRow]
       }
-      card.install(verticalStack(items, spacing: 8), inset: 12)
-      let scaledWidth = UIFontMetrics(forTextStyle: .body).scaledValue(for: 166, compatibleWith: traitCollection)
-      let availableWidth = scrollView.bounds.width > 0 ? scrollView.bounds.width : view.bounds.width
-      card.widthAnchor.constraint(equalToConstant: min(scaledWidth, max(166, availableWidth - 64))).isActive = true
+      var windItems: [UIView] = [speed]
+      if let gusts = sample.windGustsKmh {
+        let gust = forecastLabel(style: .caption1, secondary: true)
+        gust.text = String(format: L("mikshat_weather_hour_gusts"), windSpeed(gusts))
+        windItems.append(gust)
+      }
+      let items: [UIView]
+      if accessibility {
+        items = itemsHeader + windItems + [windSource(sample, compact: true)]
+      } else {
+        let windRow = UIStackView(arrangedSubviews: windItems)
+        windRow.axis = .horizontal
+        windRow.alignment = .center
+        windRow.distribution = .fillEqually
+        windRow.spacing = 4
+        items = itemsHeader + [windRow, windSource(sample, compact: true)]
+      }
+      card.install(verticalStack(items, spacing: 3), inset: 8)
+      card.widthAnchor.constraint(equalToConstant: cardWidth).isActive = true
+      // UIScrollView has no intrinsic height. Measure the complete card at its real width so
+      // wrapped localized labels and Dynamic Type expand the page instead of being clipped.
+      let measured = card.systemLayoutSizeFitting(CGSize(width: cardWidth, height: UIView.layoutFittingCompressedSize.height),
+                                                  withHorizontalFittingPriority: .required,
+                                                  verticalFittingPriority: .fittingSizeLevel)
+      maximumCardHeight = max(maximumCardHeight, ceil(measured.height))
       card.isAccessibilityElement = true
       card.accessibilityIdentifier = "weather.hour.\(Int(sample.time.timeIntervalSince1970))"
       let wind = MikshatWeatherWind(speedKmh: sample.windSpeedKmh, directionDegrees: sample.windDirectionDegrees)
@@ -469,16 +602,17 @@ final class MikshatWeatherViewController: UIViewController {
       card.accessibilityLabel = accessible.joined(separator: ", ")
       hourlyStack.addArrangedSubview(card)
     }
+    hourlyHeight?.constant = maximumCardHeight + 10
     hourlyScroll.setNeedsLayout()
     view.setNeedsLayout()
   }
 
   private func metric(title: String, value: String) -> UIView {
-    let titleLabel = weatherLabel(style: .caption1, secondary: true)
+    let titleLabel = forecastLabel(style: .caption1, secondary: true)
     titleLabel.text = title
-    let valueLabel = weatherLabel(style: .body)
+    let valueLabel = forecastLabel(style: .subheadline)
     valueLabel.text = value
-    let stack = verticalStack([titleLabel, valueLabel], spacing: 5)
+    let stack = verticalStack([titleLabel, valueLabel], spacing: 2)
     stack.isAccessibilityElement = true
     stack.accessibilityLabel = title + ", " + value
     return stack
@@ -486,7 +620,7 @@ final class MikshatWeatherViewController: UIViewController {
 
   private func windSource(_ sample: MikshatWeatherSample, compact: Bool = false) -> UIView {
     let wind = MikshatWeatherWind(speedKmh: sample.windSpeedKmh, directionDegrees: sample.windDirectionDegrees)
-    let label = weatherLabel(style: compact ? .caption1 : .body)
+    let label = forecastLabel(style: .caption1)
     label.text = windDescription(wind)
     var items: [UIView] = []
     if let bearing = wind.bearingDegrees {
@@ -496,17 +630,23 @@ final class MikshatWeatherViewController: UIViewController {
       arrow.isAccessibilityElement = false
       arrow.transform = CGAffineTransform(rotationAngle: CGFloat(bearing * .pi / 180))
       let container = UIView()
+      let arrowSize: CGFloat = compact ? 14 : 16
+      let containerSize: CGFloat = compact ? 18 : 20
       arrow.translatesAutoresizingMaskIntoConstraints = false
       container.addSubview(arrow)
       NSLayoutConstraint.activate([
-        arrow.widthAnchor.constraint(equalToConstant: 23), arrow.heightAnchor.constraint(equalToConstant: 23),
+        arrow.widthAnchor.constraint(equalToConstant: arrowSize), arrow.heightAnchor.constraint(equalToConstant: arrowSize),
         arrow.centerXAnchor.constraint(equalTo: container.centerXAnchor), arrow.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-        container.heightAnchor.constraint(equalToConstant: 29),
+        container.widthAnchor.constraint(equalToConstant: containerSize),
+        container.heightAnchor.constraint(equalToConstant: containerSize),
       ])
       items.append(container)
     }
     items.append(label)
-    let result = verticalStack(items, spacing: 4)
+    let result = UIStackView(arrangedSubviews: items)
+    result.axis = .horizontal
+    result.alignment = .center
+    result.spacing = 3
     result.isAccessibilityElement = true
     result.accessibilityLabel = label.text
     return result
@@ -515,6 +655,14 @@ final class MikshatWeatherViewController: UIViewController {
   private func windDescription(_ wind: MikshatWeatherWind) -> String {
     let direction = L(wind.localizationKey)
     return wind.bearingDegrees == nil ? direction : String(format: L("mikshat_weather_wind_from"), direction)
+  }
+
+  private func forecastLabel(style: UIFont.TextStyle, secondary: Bool = false) -> UILabel {
+    let label = weatherLabel(style: style, secondary: secondary)
+    // Cards are measured before being attached; inherit this controller's current text size
+    // explicitly rather than measuring once with the default trait environment.
+    label.font = .preferredFont(forTextStyle: style, compatibleWith: traitCollection)
+    return label
   }
 
   private func startMonitoringConnectivity() {

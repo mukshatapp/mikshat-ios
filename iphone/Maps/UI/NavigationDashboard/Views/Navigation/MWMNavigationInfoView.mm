@@ -117,6 +117,25 @@ CGFloat ScaledTurnsWidth()
 
   self.distanceToNextTurnLabel.adjustsFontForContentSizeCategory = YES;
   self.turnsWidth.constant = ScaledTurnsWidth();
+  self.turnsView.accessibilityIdentifier = @"navigation.maneuverPanel";
+  self.secondTurnView.accessibilityIdentifier = @"navigation.nextManeuver";
+  self.streetNameView.accessibilityIdentifier = @"navigation.streetPanel";
+}
+
+- (void)layoutSubviews
+{
+  [super layoutSubviews];
+  CGRect occupied = CGRectNull;
+  if (self.state == MWMNavigationInfoViewStateNavigation)
+  {
+    for (UIView * panel in @[self.streetNameView, self.turnsView])
+      if (!panel.hidden)
+        occupied = CGRectUnion(occupied, [panel convertRect:panel.bounds toView:self]);
+    // Include the complete next-turn container, even while its parent is animating.
+    if (!self.turnsView.hidden && !self.secondTurnView.hidden)
+      occupied = CGRectUnion(occupied, [self.secondTurnView convertRect:self.secondTurnView.bounds toView:self]);
+  }
+  [MikshatHomeControls updateNavigationObstruction:self frame:CGRectIsNull(occupied) ? CGRectZero : occupied];
 }
 
 - (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection
@@ -371,7 +390,7 @@ CGFloat ScaledTurnsWidth()
 - (void)refreshLayout
 {
   dispatch_async(dispatch_get_main_queue(), ^{
-    if (UIDeviceOrientationIsLandscape([UIDevice currentDevice].orientation))
+    if (self.ownerView.bounds.size.width > self.ownerView.bounds.size.height)
       self.streetNameLabel.numberOfLines = 1;
     else
       self.streetNameLabel.numberOfLines = 2;
@@ -445,6 +464,8 @@ CGFloat ScaledTurnsWidth()
   if (_state == state)
     return;
   _state = state;
+  if (state == MWMNavigationInfoViewStateHidden)
+    [MikshatHomeControls updateNavigationObstruction:self frame:CGRectZero];
   switch (state)
   {
   case MWMNavigationInfoViewStateHidden: self.isVisible = NO; break;

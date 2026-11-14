@@ -18,6 +18,7 @@ NS_ASSUME_NONNULL_BEGIN
 + (nullable MWMRoutePoint *)mikshatUserPosition;
 + (void)beginMikshatDirectFrom:(CLLocationCoordinate2D)origin to:(CLLocationCoordinate2D)destination NS_SWIFT_NAME(beginMikshatDirect(from:to:));
 + (void)endMikshatDirect;
++ (void)restoreMikshatDestination:(CLLocationCoordinate2D)coordinate title:(nullable NSString *)title;
 
 
 + (void)subscribeToEvents;

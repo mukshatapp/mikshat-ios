@@ -37,10 +37,12 @@ CGFloat const kButtonsBottomOffset = 6;
   [NSLayoutConstraint activateConstraints:@[self.widthConstraint, self.heightConstraint]];
   NSArray<UIButton *> * buttons = @[self.zoomIn, self.zoomOut, self.location];
   NSArray<NSString *> * symbols = @[@"plus", @"minus", @"scope"];
+  NSArray<NSString *> * identifiers = @[@"map.zoomIn", @"map.zoomOut", @"map.location"];
   UIColor * green = [UIColor colorWithRed:22.0/255 green:78.0/255 blue:63.0/255 alpha:1];
   for (NSUInteger index = 0; index < buttons.count; ++index)
   {
     UIButton * button = buttons[index];
+    button.accessibilityIdentifier = identifiers[index];
     [button setImage:[UIImage systemImageNamed:symbols[index]] forState:UIControlStateNormal];
     button.tintColor = green;
     button.backgroundColor = UIColor.whiteColor;
@@ -60,17 +62,20 @@ CGFloat const kButtonsBottomOffset = 6;
   [super layoutSubviews];
   if (!self.superview)
     return;
-  CGSize const viewport = self.window ? self.window.bounds.size : self.superview.bounds.size;
-  CGFloat const size = viewport.width > viewport.height ? 44 : 52;
+  CGFloat const size = MikshatHomeControls.mapControlButtonSize;
+  BOOL const horizontal = MikshatHomeControls.mapControlsHorizontal;
   CGFloat const gap = 8;
-  CGFloat const height = self.zoomHidden ? size : 3 * size + 2 * gap;
-  if (self.widthConstraint.constant != size)
-    self.widthConstraint.constant = size;
+  CGFloat const length = self.zoomHidden ? size : 3 * size + 2 * gap;
+  CGFloat const width = horizontal ? length : size;
+  CGFloat const height = horizontal ? size : length;
+  if (self.widthConstraint.constant != width)
+    self.widthConstraint.constant = width;
   if (self.heightConstraint.constant != height)
     self.heightConstraint.constant = height;
   self.zoomIn.frame = CGRectMake(0, 0, size, size);
-  self.zoomOut.frame = CGRectMake(0, size + gap, size, size);
-  self.location.frame = CGRectMake(0, self.zoomHidden ? 0 : 2 * (size + gap), size, size);
+  self.zoomOut.frame = CGRectMake(horizontal ? size + gap : 0, horizontal ? 0 : size + gap, size, size);
+  CGFloat const locationOffset = self.zoomHidden ? 0 : 2 * (size + gap);
+  self.location.frame = CGRectMake(horizontal ? locationOffset : 0, horizontal ? 0 : locationOffset, size, size);
   for (UIButton * button in @[self.zoomIn, self.zoomOut, self.location])
     button.layer.cornerRadius = size / 2;
 }
