@@ -710,7 +710,8 @@ private final class ResponsiveUIKitHost {
     canvas.view.frame = window.bounds
     container.view.frame = CGRect(origin: CGPoint(x: ResponsiveFixtureViewport.margin, y: ResponsiveFixtureViewport.margin),
                                   size: size)
-    controller.additionalSafeAreaInsets = ResponsiveFixtureViewport.insets(for: size)
+    // Screen insets belong to full viewport controllers; intrinsic child components use their own bounds.
+    controller.additionalSafeAreaInsets = fitContentHeight ? .zero : ResponsiveFixtureViewport.insets(for: size)
     controller.view.frame = container.view.bounds
     layout()
   }
@@ -737,7 +738,7 @@ private final class ResponsiveUIKitHost {
     XCTAssertEqual(controller.view.bounds.width, size.width, accuracy: 1)
     if !fitContentHeight { XCTAssertEqual(controller.view.bounds.height, size.height, accuracy: 1) }
     ResponsiveFixtureViewport.assertInsets(of: container.view, equalTo: .zero)
-    var expected = ResponsiveFixtureViewport.insets(for: size)
+    var expected = fitContentHeight ? UIEdgeInsets.zero : ResponsiveFixtureViewport.insets(for: size)
     if fitContentHeight {
       // Intrinsic content may extend below the viewport; UIKit includes that off-viewport area in its inset.
       expected.bottom += max(0, controller.view.bounds.height - container.view.bounds.height)
