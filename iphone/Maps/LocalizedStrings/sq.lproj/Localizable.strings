@@ -859,7 +859,7 @@
 /* iOS dialog for the case when recent track recording is on and the app comes back from background */
 "recent_track_background_dialog_title" = "Të çaktivizohet regjistrimi i rrugës suaj të udhëtuar së fundmi?";
 "off_recent_track_background_button" = "Çaktivizo";
-"recent_track_background_dialog_message" = "Organic Maps përdor vendndodhjen tuaj në sfond për të regjistruar rrugën tuaj të udhëtuar së fundmi.";
+"recent_track_background_dialog_message" = "Mikshat përdor vendndodhjen tuaj në sfond për të regjistruar rrugën tuaj të udhëtuar së fundmi.";
 "general_settings" = "Cilësimet e përgjithshme";
 
 /* "traffic" as in road congestion */
@@ -1287,3 +1287,7 @@
 "mikshat_weather_wind_w" = "west";
 
 "mikshat_kmh" = "km/h";
+"mikshat_collapsed" = "Collapsed";
+"mikshat_coordinate_formats" = "Coordinate formats";
+"mikshat_copy_coordinates_format" = "Copy coordinates in %@ format";
+"mikshat_expanded" = "Expanded";

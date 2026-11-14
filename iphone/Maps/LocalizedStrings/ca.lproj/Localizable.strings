@@ -859,7 +859,7 @@
 /* iOS dialog for the case when recent track recording is on and the app comes back from background */
 "recent_track_background_dialog_title" = "Voleu desactivar l'enregistrament del recorregut recent?";
 "off_recent_track_background_button" = "Desactiva";
-"recent_track_background_dialog_message" = "L’Organic Maps usa la vostra ubicació en segon pla per a enregistrar el recorregut que heu fet recentment.";
+"recent_track_background_dialog_message" = "L’Mikshat usa la vostra ubicació en segon pla per a enregistrar el recorregut que heu fet recentment.";
 "general_settings" = "Paràmetres generals";
 
 /* "traffic" as in road congestion */
@@ -1287,3 +1287,7 @@
 "mikshat_weather_wind_w" = "west";
 
 "mikshat_kmh" = "km/h";
+"mikshat_collapsed" = "Collapsed";
+"mikshat_coordinate_formats" = "Coordinate formats";
+"mikshat_copy_coordinates_format" = "Copy coordinates in %@ format";
+"mikshat_expanded" = "Expanded";

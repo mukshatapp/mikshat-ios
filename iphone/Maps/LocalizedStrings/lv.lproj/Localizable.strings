@@ -859,7 +859,7 @@
 /* iOS dialog for the case when recent track recording is on and the app comes back from background */
 "recent_track_background_dialog_title" = "Vai izslēgt pēdējā noietā vai nobrauktā maršuta ierakstīšanu?";
 "off_recent_track_background_button" = "Izslēgt";
-"recent_track_background_dialog_message" = "„Organic Maps“ fonā izmanto ierīces atrašanās vietas datus, lai reģistrētu pēdējo noieto vai nobraukto maršrutu.";
+"recent_track_background_dialog_message" = "„Mikshat“ fonā izmanto ierīces atrašanās vietas datus, lai reģistrētu pēdējo noieto vai nobraukto maršrutu.";
 "general_settings" = "Pamata iestatījumi";
 
 /* "traffic" as in road congestion */
@@ -1287,3 +1287,7 @@
 "mikshat_weather_wind_w" = "west";
 
 "mikshat_kmh" = "km/h";
+"mikshat_collapsed" = "Collapsed";
+"mikshat_coordinate_formats" = "Coordinate formats";
+"mikshat_copy_coordinates_format" = "Copy coordinates in %@ format";
+"mikshat_expanded" = "Expanded";

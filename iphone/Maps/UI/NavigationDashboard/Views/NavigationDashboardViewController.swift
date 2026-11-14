@@ -107,7 +107,11 @@ final class NavigationDashboardViewController: UIViewController {
     let active = MikshatNavigationCoordinator.isDirectActive
     availableAreaView.isHidden = active
     bottomActionsMenu.isHidden = active
-    if active { navigationControlView.isVisible = false; updatePresentationStep(.hidden) }
+    if active {
+      navigationInfoView.state = .hidden
+      navigationControlView.isVisible = false
+      updatePresentationStep(.hidden)
+    }
   }
 
   override func viewDidLayoutSubviews() {
@@ -501,6 +505,7 @@ final class NavigationDashboardViewController: UIViewController {
   }
 
   private func close() {
+    navigationInfoView.state = .hidden
     navigationControlView.isVisible = false
     bottomActionsMenu.setHidden(true)
     removeElevationProfileIfNeeded()

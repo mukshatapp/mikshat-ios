@@ -19,10 +19,6 @@ protocol PlacePageInfoViewControllerDelegate: AnyObject {
 }
 
 class PlacePageInfoViewController: UIViewController {
-  private enum Constants {
-    static let coordFormatIdKey = "PlacePageInfoViewController_coordFormatIdKey"
-  }
-
   private typealias TapHandler = InfoItemView.TapHandler
   private typealias Style = InfoItemView.Style
 
@@ -30,7 +26,6 @@ class PlacePageInfoViewController: UIViewController {
 
   private lazy var openingHoursViewController: OpeningHoursViewController = storyboard!.instantiateViewController(ofType: OpeningHoursViewController.self)
 
-  private var coordinatesView: InfoItemView?
   private var openWithAppView: InfoItemView?
   private var routeRefsView: InfoItemView?
   /// Relation id of the route most recently picked from the refs popup, or nil.
@@ -41,11 +36,6 @@ class PlacePageInfoViewController: UIViewController {
   weak var placePageInfoData: PlacePageInfoData!
   weak var delegate: PlacePageInfoViewControllerDelegate?
   var didTapWeather: (() -> Void)?
-
-  var coordinatesFormatId: Int {
-    get { UserDefaults.standard.integer(forKey: Constants.coordFormatIdKey) }
-    set { UserDefaults.standard.set(newValue, forKey: Constants.coordFormatIdKey) }
-  }
 
   override func viewDidLoad() {
     super.viewDidLoad()
@@ -199,18 +189,7 @@ class PlacePageInfoViewController: UIViewController {
                      })
     }
 
-    setupCoordinatesView()
     setupWeatherView()
-  }
-
-  private func setupCoordinatesView() {
-    let formats = MikshatNavigationMath.coordinatePairs(latitude: placePageInfoData.latitude, longitude: placePageInfoData.longitude)
-    for (index, text) in formats.prefix(2).enumerated() {
-      let row = MikshatCoordinateRow(text: text, format: ["DD", "DDM", "DMS"][index]) { [weak self] in
-        self?.delegate?.didCopy(text)
-      }
-      addToStack(row)
-    }
   }
 
   private func setupWeatherView() {
@@ -227,39 +206,10 @@ class PlacePageInfoViewController: UIViewController {
     weatherView.isAccessibilityElement = true
     weatherView.accessibilityLabel = L("mikshat_weather_title")
     weatherView.accessibilityTraits = .button
-  }
-
-  /// The format index actually shown: the saved one if available here, otherwise the next available.
-  /// Does not change the saved preference (`coordinatesFormatId`).
-  private func effectiveFormatId(in formats: [String]) -> Int {
-    let saved = coordinatesFormatId
-    let id = (saved >= 0 && saved < formats.count) ? saved : 0
-    return formats[id].isEmpty ? nextAvailableFormatId(after: id, in: formats) : id
-  }
-
-  /// Returns the format index following `current` whose value is non-empty (available at this location).
-  /// Falls back to `current` if none are available; the decimal formats are always present.
-  private func nextAvailableFormatId(after current: Int, in formats: [String]) -> Int {
-    for step in 1 ... formats.count {
-      let candidate = (current + step) % formats.count
-      if !formats[candidate].isEmpty {
-        return candidate
-      }
-    }
-    return current
-  }
-
-  private func setCoordinatesSelected(formatId: Int) {
-    guard let coordFormats = placePageInfoData.coordFormats as? [String] else { return }
-    coordinatesFormatId = formatId
-    let coordinates: String = coordFormats[formatId]
-    coordinatesView?.setTitle(coordinates, style: .link)
-  }
-
-  private func copyCoordinatesToPasteboard() {
-    guard let coordFormats = placePageInfoData.coordFormats as? [String] else { return }
-    let coordinates: String = coordFormats[effectiveFormatId(in: coordFormats)]
-    delegate?.didCopy(coordinates)
+    weatherView.textLabel.font = UIFontMetrics(forTextStyle: .title3).scaledFont(for: .systemFont(ofSize: 20, weight: .medium))
+    weatherView.textLabel.adjustsFontForContentSizeCategory = true
+    weatherView.iconButton.setPreferredSymbolConfiguration(UIImage.SymbolConfiguration(pointSize: 25), forImageIn: .normal)
+    weatherView.heightAnchor.constraint(greaterThanOrEqualToConstant: 64).isActive = true
   }
 
   private func showRoutesSelector() {

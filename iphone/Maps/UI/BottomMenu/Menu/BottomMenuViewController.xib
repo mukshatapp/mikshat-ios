@@ -32,9 +32,12 @@
                     <rect key="frame" x="0.0" y="562" width="414" height="300"/>
                     <color key="backgroundColor" systemColor="systemBackgroundColor" cocoaTouchSystemColor="whiteColor"/>
                     <constraints>
-                        <constraint firstAttribute="width" constant="350" id="Jyo-UJ-ltJ"/>
+                        <constraint firstAttribute="width" priority="999" constant="350" id="Jyo-UJ-ltJ"/>
                         <constraint firstAttribute="height" priority="750" constant="300" id="dYV-fi-iGj"/>
                     </constraints>
+                    <userDefinedRuntimeAttributes>
+                        <userDefinedRuntimeAttribute type="string" keyPath="accessibilityIdentifier" value="menu.panel"/>
+                    </userDefinedRuntimeAttributes>
                     <variation key="default">
                         <mask key="constraints">
                             <exclude reference="Jyo-UJ-ltJ"/>
@@ -69,11 +72,20 @@
                 <constraint firstItem="L4F-0e-1B7" firstAttribute="trailing" secondItem="vUN-kp-3ea" secondAttribute="trailing" id="g7h-Yh-azG"/>
                 <constraint firstAttribute="bottom" secondItem="M4g-vy-YtE" secondAttribute="bottom" priority="750" id="hFA-7p-XKe"/>
                 <constraint firstItem="L4F-0e-1B7" firstAttribute="leading" secondItem="vUN-kp-3ea" secondAttribute="leading" id="t8e-ZM-EdJ"/>
+                <constraint firstItem="L4F-0e-1B7" firstAttribute="centerX" secondItem="vUN-kp-3ea" secondAttribute="centerX" id="mks-CP-ctr"/>
+                <constraint firstItem="L4F-0e-1B7" firstAttribute="width" relation="lessThanOrEqual" secondItem="vUN-kp-3ea" secondAttribute="width" id="mks-SW-cap"/>
             </constraints>
             <viewLayoutGuide key="safeArea" id="vUN-kp-3ea"/>
+            <variation key="default">
+                <mask key="constraints">
+                    <exclude reference="mks-CP-ctr"/>
+                </mask>
+            </variation>
             <variation key="heightClass=compact">
                 <mask key="constraints">
                     <exclude reference="g7h-Yh-azG"/>
+                    <exclude reference="t8e-ZM-EdJ"/>
+                    <include reference="mks-CP-ctr"/>
                 </mask>
             </variation>
             <connections>

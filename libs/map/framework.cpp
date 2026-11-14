@@ -2668,6 +2668,20 @@ void Framework::UpdatePlacePageInfoForCurrentSelection(std::optional<place_page:
     m_onPlacePageUpdate();
 }
 
+void Framework::ShowPointSelection(m2::PointD const & point, std::string const & title)
+{
+  StopLocationFollow();
+  DeactivateHotelSearchMark();
+  place_page::BuildInfo buildInfo;
+  buildInfo.m_mercator = point;
+  buildInfo.m_match = place_page::BuildInfo::Match::Nothing;
+  m_currentPlacePageInfo = BuildPlacePageInfo(buildInfo);
+  if (!title.empty())
+    m_currentPlacePageInfo->SetCustomNames(title, m_currentPlacePageInfo->GetSubtitle());
+  SetViewportCenter(point, -1 /* current zoom */, true /* isAnim */, true /* trackVisibleViewport */);
+  ActivateMapSelection();
+}
+
 std::vector<Track::TrackSelectionInfo> Framework::FindTracksInTapPosition(place_page::BuildInfo const & buildInfo) const
 {
   auto const & bm = GetBookmarkManager();

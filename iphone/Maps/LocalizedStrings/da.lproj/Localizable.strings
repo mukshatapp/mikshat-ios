@@ -859,7 +859,7 @@
 /* iOS dialog for the case when recent track recording is on and the app comes back from background */
 "recent_track_background_dialog_title" = "Deaktiver optagelse af din nyligt tilbagelagte rute?";
 "off_recent_track_background_button" = "Deaktiver";
-"recent_track_background_dialog_message" = "Organic Maps anvender din placering i baggrunden til at gemme din nyligt tilbagelagte rute.";
+"recent_track_background_dialog_message" = "Mikshat anvender din placering i baggrunden til at gemme din nyligt tilbagelagte rute.";
 "general_settings" = "Generelle indstillinger";
 
 /* "traffic" as in road congestion */
@@ -1287,3 +1287,7 @@
 "mikshat_weather_wind_w" = "west";
 
 "mikshat_kmh" = "km/h";
+"mikshat_collapsed" = "Collapsed";
+"mikshat_coordinate_formats" = "Coordinate formats";
+"mikshat_copy_coordinates_format" = "Copy coordinates in %@ format";
+"mikshat_expanded" = "Expanded";

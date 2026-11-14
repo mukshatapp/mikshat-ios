@@ -859,7 +859,7 @@
 /* iOS dialog for the case when recent track recording is on and the app comes back from background */
 "recent_track_background_dialog_title" = "Išjungti paskiausiai keliautų trasų įrašymą?";
 "off_recent_track_background_button" = "Išjungti";
-"recent_track_background_dialog_message" = "„Organic Maps“ naudoja jūsų vietos duomenis fone, kad įrašytų jūsų paskiausiai keliautą trasą.";
+"recent_track_background_dialog_message" = "„Mikshat“ naudoja jūsų vietos duomenis fone, kad įrašytų jūsų paskiausiai keliautą trasą.";
 "general_settings" = "Bendrieji nustatymai";
 
 /* "traffic" as in road congestion */
@@ -1287,3 +1287,7 @@
 "mikshat_weather_wind_w" = "west";
 
 "mikshat_kmh" = "km/h";
+"mikshat_collapsed" = "Collapsed";
+"mikshat_coordinate_formats" = "Coordinate formats";
+"mikshat_copy_coordinates_format" = "Copy coordinates in %@ format";
+"mikshat_expanded" = "Expanded";

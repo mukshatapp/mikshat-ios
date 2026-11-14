@@ -859,7 +859,7 @@
 /* iOS dialog for the case when recent track recording is on and the app comes back from background */
 "recent_track_background_dialog_title" = "هل تريد تعطيل تسجيل مسارات سفرك؟";
 "off_recent_track_background_button" = "تعطيل";
-"recent_track_background_dialog_message" = "يستخدم Organic Maps موقعك الجغرافي في الخلفية لتسجيل مسار سفرك الأخير.";
+"recent_track_background_dialog_message" = "يستخدم مكشات موقعك الجغرافي في الخلفية لتسجيل مسار سفرك الأخير.";
 "general_settings" = "الإعدادات العامة";
 
 /* "traffic" as in road congestion */
@@ -1484,3 +1484,7 @@
 "mikshat_weather_wind_sw" = "الجنوب الغربي";
 "mikshat_weather_wind_unavailable" = "اتجاه الرياح غير متوفر";
 "mikshat_weather_wind_w" = "الغرب";
+"mikshat_collapsed" = "مطوي";
+"mikshat_coordinate_formats" = "تنسيقات الإحداثيات";
+"mikshat_copy_coordinates_format" = "نسخ الإحداثيات بتنسيق %@";
+"mikshat_expanded" = "موسّع";

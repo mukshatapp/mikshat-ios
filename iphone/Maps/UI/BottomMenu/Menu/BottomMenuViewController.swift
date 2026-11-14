@@ -85,7 +85,7 @@ final class BottomMenuViewController: MWMViewController {
     tableView.layoutIfNeeded()
 
     let contentHeight = tableView.contentSize.height
-    let maximumHeight = view.bounds.height - view.safeAreaInsets.bottom
+    let maximumHeight = view.safeAreaLayoutGuide.layoutFrame.height
     guard contentHeight > 0, maximumHeight > 0 else { return }
 
     let targetHeight = min(contentHeight, maximumHeight)

@@ -1,5 +1,6 @@
 protocol PlacePagePresenterProtocol: AnyObject {
   func layoutIfNeeded()
+  func refreshContentSize()
   func updateVisibleAreaInsets(_ insets: UIEdgeInsets, updatingViewport: Bool)
   func showNextStop()
   func scrollToReveal(_ anchor: UIView)
@@ -31,6 +32,10 @@ final class PlacePagePresenter: NSObject {
 extension PlacePagePresenter: PlacePagePresenterProtocol {
   func layoutIfNeeded() {
     view.layoutIfNeeded()
+  }
+
+  func refreshContentSize() {
+    view.refreshContentSize()
   }
 
   func updateVisibleAreaInsets(_ insets: UIEdgeInsets, updatingViewport: Bool) {

@@ -50,10 +50,20 @@ BOOL defaultOrientation(CGSize const & size)
   return IPAD || (size.height > size.width && size.width >= minWidth);
 }
 
-CGFloat ScaledTurnsWidth()
+BOOL UsesTabletTurnLayout(UIView * view)
 {
-  CGFloat const baseWidth = IPAD ? kTurnsiPadWidth : kTurnsiPhoneWidth;
-  CGFloat const scaledWidth = [[UIFontMetrics metricsForTextStyle:UIFontTextStyleTitle1] scaledValueForValue:baseWidth];
+  // A narrow iPad window has the same layout budget as a phone. The hardware
+  // idiom alone can otherwise push the next turn and every tool below the screen.
+  UIView * container = view.superview ?: view;
+  CGSize const viewport = UIEdgeInsetsInsetRect(container.bounds, container.safeAreaInsets).size;
+  return MIN(viewport.width, viewport.height) >= 600;
+}
+
+CGFloat ScaledTurnsWidth(UIView * view)
+{
+  CGFloat const baseWidth = UsesTabletTurnLayout(view) ? kTurnsiPadWidth : kTurnsiPhoneWidth;
+  CGFloat const scaledWidth = [[UIFontMetrics metricsForTextStyle:UIFontTextStyleTitle1]
+      scaledValueForValue:baseWidth compatibleWithTraitCollection:view.traitCollection];
   return MAX(baseWidth, scaledWidth);
 }
 }  // namespace
@@ -116,7 +126,33 @@ CGFloat ScaledTurnsWidth()
   self.roundTurnLabel.adjustsFontForContentSizeCategory = YES;
 
   self.distanceToNextTurnLabel.adjustsFontForContentSizeCategory = YES;
-  self.turnsWidth.constant = ScaledTurnsWidth();
+  self.turnsWidth.constant = ScaledTurnsWidth(self);
+  self.turnsView.accessibilityIdentifier = @"navigation.maneuverPanel";
+  self.secondTurnView.accessibilityIdentifier = @"navigation.nextManeuver";
+  self.streetNameView.accessibilityIdentifier = @"navigation.streetPanel";
+}
+
+- (void)layoutSubviews
+{
+  CGFloat const turnsWidth = ScaledTurnsWidth(self);
+  if (self.turnsWidth.constant != turnsWidth)
+  {
+    self.turnsWidth.constant = turnsWidth;
+    if (self.navigationInfo)
+      [self onNavigationInfoUpdated:self.navigationInfo];
+  }
+  [super layoutSubviews];
+  CGRect occupied = CGRectNull;
+  if (self.state == MWMNavigationInfoViewStateNavigation)
+  {
+    for (UIView * panel in @[self.streetNameView, self.turnsView])
+      if (!panel.hidden)
+        occupied = CGRectUnion(occupied, [panel convertRect:panel.bounds toView:self]);
+    // Include the complete next-turn container, even while its parent is animating.
+    if (!self.turnsView.hidden && !self.secondTurnView.hidden)
+      occupied = CGRectUnion(occupied, [self.secondTurnView convertRect:self.secondTurnView.bounds toView:self]);
+  }
+  [MikshatHomeControls updateNavigationObstruction:self frame:CGRectIsNull(occupied) ? CGRectZero : occupied];
 }
 
 - (void)traitCollectionDidChange:(UITraitCollection *)previousTraitCollection
@@ -126,7 +162,7 @@ CGFloat ScaledTurnsWidth()
                                      isEqualToString:self.traitCollection.preferredContentSizeCategory])
     return;
 
-  self.turnsWidth.constant = ScaledTurnsWidth();
+  self.turnsWidth.constant = ScaledTurnsWidth(self);
   [self onNavigationInfoUpdated:self.navigationInfo];
   [self setNeedsLayout];
 }
@@ -272,13 +308,17 @@ CGFloat ScaledTurnsWidth()
       self.roundTurnLabel.text = @(info.roundExitNumber).stringValue;
     }
 
+    BOOL const tabletLayout = UsesTabletTurnLayout(self);
+    UIFontMetrics * metrics = [UIFontMetrics defaultMetrics];
     NSDictionary * turnNumberAttributes = @{
       NSForegroundColorAttributeName: [UIColor whitePrimary],
-      NSFontAttributeName: IPAD ? UIFont.bold36.dynamic : UIFont.bold28.dynamic
+      NSFontAttributeName: [metrics scaledFontForFont:[UIFont boldSystemFontOfSize:tabletLayout ? 36 : 28]
+                       compatibleWithTraitCollection:self.traitCollection]
     };
     NSDictionary * turnLegendAttributes = @{
       NSForegroundColorAttributeName: [UIColor whitePrimary],
-      NSFontAttributeName: IPAD ? UIFont.bold24.dynamic : UIFont.bold16.dynamic
+      NSFontAttributeName: [metrics scaledFontForFont:[UIFont boldSystemFontOfSize:tabletLayout ? 24 : 16]
+                       compatibleWithTraitCollection:self.traitCollection]
     };
 
     NSMutableAttributedString * distance = [[NSMutableAttributedString alloc] initWithString:info.distanceToTurn
@@ -371,7 +411,7 @@ CGFloat ScaledTurnsWidth()
 - (void)refreshLayout
 {
   dispatch_async(dispatch_get_main_queue(), ^{
-    if (UIDeviceOrientationIsLandscape([UIDevice currentDevice].orientation))
+    if (self.ownerView.bounds.size.width > self.ownerView.bounds.size.height)
       self.streetNameLabel.numberOfLines = 1;
     else
       self.streetNameLabel.numberOfLines = 2;
@@ -445,6 +485,8 @@ CGFloat ScaledTurnsWidth()
   if (_state == state)
     return;
   _state = state;
+  if (state == MWMNavigationInfoViewStateHidden)
+    [MikshatHomeControls updateNavigationObstruction:self frame:CGRectZero];
   switch (state)
   {
   case MWMNavigationInfoViewStateHidden: self.isVisible = NO; break;
@@ -473,7 +515,7 @@ CGFloat ScaledTurnsWidth()
   if (isVisible)
   {
     [self setSearchState:NavigationSearchStateMinimizedNormal animated:NO];
-    self.turnsWidth.constant = ScaledTurnsWidth();
+    self.turnsWidth.constant = ScaledTurnsWidth(self);
     UIView * sv = self.ownerView;
     NSAssert(sv != nil, @"Superview can't be nil");
     if (![sv.subviews containsObject:self])

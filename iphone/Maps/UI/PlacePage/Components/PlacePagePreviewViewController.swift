@@ -16,6 +16,137 @@ final class PlacePageDirectionView: UIView {
   }
 }
 
+/// All formats belong to the selected map point, independently of GPS updates or format preferences.
+final class PlacePageCoordinatesView: UIStackView {
+  private let toggleButton = UIButton(type: .system)
+  private let additionalRows: [UIView]
+  private let didChangeExpanded: () -> Void
+  private(set) var isExpanded = false
+
+  init(coordinate: CLLocationCoordinate2D,
+       copy: @escaping (String) -> Void,
+       didChangeExpanded: @escaping () -> Void) {
+    let formats = MikshatNavigationMath.coordinatePairs(latitude: coordinate.latitude, longitude: coordinate.longitude)
+    additionalRows = [("DD", formats[0]), ("DMS", formats[2])].map { format, text in
+      PlacePageCoordinateFormatRow(text: text, format: format, copy: { copy(text) })
+    }
+    self.didChangeExpanded = didChangeExpanded
+    super.init(frame: .zero)
+    axis = .vertical
+    alignment = .fill
+    spacing = 0
+    accessibilityIdentifier = "placePage.coordinates"
+
+    var configuration = UIButton.Configuration.filled()
+    configuration.image = UIImage(systemName: "line.3.horizontal")
+    configuration.baseBackgroundColor = MikshatStyle.green
+    configuration.baseForegroundColor = .white
+    configuration.cornerStyle = .medium
+    configuration.preferredSymbolConfigurationForImage = UIImage.SymbolConfiguration(pointSize: 21)
+    toggleButton.configuration = configuration
+    toggleButton.accessibilityIdentifier = "placePage.coordinates.toggle"
+    toggleButton.accessibilityLabel = L("mikshat_coordinate_formats")
+    toggleButton.widthAnchor.constraint(equalToConstant: 44).isActive = true
+    toggleButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+    toggleButton.addAction(UIAction { [weak self] _ in self?.toggleExpanded() }, for: .touchUpInside)
+
+    addArrangedSubview(PlacePageCoordinateFormatRow(text: formats[1],
+                                                   format: "DDM",
+                                                   accessory: toggleButton,
+                                                   copy: { copy(formats[1]) }))
+    updateExpandedAccessibility()
+  }
+
+  @available(*, unavailable)
+  required init(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+  private func toggleExpanded() {
+    isExpanded.toggle()
+    for row in additionalRows {
+      if isExpanded {
+        addArrangedSubview(row)
+      } else {
+        removeArrangedSubview(row)
+        row.removeFromSuperview()
+      }
+    }
+    updateExpandedAccessibility()
+    invalidateIntrinsicContentSize()
+    didChangeExpanded()
+    UIAccessibility.post(notification: .layoutChanged, argument: toggleButton)
+  }
+
+  private func updateExpandedAccessibility() {
+    toggleButton.accessibilityValue = L(isExpanded ? "mikshat_expanded" : "mikshat_collapsed")
+    toggleButton.isSelected = isExpanded
+  }
+}
+
+private final class PlacePageCoordinateFormatRow: UIStackView {
+  init(text: String, format: String, accessory: UIView? = nil, copy: @escaping () -> Void) {
+    super.init(frame: .zero)
+    axis = .horizontal
+    alignment = .center
+    spacing = 8
+    semanticContentAttribute = .forceLeftToRight
+    isLayoutMarginsRelativeArrangement = true
+    layoutMargins = UIEdgeInsets(top: 10, left: 12, bottom: 10, right: 12)
+    let identifier = "placePage.coordinates.\(format.lowercased())"
+    accessibilityIdentifier = identifier
+
+    let copyButton = UIButton(type: .system)
+    var configuration = UIButton.Configuration.filled()
+    configuration.title = L("mikshat_copy")
+    configuration.baseBackgroundColor = MikshatStyle.green
+    configuration.baseForegroundColor = .white
+    configuration.cornerStyle = .medium
+    configuration.contentInsets = NSDirectionalEdgeInsets(top: 10, leading: 8, bottom: 10, trailing: 8)
+    configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+      var attributes = incoming
+      attributes.font = UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: 17), maximumPointSize: 20)
+      return attributes
+    }
+    copyButton.configuration = configuration
+    copyButton.accessibilityIdentifier = identifier + ".copy"
+    copyButton.accessibilityLabel = String(format: L("mikshat_copy_coordinates_format"), format)
+    copyButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+    copyButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+    copyButton.setContentHuggingPriority(.required, for: .horizontal)
+    copyButton.setContentCompressionResistancePriority(.required, for: .horizontal)
+    copyButton.addAction(UIAction { _ in copy() }, for: .touchUpInside)
+    addArrangedSubview(copyButton)
+
+    let values = UIStackView()
+    values.axis = .vertical
+    values.alignment = .fill
+    values.spacing = 3
+    let formatLabel = MikshatStyle.label(format, size: 12, color: MikshatStyle.green)
+    formatLabel.font = UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: 12), maximumPointSize: 16)
+    formatLabel.textAlignment = .left
+    values.addArrangedSubview(formatLabel)
+    for (index, line) in text.components(separatedBy: "\n").enumerated() {
+      let label = MikshatStyle.label(line, size: 18, color: MikshatStyle.green)
+      label.font = UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: 18), maximumPointSize: 24)
+      label.numberOfLines = 1
+      label.textAlignment = .left
+      label.semanticContentAttribute = .forceLeftToRight
+      label.adjustsFontSizeToFitWidth = true
+      label.minimumScaleFactor = 0.5
+      label.accessibilityIdentifier = identifier + (index == 0 ? ".latitude" : ".longitude")
+      label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+      values.addArrangedSubview(label)
+    }
+    values.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+    addArrangedSubview(values)
+    if let accessory { addArrangedSubview(accessory) }
+    setContentHuggingPriority(.required, for: .vertical)
+    setContentCompressionResistancePriority(.required, for: .vertical)
+  }
+
+  @available(*, unavailable)
+  required init(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+}
+
 final class PlacePagePreviewViewController: UIViewController {
   @IBOutlet var stackView: UIStackView!
   @IBOutlet var popularView: UIView!
@@ -65,8 +196,9 @@ final class PlacePagePreviewViewController: UIViewController {
 
     updateViews()
     if let coordinate = mikshatCoordinate {
-      let text = MikshatNavigationMath.coordinatePairs(latitude: coordinate.latitude, longitude: coordinate.longitude)[1]
-      stackView.addArrangedSubview(MikshatCoordinateRow(text: text) { [weak self] in self?.delegate?.previewDidCopy(text) })
+      stackView.addArrangedSubview(PlacePageCoordinatesView(coordinate: coordinate,
+                                                           copy: { [weak self] text in self?.delegate?.previewDidCopy(text) },
+                                                           didChangeExpanded: { [weak self] in self?.delegate?.previewDidChangeContentSize() }))
     }
 
     subtitleLabel.adjustsFontForContentSizeCategory = true
@@ -97,15 +229,18 @@ final class PlacePagePreviewViewController: UIViewController {
 //                                                              .font : UIFont.regular14]))
 //      }
 
-      if let subtitle = placePagePreviewData.subtitle ?? placePagePreviewData.coordinates {
+      let subtitle = placePagePreviewData.subtitle ?? (mikshatCoordinate == nil ? placePagePreviewData.coordinates : nil)
+      if let subtitle {
         subtitleString.append(NSAttributedString(string: !subtitleString.string.isEmpty ? " • " + subtitle : subtitle,
                                                  attributes: [.foregroundColor: UIColor.blackSecondaryText,
                                                               .font: UIFont.emojiRegular14.dynamic]))
 
         subtitleLabel.attributedText = subtitleString
+        subtitleLabel.isHidden = false
         subtitleContainerView.isHidden = false
       } else {
         subtitleLabel.text = nil
+        subtitleLabel.isHidden = true
         subtitleContainerView.isHidden = true
       }
     }
@@ -118,6 +253,9 @@ final class PlacePagePreviewViewController: UIViewController {
     } else {
       addressContainerView.isHidden = true
     }
+    if placePageDirectionView === subtitleDirectionView, distance != nil {
+      subtitleContainerView.isHidden = false
+    }
     placePageDirectionView?.imageView.changeColoringToOpposite()
     configSchedule()
   }
@@ -126,6 +264,9 @@ final class PlacePagePreviewViewController: UIViewController {
     self.distance = distance
     placePageDirectionView?.isHidden = false
     placePageDirectionView?.label.text = distance
+    if placePageDirectionView === subtitleDirectionView {
+      subtitleContainerView?.isHidden = false
+    }
     loadedDirectionView?.updateDistance(distance)
   }
 

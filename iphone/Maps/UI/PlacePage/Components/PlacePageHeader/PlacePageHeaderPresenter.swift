@@ -22,6 +22,7 @@ protocol PlacePageHeaderViewControllerDelegate: AnyObject {
   func previewDidPressShare(from sourceView: UIView)
   func previewDidPressExportTrack(_ type: FileType, from sourceView: UIView)
   func previewDidCopy(_ content: String)
+  func previewDidChangeContentSize()
   func previewDidFinishEditingTitle(_ newTitle: String)
 }
 

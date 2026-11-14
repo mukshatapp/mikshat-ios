@@ -226,13 +226,14 @@ final class SearchHistoryOnlyTests: XCTestCase {
                                                          verticalFittingPriority: .fittingSizeLevel)
     controller.view.frame = CGRect(origin: .zero, size: fitting)
     controller.view.layoutIfNeeded()
-    let coordinates = controller.stackView.arrangedSubviews.compactMap { $0 as? MikshatCoordinateRow }
-    XCTAssertEqual(coordinates.count, 2)
+    XCTAssertTrue(controller.stackView.arrangedSubviews.compactMap { $0 as? MikshatCoordinateRow }.isEmpty,
+                  "The selected point's inline formats live in Preview; Info must not duplicate them")
     let weather = try XCTUnwrap(controller.stackView.arrangedSubviews.last as? InfoItemView)
     XCTAssertEqual(weather.accessibilityIdentifier, "placePage.weather")
-    XCTAssertGreaterThanOrEqual(weather.frame.minY, try XCTUnwrap(coordinates.last).frame.maxY)
     XCTAssertEqual(weather.frame.maxY, controller.view.bounds.maxY, accuracy: 1)
-    XCTAssertGreaterThan(fitting.height, 176)
+    XCTAssertGreaterThanOrEqual(weather.bounds.height, 44)
+    XCTAssertTrue(weather.accessibilityTraits.contains(.button))
+    XCTAssertGreaterThan(fitting.height, 0)
     XCTAssertLessThan(fitting.height, 400)
     weather.infoLabelTapHandler?()
     weather.iconButton.sendActions(for: .touchUpInside)

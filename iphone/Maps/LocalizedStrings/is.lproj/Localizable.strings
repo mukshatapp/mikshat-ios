@@ -859,7 +859,7 @@
 /* iOS dialog for the case when recent track recording is on and the app comes back from background */
 "recent_track_background_dialog_title" = "Gera óvirka upptöku af leiðinni sem þú varst að ferðast eftir?";
 "off_recent_track_background_button" = "Gera óvirkt";
-"recent_track_background_dialog_message" = "Organic Maps notar staðsetningu þína í bakgrunni til að skrá leiðina sem þú varst að ferðast eftir.";
+"recent_track_background_dialog_message" = "Mikshat notar staðsetningu þína í bakgrunni til að skrá leiðina sem þú varst að ferðast eftir.";
 "general_settings" = "Almennar stillingar";
 
 /* "traffic" as in road congestion */
@@ -1287,3 +1287,7 @@
 "mikshat_weather_wind_w" = "west";
 
 "mikshat_kmh" = "km/h";
+"mikshat_collapsed" = "Collapsed";
+"mikshat_coordinate_formats" = "Coordinate formats";
+"mikshat_copy_coordinates_format" = "Copy coordinates in %@ format";
+"mikshat_expanded" = "Expanded";
