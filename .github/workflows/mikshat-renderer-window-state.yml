@@ -1,4 +1,4 @@
-name: Mikshat recorded setup state and Settings preview
+name: Mikshat current driver log and renderer crash state
 on:
   push:
     branches: [diagnostics/renderer-window-state-4615]
@@ -6,33 +6,47 @@ permissions:
   contents: read
   actions: read
 jobs:
-  read-recorded-state:
+  recorded-runtime:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Read recorded setup state and selected iPad windowing mode
+      - name: Read current recorded driver and renderer evidence
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14164200273/zip > renderer.zip
-          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14163204085/zip > pad.zip
-          python3 -m pip install --quiet Pillow
+          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14167095788/zip > pad.zip
+          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14166787179/zip > renderer.zip
           python3 - <<'PY'
-          import base64,io,json,zipfile
-          from PIL import Image
+          import json,zipfile
+          with zipfile.ZipFile('pad.zip') as archive:
+              names=[n for n in archive.namelist() if n.endswith('scene-rotation-driver.log') or '/scene-rotation/' in n and n.endswith('.json')]
+              print('DRIVER_EVIDENCE_FILES',names)
+              for name in names:
+                  print('DRIVER_EVIDENCE_FILE',name)
+                  print(archive.read(name).decode('utf-8',errors='replace')[:70000])
           with zipfile.ZipFile('renderer.zip') as archive:
               for name in archive.namelist():
                   if name.endswith(('renderer-launch.json','renderer-coverage.jsonl')):
-                      print('RECORDED_STATE_FILE',name)
-                      print(archive.read(name).decode('utf-8',errors='replace'))
-          with zipfile.ZipFile('pad.zip') as archive:
-              names=[n for n in archive.namelist() if 'simulator-setup-screenshots' in n and n.endswith('.png')]
-              print('SETTINGS_EXPORTED_IMAGES',names)
-              for name in names:
-                  image=Image.open(io.BytesIO(archive.read(name)))
-                  image.thumbnail((900,900))
-                  output=io.BytesIO()
-                  image.save(output,format='PNG')
-                  print('SETTINGS_SELECTION_PREVIEW '+json.dumps(dict(name=name,pngBase64=base64.b64encode(output.getvalue()).decode())))
+                      print('RENDERER_STATE_FILE',name)
+                      print(archive.read(name).decode('utf-8',errors='replace')[:70000])
+              crashes=[n for n in archive.namelist() if n.endswith('.ips') and ('organic' in n.lower() or 'omaps' in n.lower())]
+              print('RENDERER_CRASH_FILES',crashes)
+              for name in crashes:
+                  value=archive.read(name).decode('utf-8',errors='replace').lstrip()
+                  first,offset=json.JSONDecoder().raw_decode(value)
+                  remaining=value[offset:].strip()
+                  report=json.loads(remaining) if remaining else first
+                  images=report.get('usedImages',[])
+                  index=report.get('faultingThread')
+                  threads=report.get('threads',[])
+                  selected=[(i,t) for i,t in enumerate(threads) if i==index or t.get('triggered')]
+                  print('RENDERER_CRASH',json.dumps(dict(file=name,exception=report.get('exception'),termination=report.get('termination'),faultingThread=index,asi=report.get('asi')))[:12000])
+                  for number,thread in selected:
+                      frames=[]
+                      for frame in thread.get('frames',[])[:70]:
+                          imageIndex=frame.get('imageIndex')
+                          binary=images[imageIndex] if isinstance(imageIndex,int) and imageIndex<len(images) else {}
+                          frames.append(dict(symbol=frame.get('symbol'),offset=frame.get('symbolLocation'),image=binary.get('name'),imageOffset=frame.get('imageOffset')))
+                      print('RENDERER_CRASH_THREAD',json.dumps(dict(index=number,name=thread.get('name'),queue=thread.get('queue'),frames=frames)))
           PY

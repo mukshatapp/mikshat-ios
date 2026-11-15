@@ -881,12 +881,13 @@ final class SearchThemeWindowLifecycleTests: XCTestCase {
     XCTAssertTrue(field.isStyleApplied)
   }
 
-  func test_SearchOpensFocusesAndClosesRepeatedlyInNormalAndRoutingModes() throws {
+  @MainActor
+  func test_SearchOpensFocusesAndClosesRepeatedlyInNormalAndRoutingModes() async throws {
     let map = try XCTUnwrap(MapViewController.shared())
     map.loadViewIfNeeded()
     let restoreHistory = prepareCoordinateHistoryIfRendererRequested()
     defer { restoreHistory?() }
-    try requireRenderedArabicMapIfRequested(map)
+    try await requireRenderedArabicMapIfRequested(map)
     let manager = SearchOnMapManager()
     defer { manager.close() }
     for routing in [false, true] {
@@ -895,30 +896,33 @@ final class SearchThemeWindowLifecycleTests: XCTestCase {
         let controller = try XCTUnwrap(manager.viewController)
         let attached = expectation(description: "Search attachment and deferred keyboard focus completed")
         DispatchQueue.main.async { attached.fulfill() }
-        wait(for: [attached], timeout: 2)
+        await fulfillment(of: [attached], timeout: 2)
         XCTAssertTrue(controller.parent === map)
         let bar = try XCTUnwrap(findSearchBar(in: controller.view))
         XCTAssertTrue(bar.searchTextField.isFirstResponder)
         try requireAttachedCoordinateHistoryIndicatorIfRequested(in: controller.view)
         manager.close()
         let detached = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in controller.parent == nil }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [detached], timeout: 3), .completed)
+        let detachedOutcome = await XCTWaiter.fulfillment(of: [detached], timeout: 3)
+        XCTAssertEqual(detachedOutcome, .completed)
       }
     }
   }
 
-  func test_GlobalSearchManagerOpensWithDashboardObserversInPrepareAndNavigation() throws {
+  @MainActor
+  func test_GlobalSearchManagerOpensWithDashboardObserversInPrepareAndNavigation() async throws {
     let map = try XCTUnwrap(MapViewController.shared())
     map.loadViewIfNeeded()
     let restoreHistory = prepareCoordinateHistoryIfRendererRequested()
     defer { restoreHistory?() }
-    try requireRenderedArabicMapIfRequested(map)
+    try await requireRenderedArabicMapIfRequested(map)
     let manager = map.searchManager
     let dashboard = MWMNavigationDashboardManager.shared()
     if let existing = manager.viewController {
       manager.close()
       let detached = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in existing.parent == nil }, object: nil)
-      XCTAssertEqual(XCTWaiter.wait(for: [detached], timeout: 3), .completed)
+      let detachedOutcome = await XCTWaiter.fulfillment(of: [detached], timeout: 3)
+      XCTAssertEqual(detachedOutcome, .completed)
     }
     defer {
       manager.close()
@@ -935,7 +939,7 @@ final class SearchThemeWindowLifecycleTests: XCTestCase {
           let controller = try XCTUnwrap(manager.viewController)
           let focused = expectation(description: "Global search notification and keyboard focus complete")
           DispatchQueue.main.async { focused.fulfill() }
-          wait(for: [focused], timeout: 2)
+          await fulfillment(of: [focused], timeout: 2)
           XCTAssertTrue(controller.parent === map)
           let bar = try XCTUnwrap(findSearchBar(in: controller.view))
           XCTAssertTrue(bar.searchTextField.isFirstResponder)
@@ -943,7 +947,8 @@ final class SearchThemeWindowLifecycleTests: XCTestCase {
           XCTAssertEqual(dashboard.state, navigation ? .navigation : .prepare)
           manager.close()
           let detached = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in controller.parent == nil }, object: nil)
-          XCTAssertEqual(XCTWaiter.wait(for: [detached], timeout: 3), .completed)
+          let detachedOutcome = await XCTWaiter.fulfillment(of: [detached], timeout: 3)
+          XCTAssertEqual(detachedOutcome, .completed)
         }
       }
     }
@@ -958,7 +963,7 @@ final class SearchThemeWindowLifecycleTests: XCTestCase {
 // Test-only helpers for SearchThemeWindowLifecycleTests. After loading the map:
 //   let restoreHistory = prepareCoordinateHistoryIfRendererRequested()
 //   defer { restoreHistory?() }
-//   try requireRenderedArabicMapIfRequested(map)
+//   try await requireRenderedArabicMapIfRequested(map)
 // After each open has focused its search field:
 //   try requireAttachedCoordinateHistoryIndicatorIfRequested(in: controller.view)
 // Ordinary -IsTests runs are unchanged. Use a fresh simulator: the public native
@@ -1001,7 +1006,8 @@ private func prepareCoordinateHistoryIfRendererRequested() -> (() -> Void)? {
   }
 }
 
-private func requireRenderedArabicMapIfRequested(_ map: MapViewController) throws {
+@MainActor
+private func requireRenderedArabicMapIfRequested(_ map: MapViewController) async throws {
   guard ProcessInfo.processInfo.arguments.contains("-MikshatRequireRenderer") else { return }
   guard !MapsAppDelegate.isTestsEnvironment() else {
     throw NSError(domain: "MikshatSearchRendererSetup", code: 1,
@@ -1014,14 +1020,19 @@ private func requireRenderedArabicMapIfRequested(_ map: MapViewController) throw
                   userInfo: [NSLocalizedDescriptionKey: "Arabic launch arguments were not applied: \(language)"])
   }
   XCTAssertEqual(UIView.userInterfaceLayoutDirection(for: .unspecified), .rightToLeft)
-  // Hosted tests can start while UIKit is still activating the application.
-  // Wait for its real foreground window before requesting normal map layout.
-  let foregroundReady = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+  // Hosted tests can start before UIKit finishes activating the application.
+  // Yield the main actor between observations so those lifecycle callbacks can
+  // complete; keep the real foreground/key-window requirement and deadline.
+  let foregroundReady = {
     guard UIApplication.shared.applicationState == .active,
           let window = map.viewIfLoaded?.window else { return false }
     return window.isKeyWindow && !window.isHidden && window.alpha > 0 && !window.bounds.isEmpty
-  }, object: nil)
-  let foregroundOutcome = XCTWaiter.wait(for: [foregroundReady], timeout: 20)
+  }
+  let activationDeadline = Date().addingTimeInterval(20)
+  while !foregroundReady(), Date() < activationDeadline {
+    try await Task.sleep(nanoseconds: 50_000_000)
+  }
+  let foregroundOutcome: XCTWaiter.Result = foregroundReady() ? .completed : .timedOut
   guard foregroundOutcome == .completed else {
     let window = map.viewIfLoaded?.window
     try? appendRendererCoverage(event: "setup-failed", map: map,
@@ -1046,7 +1057,7 @@ private func requireRenderedArabicMapIfRequested(_ map: MapViewController) throw
   let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
     map.mapView.drapeEngineCreated && map.mapView.graphicContextInitialized
   }, object: nil)
-  let outcome = XCTWaiter.wait(for: [ready], timeout: 30)
+  let outcome = await XCTWaiter.fulfillment(of: [ready], timeout: 30)
   XCTAssertEqual(outcome, .completed, "Normal Drape creation and both graphics contexts must complete before opening search")
   guard outcome == .completed else {
     throw NSError(domain: "MikshatSearchRendererSetup", code: 3,
