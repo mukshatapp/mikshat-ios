@@ -636,8 +636,9 @@ private func assertResponsiveVisible(_ view: UIView, in viewport: UIView, contex
     ancestor = current.superview
   }
   XCTAssertTrue(view === viewport || view.isDescendant(of: viewport), context, file: file, line: line)
-  XCTAssertGreaterThan(rect.width, 0, context, file: file, line: line)
-  XCTAssertGreaterThan(rect.height, 0, context, file: file, line: line)
+  let geometry = "\(view.accessibilityIdentifier ?? String(describing: type(of: view))) rect=\(rect) viewport=\(viewport.bounds) \(context)"
+  XCTAssertGreaterThan(rect.width, 0, geometry, file: file, line: line)
+  XCTAssertGreaterThan(rect.height, 0, geometry, file: file, line: line)
   XCTAssertTrue(viewport.bounds.insetBy(dx: -1, dy: -1).contains(rect),
                 "\(view.accessibilityIdentifier ?? "view") \(rect) outside \(viewport.bounds) \(context)", file: file, line: line)
 }

@@ -5,6 +5,7 @@ iPad app. They exchange versioned requests here; the tests still verify the actu
 scene orientation and window/map bounds after each physical device command.
 """
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 from pathlib import Path
@@ -45,6 +46,8 @@ def main():
     session = str(uuid.uuid4())
     stopping = False
     documents = None
+    discovery = None
+    lookup = None
 
     def stop(_signum, _frame):
         nonlocal stopping
@@ -109,6 +112,18 @@ def main():
         atomic_json(directory / (PREFIX + "ready.json"), ready)
         return ready
 
+    def discover_documents():
+        started_at, started_monotonic = time.time(), time.monotonic()
+        directory = None
+        record = {"startedAt": started_at}
+        try:
+            directory = resolve_documents()
+            record.update(success=True, documents=str(directory))
+        except Exception as error:
+            record.update(success=False, error=str(error))
+        record.update(completedAt=time.time(), durationSeconds=time.monotonic() - started_monotonic)
+        return directory, record
+
     try:
         # Fail before announcing readiness if the public device service is not available.
         device_command("get", "prewarm")
@@ -117,39 +132,45 @@ def main():
         atomic_json(options.ready_output, dict(ready, documents=str(documents)))
         event("MIKSHAT_SCENE_DRIVER_READY", dict(ready, documents=str(documents)))
         handled = set()
-        resolved_at = heartbeat_at = time.monotonic()
-        container_unavailable_at = None
+        heartbeat_at = time.monotonic()
+        next_lookup_at = heartbeat_at + 2
+        documents_missing_at = None
+        discovery = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mikshat-container-lookup")
         while not stopping:
             now = time.monotonic()
-            if now - resolved_at >= 2:
-                # test-without-building may reinstall the host. Follow its real container
-                # rather than publishing a stale marker into an old sandbox.
-                try:
-                    current_documents = resolve_documents()
-                except RuntimeError as error:
-                    if container_unavailable_at is None:
-                        container_unavailable_at = now
-                    event("MIKSHAT_SCENE_DRIVER_RESOLUTION_RETRY",
-                          {"error": str(error), "elapsedSeconds": now - container_unavailable_at,
-                           "documents": str(documents)})
-                    if now - container_unavailable_at > 30:
-                        raise
-                    if documents.is_dir():
-                        publish_ready(documents)
-                    time.sleep(0.2)
-                    continue
-                container_unavailable_at = None
-                if current_documents != documents:
+            if lookup is not None and lookup.done():
+                # Only the main thread applies a completed public-container lookup.
+                # A slow auxiliary RPC must not starve requests in the known sandbox.
+                current_documents, record = lookup.result()
+                lookup = None
+                next_lookup_at = now + 2
+                event("MIKSHAT_SCENE_DRIVER_LOOKUP", record)
+                if current_documents is not None and current_documents != documents:
                     old_marker = documents / (PREFIX + "ready.json")
                     if (read_json(old_marker) or {}).get("session") == session:
                         old_marker.unlink(missing_ok=True)
                     documents = current_documents
-                    ready = publish_ready(documents)
-                    atomic_json(options.ready_output, dict(ready, documents=str(documents)))
-                    event("MIKSHAT_SCENE_DRIVER_CONTAINER", dict(ready, documents=str(documents)))
-                resolved_at = now
+                    heartbeat_at = 0
+                    event("MIKSHAT_SCENE_DRIVER_CONTAINER", {"documents": str(documents), "session": session})
+            if lookup is None and now >= next_lookup_at:
+                event("MIKSHAT_SCENE_DRIVER_LOOKUP_START", {"startedAt": time.time()})
+                lookup = discovery.submit(discover_documents)
+            if not documents.is_dir():
+                if documents_missing_at is None:
+                    documents_missing_at = now
+                    event("MIKSHAT_SCENE_DRIVER_DOCUMENTS_MISSING", {"documents": str(documents), "startedAt": time.time()})
+                if now - documents_missing_at >= 30:
+                    raise RuntimeError("The installed test host Documents directory remained unavailable for 30 seconds")
+                time.sleep(0.1)
+                continue
+            documents_missing_at = None
             if now - heartbeat_at >= 1:
-                publish_ready(documents)
+                try:
+                    ready = publish_ready(documents)
+                except FileNotFoundError:
+                    # A reinstall may remove this directory between is_dir and write.
+                    continue
+                atomic_json(options.ready_output, dict(ready, documents=str(documents)))
                 heartbeat_at = now
             request = read_json(documents / (PREFIX + "request.json"))
             if request and request.get("session") == session and request.get("id") not in handled:
@@ -172,6 +193,12 @@ def main():
                     raise RuntimeError(response["error"])
             time.sleep(0.1)
     finally:
+        if lookup is not None:
+            lookup.cancel()
+        if discovery is not None:
+            # At most one public lookup is running, with its own 10-second
+            # subprocess bound. Wait for it so no worker/child survives shutdown.
+            discovery.shutdown(wait=True, cancel_futures=True)
         if documents is not None:
             marker = documents / (PREFIX + "ready.json")
             if (read_json(marker) or {}).get("session") == session:
