@@ -55,6 +55,8 @@ char const kMikshatBaseline[] = "mikshat-direct-baseline";
 
 + (MWMRoutePoint *)mikshatUserPosition
 {
+  if ([MWMLocationManager isLocationProhibited])
+    return nil;
   // Use the position that drives the map arrow, never the viewport or a planned route point.
   auto const position = GetFramework().GetCurrentPosition();
   if (!position || !std::isfinite(position->x) || !std::isfinite(position->y))
@@ -489,8 +491,16 @@ char const kMikshatBaseline[] = "mikshat-direct-baseline";
     if (MWMRoutePoint * start = [self mikshatUserPosition])
       [self addPoint:start];
   }
-  else if ([MWMLocationManager lastLocation])
-    [self addPoint:[[MWMRoutePoint alloc] initWithLastLocationAndType:MWMRoutePointTypeStart intermediateIndex:0]];
+  else if (![MWMLocationManager isLocationProhibited])
+  {
+    // Planning a car route must work from the same real arrow during weak reception,
+    // even while the active-session accessor temporarily returns no fresh reading.
+    MWMRoutePoint * start = [self mikshatUserPosition];
+    if (!start)
+      start = [[MWMRoutePoint alloc] initWithLastLocationAndType:MWMRoutePointTypeStart intermediateIndex:0];
+    if (start)
+      [self addPoint:start];
+  }
   if ([self startPoint] && [self finishPoint])
     [self rebuildWithBestRouter:bestRouter];
 }
@@ -554,8 +564,10 @@ char const kMikshatBaseline[] = "mikshat-direct-baseline";
       auto p1 = [[MWMRoutePoint alloc] initWithRouteMarkData:routePoints.front()];
       auto p2 = [[MWMRoutePoint alloc] initWithRouteMarkData:routePoints.back()];
 
-      CLLocation * lastLocation = [MWMLocationManager lastLocation];
-      if (p1.isMyPosition && lastLocation)
+      CLLocation * lastLocation = [MWMLocationManager lastLocation] ?: [MWMLocationManager lastKnownLocation];
+      BOOL const hasKnownPosition = ![MWMLocationManager isLocationProhibited] &&
+                                   (lastLocation || [self mikshatUserPosition]);
+      if (p1.isMyPosition && hasKnownPosition)
       {
         [[MWMRoutingManager routingManager] startRoute];
         [[MWMMapViewControlsManager manager] onRouteStart];

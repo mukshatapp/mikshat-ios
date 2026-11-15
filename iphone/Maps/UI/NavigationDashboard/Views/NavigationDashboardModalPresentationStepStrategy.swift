@@ -8,9 +8,9 @@ enum NavigationDashboardModalPresentationStep: Int, CaseIterable, ModalPresentat
 
 final class NavigationDashboardModalPresentationStepStrategy: ModalPresentationStepStrategy {
   private enum Constants {
-    static let iPadWidth: CGFloat = 350
-    static let iPadLeadingOffset: CGFloat = 20
-    static let compactHeightOffset: CGFloat = 300
+    static let centeredWidth: CGFloat = 720
+    static let centeredInset: CGFloat = 12
+    static let defaultContentHeight: CGFloat = 190
     static let halfScreenHeightFactorPortrait: CGFloat = 0.55
     static let halfScreenOriginFactorPortrait: CGFloat = 0.5
     static let topInset: CGFloat = 8
@@ -94,97 +94,55 @@ final class NavigationDashboardModalPresentationStepStrategy: ModalPresentationS
     }
   }
 
+  static func usesCenteredLayout(in container: UIViewController) -> Bool {
+    container.traitCollection.userInterfaceIdiom == .pad || container.view.bounds.width > container.view.bounds.height
+  }
+
   func frame(_ step: Step, for _: UIView, in containerViewController: UIViewController) -> CGRect {
-    let isIPad = UIDevice.current.userInterfaceIdiom == .pad
-    var containerSize = containerViewController.view.bounds.size
-    if containerSize == .zero {
-      containerSize = UIScreen.main.bounds.size
-    }
+    let bounds = containerViewController.view.bounds
+    guard !bounds.isEmpty else { return .zero }
     let safeAreaInsets = containerViewController.view.safeAreaInsets
-    let traitCollection = containerViewController.traitCollection
-    var frame = CGRect(origin: .zero, size: containerSize)
+    let safe = bounds.inset(by: safeAreaInsets)
 
-    func iPadFrame() -> CGRect {
-      frame.size.width = Constants.iPadWidth
-      frame.origin.x = Constants.iPadLeadingOffset
+    if Self.usesCenteredLayout(in: containerViewController) {
+      let available = safe.insetBy(dx: Constants.centeredInset, dy: Constants.topInset)
+      let desiredHeight: CGFloat
       switch step {
-      case .regular:
-        if regularHeight != 0 {
-          frame.origin.y = max(containerSize.height - regularHeight, safeAreaInsets.top + Constants.topInset)
-        } else {
-          frame.origin.y = containerSize.height * Constants.halfScreenHeightFactorPortrait
-        }
-      case .halfScreen:
-        frame.origin.y = max(containerSize.height * Constants.halfScreenOriginFactorPortrait, safeAreaInsets.top + Constants.topInset)
+      case .regular, .halfScreen:
+        desiredHeight = regularHeight
       case .compact:
-        if compactHeight != 0 {
-          frame.origin.y = containerSize.height - compactHeight
-        } else {
-          frame.origin.y = containerSize.height * Constants.halfScreenHeightFactorPortrait
-        }
+        // The route-point list is hidden. Do not retain its old discoverability
+        // padding as blank space in the compact, centered preview.
+        desiredHeight = compactBaseHeight
       case .estimates:
-        if estimatesHeight != 0 {
-          frame.origin.y = containerSize.height - estimatesHeight
-        } else {
-          frame.origin.y = compactHeight != 0
-            ? containerSize.height - compactHeight
-            : containerSize.height * Constants.halfScreenHeightFactorPortrait
-        }
+        desiredHeight = estimatesHeight > 0 ? estimatesHeight : compactBaseHeight
       case .hidden:
-        frame.origin.y = containerSize.height
+        desiredHeight = regularHeight
       }
-      return frame
+      let height = min(max(1, available.height), desiredHeight > 0 ? desiredHeight : Constants.defaultContentHeight)
+      let width = min(Constants.centeredWidth, max(1, available.width))
+      return CGRect(x: safe.midX - width / 2,
+                    y: step == .hidden ? bounds.maxY : safe.midY - height / 2,
+                    width: width, height: height)
     }
 
-    func iPhoneFrame() -> CGRect {
-      let isPortraitOrientation = traitCollection.verticalSizeClass == .regular
-      if isPortraitOrientation {
-        switch step {
-        case .regular:
-          if regularHeight != 0 {
-            frame.origin.y = max(containerSize.height - regularHeight, safeAreaInsets.top + Constants.topInset)
-          } else {
-            frame.origin.y = containerSize.height * Constants.halfScreenHeightFactorPortrait
-          }
-        case .halfScreen:
-          frame.origin.y = max(containerSize.height * Constants.halfScreenOriginFactorPortrait, safeAreaInsets.top + Constants.topInset)
-        case .compact:
-          if compactHeight != 0 {
-            frame.origin.y = containerSize.height - compactHeight
-          } else {
-            frame.origin.y = containerSize.height * Constants.halfScreenHeightFactorPortrait
-          }
-        case .estimates:
-          if estimatesHeight != 0 {
-            frame.origin.y = containerSize.height - estimatesHeight
-          } else {
-            frame.origin.y = compactHeight != 0
-              ? containerSize.height - compactHeight
-              : containerSize.height * Constants.halfScreenHeightFactorPortrait
-          }
-        case .hidden:
-          frame.origin.y = containerSize.height
-        }
-      } else {
-        frame.size.width = Constants.iPadWidth
-        frame.origin.x = safeAreaInsets.left
-        switch step {
-        case .regular, .halfScreen:
-          frame.origin.y = regularHeight != 0
-            ? max(containerSize.height - regularHeight, Constants.topInset)
-            : Constants.topInset
-        case .compact:
-          frame.origin.y = containerSize.height - (compactHeight != 0 ? compactHeight : Constants.compactHeightOffset)
-        case .estimates:
-          let height = estimatesHeight != 0 ? estimatesHeight : compactHeight
-          frame.origin.y = containerSize.height - (height != 0 ? height : Constants.compactHeightOffset)
-        case .hidden:
-          frame.origin.y = containerSize.height
-        }
-      }
-      return frame
+    // Preserve the phone's portrait bottom-sheet steps.
+    var frame = bounds
+    switch step {
+    case .regular:
+      frame.origin.y = regularHeight > 0
+        ? max(bounds.maxY - regularHeight, safe.minY + Constants.topInset)
+        : bounds.height * Constants.halfScreenHeightFactorPortrait
+    case .halfScreen:
+      frame.origin.y = max(bounds.height * Constants.halfScreenOriginFactorPortrait, safe.minY + Constants.topInset)
+    case .compact:
+      frame.origin.y = compactHeight > 0 ? bounds.maxY - compactHeight : bounds.height * Constants.halfScreenHeightFactorPortrait
+    case .estimates:
+      let height = estimatesHeight > 0 ? estimatesHeight : compactHeight
+      frame.origin.y = height > 0 ? bounds.maxY - height : bounds.height * Constants.halfScreenHeightFactorPortrait
+    case .hidden:
+      frame.origin.y = bounds.maxY
     }
-
-    return isIPad ? iPadFrame() : iPhoneFrame()
+    return frame
   }
 }

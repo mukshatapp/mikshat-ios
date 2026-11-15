@@ -87,7 +87,7 @@ final class MikshatNavigationActionsView: UIStackView {
   private var compactLayout: Bool?
   private var buttonSizes: [NSLayoutConstraint] = []
   private var bottomConstraint: NSLayoutConstraint?
-  private var landscapeBottomConstraint: NSLayoutConstraint?
+  private var viewportObserver: UIView?
 
   init() {
     super.init(frame: .zero)
@@ -103,7 +103,9 @@ final class MikshatNavigationActionsView: UIStackView {
       let size = button.heightAnchor.constraint(equalToConstant: 52)
       buttonSizes.append(size)
       size.isActive = true
-      button.widthAnchor.constraint(equalToConstant: 52).isActive = true
+      let width = button.widthAnchor.constraint(equalToConstant: 52)
+      buttonSizes.append(width)
+      width.isActive = true
       button.addAction(UIAction { _ in action() }, for: .touchUpInside)
       return button
     }
@@ -118,7 +120,9 @@ final class MikshatNavigationActionsView: UIStackView {
     recording.backgroundColor = .white
     recording.layer.cornerRadius = 26
     recording.accessibilityLabel = L("mikshat_record_track")
-    recording.widthAnchor.constraint(equalToConstant: 52).isActive = true
+    let width = recording.widthAnchor.constraint(equalToConstant: 52)
+    buttonSizes.append(width)
+    width.isActive = true
     let size = recording.heightAnchor.constraint(equalToConstant: 52)
     buttonSizes.append(size)
     size.isActive = true
@@ -148,14 +152,19 @@ final class MikshatNavigationActionsView: UIStackView {
   override func layoutSubviews() {
     super.layoutSubviews()
     guard let container = superview else { return }
+    updateLayout(in: container)
+  }
+
+  // Moving a stack after rotating its parent does not necessarily change the
+  // stack's bounds. Observe the actual viewport rather than relying on that
+  // stack receiving layoutSubviews to restore its portrait axis.
+  private func updateLayout(in container: UIView) {
     let compact = container.bounds.width > container.bounds.height
     if compactLayout != compact {
       compactLayout = compact
       axis = compact ? .horizontal : .vertical
       spacing = compact ? 6 : 9
       buttonSizes.forEach { $0.constant = compact ? 44 : 52 }
-      bottomConstraint?.isActive = !compact
-      landscapeBottomConstraint?.isActive = compact
     }
     let original = CGRect(x: container.safeAreaInsets.left + 12, y: frame.minY, width: frame.width, height: frame.height)
     let globe = MikshatSatelliteController.shared.buttonFrame(in: container)
@@ -164,6 +173,7 @@ final class MikshatNavigationActionsView: UIStackView {
   }
 
   func install(in container: UIView, above card: UIView) {
+    accessibilityIdentifier = "navigation.mapActions"
     translatesAutoresizingMaskIntoConstraints = false
     // Keep map tools below the search and place-card containers.
     if let map = MapViewController.shared(), container === map.view {
@@ -171,11 +181,25 @@ final class MikshatNavigationActionsView: UIStackView {
     } else { container.addSubview(self) }
     leftConstraint = leftAnchor.constraint(equalTo: container.safeAreaLayoutGuide.leftAnchor, constant: 12)
     bottomConstraint = bottomAnchor.constraint(equalTo: card.topAnchor, constant: -12)
-    landscapeBottomConstraint = bottomAnchor.constraint(equalTo: container.safeAreaLayoutGuide.bottomAnchor, constant: -12)
     NSLayoutConstraint.activate([
       leftConstraint!,
       bottomConstraint!,
     ])
+    viewportObserver?.removeFromSuperview()
+    viewportObserver = MikshatHomeControls.observeViewport(in: container) { [weak self, weak container] in
+      guard let self, let container, self.superview === container else { return }
+      self.updateLayout(in: container)
+      self.setNeedsLayout()
+    }
+    updateLayout(in: container)
+  }
+
+  override func didMoveToSuperview() {
+    super.didMoveToSuperview()
+    if superview == nil {
+      viewportObserver?.removeFromSuperview()
+      viewportObserver = nil
+    }
   }
 }
 
@@ -201,6 +225,7 @@ final class MikshatDirectGuidanceView: UIStackView, MWMLocationObserver {
   private var viewportObserver: UIView?
   private var metricLegends: [UILabel] = []
   private var lastMetricsLayout: (width: CGFloat, category: UIContentSizeCategory)?
+  private var metricsHeightConstraint: NSLayoutConstraint?
 
   init(target: CLLocationCoordinate2D, origin: CLLocation) {
     self.target = target
@@ -246,7 +271,8 @@ final class MikshatDirectGuidanceView: UIStackView, MWMLocationObserver {
     row.semanticContentAttribute = .forceLeftToRight
     row.distribution = .fillEqually
     row.spacing = 8
-    row.heightAnchor.constraint(greaterThanOrEqualToConstant: 102).isActive = true
+    metricsHeightConstraint = row.heightAnchor.constraint(greaterThanOrEqualToConstant: 102)
+    metricsHeightConstraint?.isActive = true
     addArrangedSubview(row)
     var config = UIButton.Configuration.filled()
     config.title = L("mikshat_stop_navigation")
@@ -289,8 +315,7 @@ final class MikshatDirectGuidanceView: UIStackView, MWMLocationObserver {
     installPlacement(in: parent)
     MikshatHomeControls.updateNavigationInformationCard(self, visible: true)
     updateResponsiveMetrics()
-    let landscape = parent.bounds.width > parent.bounds.height
-    let insets = UIEdgeInsets(top: 0, left: 0, bottom: landscape ? 0 : parent.bounds.maxY - frame.minY, right: 0)
+    let insets = UIEdgeInsets(top: 0, left: 0, bottom: parent.bounds.maxY - frame.minY, right: 0)
     guard bounds.height > 0, insets != lastInsets else { return }
     lastInsets = insets
     MapViewController.shared()?.updateVisibleAreaInsets(for: self, insets: insets, updatingViewport: true)
@@ -302,6 +327,9 @@ final class MikshatDirectGuidanceView: UIStackView, MWMLocationObserver {
   }
 
   private func updateResponsiveMetrics() {
+    let landscape = (superview?.bounds.width ?? 0) > (superview?.bounds.height ?? 0)
+    metricsHeightConstraint?.constant = landscape ? 82 : 102
+    spacing = landscape ? 8 : 12
     let category = traitCollection.preferredContentSizeCategory
     if let previous = lastMetricsLayout, previous.width == bounds.width, previous.category == category { return }
     lastMetricsLayout = (bounds.width, category)
@@ -336,10 +364,17 @@ final class MikshatDirectGuidanceView: UIStackView, MWMLocationObserver {
     NSLayoutConstraint.deactivate(placementConstraints)
     let safe = parent.safeAreaLayoutGuide
     let landscape = parent.bounds.width > parent.bounds.height
-    if landscape {
-      let width = min(560, max(180, safe.layoutFrame.width - 2 * (railWidth + 8)))
-      placementConstraints = [centerXAnchor.constraint(equalTo: safe.centerXAnchor), centerYAnchor.constraint(equalTo: safe.centerYAnchor), widthAnchor.constraint(equalToConstant: width)]
-      layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+    if landscape || traitCollection.userInterfaceIdiom == .pad {
+      // Reserve one right rail, not two symmetric rails. The wider bottom card
+      // and its expanded stop action remain separate from map tools even on a
+      // short landscape viewport.
+      let availableWidth = max(1, safe.layoutFrame.width - 24 - (landscape ? railWidth + 8 : 0))
+      let width = min(900, availableWidth)
+      placementConstraints = [
+        leftAnchor.constraint(equalTo: safe.leftAnchor, constant: 12 + (availableWidth - width) / 2),
+        bottomAnchor.constraint(equalTo: safe.bottomAnchor), widthAnchor.constraint(equalToConstant: width),
+      ]
+      layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
     } else {
       placementConstraints = [leadingAnchor.constraint(equalTo: safe.leadingAnchor), trailingAnchor.constraint(equalTo: safe.trailingAnchor), bottomAnchor.constraint(equalTo: safe.bottomAnchor)]
       layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]

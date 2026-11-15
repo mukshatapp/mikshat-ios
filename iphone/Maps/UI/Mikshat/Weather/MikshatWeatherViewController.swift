@@ -45,8 +45,13 @@ final class MikshatWeatherViewController: UIViewController {
   private var displayTimer: Timer?
   private var lastLayoutWidth: CGFloat = 0
   private var contentMaximumWidth: NSLayoutConstraint?
+  private var contentCenterY: NSLayoutConstraint?
+  private var contentTopAlignment: NSLayoutConstraint?
+  private var header: UIStackView?
   private var hourlyHeight: NSLayoutConstraint?
   private var usesColumns = false
+  private var portraitPhoneSheet: Bool?
+  private var lastSheetHeight: CGFloat = 0
 
   init(name: String?, latitude: Double, longitude: Double,
        repository: MikshatWeatherRepository = .shared) {
@@ -99,6 +104,7 @@ final class MikshatWeatherViewController: UIViewController {
       lastLayoutWidth = availableWidth
       if let snapshot { rebuildHourly(snapshot) }
     }
+    updateSheetPresentation()
   }
 
   override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
@@ -128,6 +134,7 @@ final class MikshatWeatherViewController: UIViewController {
     close.addTarget(self, action: #selector(closeScreen), for: .touchUpInside)
     close.setContentHuggingPriority(.required, for: .horizontal)
     let header = UIStackView(arrangedSubviews: [titleLabel, close])
+    self.header = header
     header.alignment = .center
     header.spacing = 12
     header.translatesAutoresizingMaskIntoConstraints = false
@@ -146,14 +153,17 @@ final class MikshatWeatherViewController: UIViewController {
     canvas.translatesAutoresizingMaskIntoConstraints = false
     scrollView.addSubview(canvas)
     canvas.addSubview(content)
-    // The canvas grows when text needs more room, while shorter pages stay centered in the
-    // actual presentation bounds (including a resizable sheet or an iPad split view).
+    // The canvas grows for accessibility text. Phone portrait content stays at the top of
+    // its content-sized sheet; other presentations retain their centered two-column layout.
     let viewportHeight = canvas.heightAnchor.constraint(equalTo: scrollView.frameLayoutGuide.heightAnchor)
     viewportHeight.priority = UILayoutPriority(249)
     let preferredWidth = content.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -24)
     preferredWidth.priority = UILayoutPriority(999)
     let maximumWidth = content.widthAnchor.constraint(lessThanOrEqualToConstant: 560)
     contentMaximumWidth = maximumWidth
+    let centerY = content.centerYAnchor.constraint(equalTo: canvas.centerYAnchor)
+    contentCenterY = centerY
+    contentTopAlignment = content.topAnchor.constraint(equalTo: canvas.topAnchor, constant: 4)
     NSLayoutConstraint.activate([
       header.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 2),
       header.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 16),
@@ -172,7 +182,7 @@ final class MikshatWeatherViewController: UIViewController {
       canvas.heightAnchor.constraint(greaterThanOrEqualTo: scrollView.frameLayoutGuide.heightAnchor),
       viewportHeight,
       content.centerXAnchor.constraint(equalTo: canvas.centerXAnchor),
-      content.centerYAnchor.constraint(equalTo: canvas.centerYAnchor),
+      centerY,
       content.topAnchor.constraint(greaterThanOrEqualTo: canvas.topAnchor, constant: 4),
       content.bottomAnchor.constraint(lessThanOrEqualTo: canvas.bottomAnchor, constant: -4),
       preferredWidth,
@@ -345,6 +355,13 @@ final class MikshatWeatherViewController: UIViewController {
     currentMetadata.axis = accessibility ? .vertical : .horizontal
     currentMetadata.alignment = accessibility ? .fill : .center
     contentMaximumWidth?.constant = columns ? 1000 : 560
+    if isPortraitPhone {
+      contentCenterY?.isActive = false
+      contentTopAlignment?.isActive = true
+    } else {
+      contentTopAlignment?.isActive = false
+      contentCenterY?.isActive = true
+    }
     guard columns != usesColumns else { return }
     usesColumns = columns
     content.axis = columns ? .horizontal : .vertical
@@ -364,6 +381,47 @@ final class MikshatWeatherViewController: UIViewController {
       sourceFooter.addArrangedSubview(attribution)
       forecastColumn.insertArrangedSubview(refreshButton, at: hourlySection.superview == nil ? 0 : 1)
     }
+  }
+
+  private var isPortraitPhone: Bool {
+    // A fitted sheet can be shorter than its width. Use its presenting window rather than
+    // that sheet's own aspect ratio, so fitting the content cannot flip the layout policy.
+    let viewport = view.window?.bounds.size ?? parent?.view.bounds.size ?? view.bounds.size
+    return traitCollection.userInterfaceIdiom == .phone && viewport.height >= viewport.width
+  }
+
+  private func updateSheetPresentation() {
+    let portrait = isPortraitPhone
+    guard let sheet = sheetPresentationController else { return }
+    if portraitPhoneSheet != portrait {
+      portraitPhoneSheet = portrait
+      if portrait {
+        let identifier = UISheetPresentationController.Detent.Identifier("mikshat.weather.content")
+        sheet.detents = [.custom(identifier: identifier) { [weak self] context in
+          guard let self else { return context.maximumDetentValue }
+          return min(context.maximumDetentValue, max(240, self.lastSheetHeight))
+        }]
+        sheet.selectedDetentIdentifier = identifier
+      } else {
+        sheet.detents = [.large()]
+        sheet.selectedDetentIdentifier = .large
+      }
+    }
+    guard portrait, let header else { return }
+    let width = min(560, max(1, view.safeAreaLayoutGuide.layoutFrame.width - 24))
+    let body = content.systemLayoutSizeFitting(
+      CGSize(width: width, height: UIView.layoutFittingCompressedSize.height),
+      withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel)
+    let heading = header.systemLayoutSizeFitting(
+      CGSize(width: max(1, width - 4), height: UIView.layoutFittingCompressedSize.height),
+      withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel)
+    // UIKit adds the sheet's bottom safe area to a custom detent. Include only our header,
+    // natural forecast height and internal padding, never a proportion of a screenshot.
+    let height = ceil(view.safeAreaInsets.top + 2 + max(44, heading.height) + body.height + 8)
+    guard abs(height - lastSheetHeight) > 1 else { return }
+    lastSheetHeight = height
+    preferredContentSize = CGSize(width: view.bounds.width, height: height)
+    sheet.invalidateDetents()
   }
 
   private var coordinateText: String {
@@ -532,6 +590,7 @@ final class MikshatWeatherViewController: UIViewController {
     let availableWidth = hourlySection.bounds.width > 0 ? hourlySection.bounds.width : max(166, view.bounds.width - 24)
     let cardWidth = min(scaledWidth, max(166, availableWidth))
     let cardInset: CGFloat = 7
+    let verticalInset: CGFloat = isPortraitPhone ? 11 : cardInset
     for sample in hours {
       let condition = MikshatWeatherCondition(code: sample.weatherCode, isDay: sample.isDay)
       let card = WeatherCard()
@@ -592,7 +651,7 @@ final class MikshatWeatherViewController: UIViewController {
         items = itemsHeader + [windRow, windSource(sample, compact: true)]
       }
       let body = verticalStack(items, spacing: 3)
-      card.install(body, inset: cardInset)
+      card.install(body, inset: cardInset, verticalInset: verticalInset)
       card.widthAnchor.constraint(equalToConstant: cardWidth).isActive = true
       card.isAccessibilityElement = true
       card.accessibilityIdentifier = "weather.hour.\(Int(sample.time.timeIntervalSince1970))"
@@ -612,7 +671,7 @@ final class MikshatWeatherViewController: UIViewController {
       let measured = body.systemLayoutSizeFitting(
         CGSize(width: cardWidth - 2 * cardInset, height: UIView.layoutFittingCompressedSize.height),
         withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel)
-      return ceil(measured.height) + 2 * cardInset
+      return ceil(measured.height) + 2 * verticalInset
     }.max() ?? 0
     hourlyHeight?.constant = maximumCardHeight + 10
     hourlyScroll.setNeedsLayout()
@@ -833,14 +892,15 @@ private final class WeatherCard: UIView {
     updateBorder()
   }
   func updateBorder() { layer.borderColor = WeatherPalette.border.resolvedColor(with: traitCollection).cgColor }
-  func install(_ contents: UIView, inset: CGFloat = 18) {
+  func install(_ contents: UIView, inset: CGFloat = 18, verticalInset: CGFloat? = nil) {
+    let verticalInset = verticalInset ?? inset
     contents.translatesAutoresizingMaskIntoConstraints = false
     addSubview(contents)
     NSLayoutConstraint.activate([
-      contents.topAnchor.constraint(equalTo: topAnchor, constant: inset),
+      contents.topAnchor.constraint(equalTo: topAnchor, constant: verticalInset),
       contents.leadingAnchor.constraint(equalTo: leadingAnchor, constant: inset),
       contents.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -inset),
-      contents.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -inset),
+      contents.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -verticalInset),
     ])
   }
 }

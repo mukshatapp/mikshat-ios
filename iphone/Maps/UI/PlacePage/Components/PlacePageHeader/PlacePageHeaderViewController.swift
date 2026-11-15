@@ -47,9 +47,12 @@ final class PlacePageHeaderViewController: UIViewController {
     let tap = UITapGestureRecognizer(target: self, action: #selector(onExpandPressed(sender:)))
     expandView.addGestureRecognizer(tap)
     headerView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
-    iPadSpecific { [weak self] in
-      self?.grabberView.isHidden = true
-    }
+    // The tablet uses the same expandable bottom sheet as the phone.
+    grabberView.isHidden = false
+    headerView.accessibilityIdentifier = "placePage.headerContent"
+    titleTextView.accessibilityIdentifier = "placePage.title"
+    closeButton.accessibilityIdentifier = "placePage.close"
+    shareButton.accessibilityIdentifier = "placePage.share"
     closeButton.setImage(UIImage(resource: .icClose))
     shareButton.setImage(UIImage(resource: .icShare))
     shareButton.isHidden = !(presenter?.canShare ?? true)

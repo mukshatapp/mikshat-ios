@@ -3,6 +3,7 @@ name: Mikshat rendered Arabic search regression
   push:
     branches:
     - diagnostics/search-full-app
+    - feature/ios-layout-followup
   workflow_dispatch: null
 permissions:
   contents: read
@@ -12,7 +13,7 @@ concurrency:
 jobs:
   rendered-search:
     name: Normal Metal renderer and Arabic on iPhone 16 / iOS 26
-    if: contains(github.event.head_commit.message, '[renderer-only]') || github.event_name == 'workflow_dispatch'
+    if: github.ref == 'refs/heads/feature/ios-layout-followup' || contains(github.event.head_commit.message, '[renderer-only]') || github.event_name == 'workflow_dispatch'
     runs-on: macos-26
     timeout-minutes: 45
     env:
@@ -438,6 +439,13 @@ jobs:
         report=dict(entries=len(entries),validatedEntries=len(valid),syntheticGpsReadyEntries=gps,gpsSetupFailures=gps_failures,
                     historyIndicatorEntries=indicators,coverageConfirmed=confirmed,
                     requirement='Both tests must confirm active Drape/Metal, Arabic/RTL and fresh synthetic GPS, with attached history indicators and no GPS setup failure')
+        footprints=[item['physicalFootprintBytes'] for item in entries
+                    if isinstance(item.get('physicalFootprintBytes'),int) and item['physicalFootprintBytes']>0]
+        report['memory']=dict(samples=len(footprints),
+                              minimumBytes=min(footprints) if footprints else None,
+                              peakBytes=max(footprints) if footprints else None,
+                              firstToLastDeltaBytes=footprints[-1]-footprints[0] if footprints else None,
+                              scope='Samples during foreground search and renderer activity; not post-release measurements, a leak threshold, or physical-device Jetsam evidence')
         Path('build/search-diagnostics/renderer-coverage-summary.json').write_text(json.dumps(report,indent=2)+'\n')
         print(json.dumps(report))
         if not confirmed:
@@ -491,7 +499,7 @@ jobs:
             print('Mikshat crash summary: '+json.dumps(summary))
         PY
         if [[ -n "${MIKSHAT_SIMULATOR_UDID:-}" ]]; then
-          xcrun simctl spawn "$MIKSHAT_SIMULATOR_UDID" log show --last 3m --style compact \
+          xcrun simctl spawn "$MIKSHAT_SIMULATOR_UDID" log show --last 30m --info --style compact \
             --predicate 'process CONTAINS[c] "Organic" OR process CONTAINS[c] "OMaps"' \
             > build/search-diagnostics/simulator-app.log 2>&1 || true
         fi

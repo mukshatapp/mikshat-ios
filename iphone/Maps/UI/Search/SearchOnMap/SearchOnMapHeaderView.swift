@@ -20,6 +20,8 @@ final class SearchOnMapHeaderView: UIView {
   private let coordinateInput = MikshatCoordinateInputView()
   private let coordinateArea = UIScrollView()
   private var coordinateAreaHeight: NSLayoutConstraint?
+  private var availableHeaderHeight: CGFloat?
+  private var isPhoneLandscape = false
   weak var delegate: SearchOnMapHeaderViewDelegate? {
     didSet {
       searchBar.delegate = delegate
@@ -158,10 +160,12 @@ final class SearchOnMapHeaderView: UIView {
     addSubview(coordinateArea)
     coordinateArea.addSubview(coordinateInput)
     coordinateArea.translatesAutoresizingMaskIntoConstraints = false
+    coordinateArea.accessibilityIdentifier = "search.coordinateScroll"
     coordinateArea.keyboardDismissMode = .interactive
     coordinateAreaHeight = coordinateArea.heightAnchor.constraint(equalToConstant: 184)
     coordinateAreaHeight?.isActive = true
     coordinateInput.onSubmit = { [weak self] coordinate in self?.coordinateDidSubmit?(coordinate) }
+    coordinateInput.onFocusField = { [weak self] field in self?.revealCoordinateField(field) }
     coordinateInput.translatesAutoresizingMaskIntoConstraints = false
 
     cancelContainer.addSubview(cancelButton)
@@ -231,9 +235,47 @@ final class SearchOnMapHeaderView: UIView {
 
   override func layoutSubviews() {
     super.layoutSubviews()
+    guard coordinateArea.bounds.width > 0 else { return }
     let size = window?.bounds.size ?? UIScreen.main.bounds.size
-    let height: CGFloat = size.width > size.height ? 84 : 184
-    if coordinateAreaHeight?.constant != height { coordinateAreaHeight?.constant = height }
+    let horizontal = isPhoneLandscape && coordinateArea.bounds.width >= 480
+      && !traitCollection.preferredContentSizeCategory.isAccessibilityCategory
+    coordinateInput.setHorizontalRows(horizontal)
+    let height: CGFloat
+    if isPhoneLandscape {
+      let fitting = coordinateInput.systemLayoutSizeFitting(
+        CGSize(width: max(0, coordinateArea.bounds.width), height: UIView.layoutFittingCompressedSize.height),
+        withHorizontalFittingPriority: .required, verticalFittingPriority: .fittingSizeLevel).height
+      let available = availableHeaderHeight.map { max(44, $0 - coordinateArea.frame.minY - 10) } ?? fitting
+      height = ceil(min(fitting, available))
+    } else {
+      // Keep the established portrait and tablet layout unchanged.
+      height = size.width > size.height ? 84 : 184
+    }
+    if coordinateAreaHeight?.constant != height {
+      coordinateAreaHeight?.constant = height
+      revealFocusedCoordinateField()
+    }
+  }
+
+  func updateCoordinateViewport(availableHeight: CGFloat, phoneLandscape: Bool) {
+    guard availableHeaderHeight != availableHeight || isPhoneLandscape != phoneLandscape else { return }
+    availableHeaderHeight = availableHeight
+    isPhoneLandscape = phoneLandscape
+    setNeedsLayout()
+    revealFocusedCoordinateField()
+  }
+
+  private func revealFocusedCoordinateField() {
+    guard let field = coordinateInput.focusedField else { return }
+    revealCoordinateField(field)
+  }
+
+  private func revealCoordinateField(_ field: UITextField) {
+    DispatchQueue.main.async { [weak self, weak field] in
+      guard let self, let field, field.isFirstResponder else { return }
+      self.coordinateArea.layoutIfNeeded()
+      self.coordinateArea.scrollRectToVisible(field.convert(field.bounds, to: self.coordinateArea).insetBy(dx: -4, dy: -4), animated: false)
+    }
   }
 
   @objc private func grabberDidTap() {

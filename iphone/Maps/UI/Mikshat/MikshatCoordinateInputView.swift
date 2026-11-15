@@ -3,6 +3,7 @@ import CoreLocation
 
 final class MikshatCoordinateInputView: UIStackView, UITextFieldDelegate {
   var onSubmit: ((CLLocationCoordinate2D) -> Void)?
+  var onFocusField: ((UITextField) -> Void)?
   private let latDegrees = UITextField()
   private let latMinutes = UITextField()
   private let lonDegrees = UITextField()
@@ -10,16 +11,29 @@ final class MikshatCoordinateInputView: UIStackView, UITextFieldDelegate {
   private let latitudeDirection = UISegmentedControl(items: ["N", "S"])
   private let longitudeDirection = UISegmentedControl(items: ["E", "W"])
   private let errorLabel = MikshatStyle.label(size: 13, color: .systemRed)
+  private let heading = MikshatStyle.label(L("mikshat_enter_coordinates"), size: 17, color: MikshatStyle.green)
 
   private let show = UIButton(type: .system)
+  private let coordinateRows = UIStackView()
+  private let compactActions = UIStackView()
+  private var rowHeights: [NSLayoutConstraint] = []
+  private var hasHorizontalRows = false
   private var counts: [ObjectIdentifier: Int] = [:]
   private var fields: [UITextField] { [latDegrees, latMinutes, lonDegrees, lonMinutes] }
+  var focusedField: UITextField? { fields.first(where: \.isFirstResponder) }
 
   init() {
     super.init(frame: .zero)
     axis = .vertical
     spacing = 7
-    addArrangedSubview(MikshatStyle.label(L("mikshat_enter_coordinates"), size: 17, color: MikshatStyle.green))
+    accessibilityIdentifier = "search.coordinateInput"
+    addArrangedSubview(heading)
+    compactActions.axis = .horizontal
+    compactActions.alignment = .center
+    compactActions.spacing = 12
+    coordinateRows.axis = .vertical
+    coordinateRows.spacing = 7
+    addArrangedSubview(coordinateRows)
     for (degrees, minutes, direction, placeholders, keys) in [
       (latDegrees, latMinutes, latitudeDirection, ["00", "00.000"], ["mikshat_lat_degrees", "mikshat_lat_minutes"]),
       (lonDegrees, lonMinutes, longitudeDirection, ["000", "00.000"], ["mikshat_lon_degrees", "mikshat_lon_minutes"]),
@@ -33,12 +47,15 @@ final class MikshatCoordinateInputView: UIStackView, UITextFieldDelegate {
         field.adjustsFontForContentSizeCategory = true
         field.textAlignment = .center
         field.accessibilityLabel = L(keys[index])
+        field.accessibilityIdentifier = "search.coordinates." + keys[index]
         field.semanticContentAttribute = .forceLeftToRight
         field.setContentHuggingPriority(.defaultLow, for: .horizontal)
       }
       direction.selectedSegmentIndex = 0
+      direction.accessibilityIdentifier = degrees === latDegrees ? "search.coordinates.latitudeDirection" : "search.coordinates.longitudeDirection"
       direction.widthAnchor.constraint(equalToConstant: 78).isActive = true
       let row = UIStackView(arrangedSubviews: [direction, degrees, MikshatStyle.label("°", color: MikshatStyle.green), minutes, MikshatStyle.label("′", color: MikshatStyle.green)])
+      row.accessibilityIdentifier = degrees === latDegrees ? "search.coordinates.latitudeRow" : "search.coordinates.longitudeRow"
       // Both fields must share an ancestor before activating a constraint between them.
       degrees.widthAnchor.constraint(equalTo: minutes.widthAnchor, multiplier: 0.65).isActive = true
       row.axis = .horizontal
@@ -46,8 +63,10 @@ final class MikshatCoordinateInputView: UIStackView, UITextFieldDelegate {
       row.semanticContentAttribute = .forceLeftToRight
       row.backgroundColor = MikshatStyle.green.withAlphaComponent(0.05)
       row.layer.cornerRadius = 10
-      row.heightAnchor.constraint(greaterThanOrEqualToConstant: 42).isActive = true
-      addArrangedSubview(row)
+      let height = row.heightAnchor.constraint(greaterThanOrEqualToConstant: 42)
+      height.isActive = true
+      rowHeights.append(height)
+      coordinateRows.addArrangedSubview(row)
     }
     var config = UIButton.Configuration.filled()
     config.title = L("mikshat_show_map")
@@ -55,6 +74,8 @@ final class MikshatCoordinateInputView: UIStackView, UITextFieldDelegate {
     config.baseForegroundColor = .white
     config.cornerStyle = .medium
     show.configuration = config
+    show.setContentHuggingPriority(.required, for: .horizontal)
+    show.accessibilityIdentifier = "search.coordinates.showMap"
     show.isEnabled = false
     latitudeDirection.addTarget(self, action: #selector(validateInput), for: .valueChanged)
     longitudeDirection.addTarget(self, action: #selector(validateInput), for: .valueChanged)
@@ -66,6 +87,40 @@ final class MikshatCoordinateInputView: UIStackView, UITextFieldDelegate {
   }
   @available(*, unavailable)
   required init(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+  func setHorizontalRows(_ enabled: Bool) {
+    guard hasHorizontalRows != enabled else { return }
+    hasHorizontalRows = enabled
+    // Change only the stack axis: keeping the fields in the same hierarchy
+    // preserves their first responder and selection while the device rotates.
+    coordinateRows.axis = enabled ? .horizontal : .vertical
+    coordinateRows.distribution = enabled ? .fillEqually : .fill
+    coordinateRows.spacing = enabled ? 12 : 7
+    rowHeights.forEach { $0.constant = enabled ? 44 : 42 }
+    // The heading and submit action share their own line on a wide phone.
+    // The coordinate rows themselves never leave their superview.
+    for item in [heading as UIView, show] {
+      (item.superview as? UIStackView)?.removeArrangedSubview(item)
+      item.removeFromSuperview()
+    }
+    if enabled {
+      compactActions.addArrangedSubview(heading)
+      compactActions.addArrangedSubview(show)
+      insertArrangedSubview(compactActions, at: 0)
+    } else {
+      removeArrangedSubview(compactActions)
+      compactActions.removeFromSuperview()
+      insertArrangedSubview(heading, at: 0)
+      insertArrangedSubview(show, at: 2)
+    }
+    invalidateIntrinsicContentSize()
+    setNeedsLayout()
+  }
+
+  func textFieldDidBeginEditing(_ textField: UITextField) {
+    onFocusField?(textField)
+  }
+
   private func limit(for field: UITextField) -> Int {
     field === latDegrees ? 2 : (field === lonDegrees ? 3 : 5)
   }

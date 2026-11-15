@@ -10,6 +10,7 @@ final class RouteActionsBottomMenuView: UIView {
 
   private let stackView = UIStackView()
   private var bottomConstraint: NSLayoutConstraint?
+  private var topConstraint: NSLayoutConstraint?
 
   init() {
     super.init(frame: .zero)
@@ -44,10 +45,12 @@ final class RouteActionsBottomMenuView: UIView {
     let bottomConstraint = stackView.bottomAnchor.constraint(equalTo: safeAreaLayoutGuide.bottomAnchor,
                                                              constant: -Self.bottomInset(for: safeAreaInsets))
     self.bottomConstraint = bottomConstraint
+    let topConstraint = stackView.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: Constants.topInset)
+    self.topConstraint = topConstraint
     NSLayoutConstraint.activate([
       stackView.leadingAnchor.constraint(equalTo: safeAreaLayoutGuide.leadingAnchor, constant: Constants.horizontalInset),
       stackView.trailingAnchor.constraint(equalTo: safeAreaLayoutGuide.trailingAnchor, constant: -Constants.horizontalInset),
-      stackView.topAnchor.constraint(equalTo: safeAreaLayoutGuide.topAnchor, constant: Constants.topInset),
+      topConstraint,
       bottomConstraint,
       stackView.heightAnchor.constraint(equalToConstant: Constants.height),
     ])
@@ -55,6 +58,11 @@ final class RouteActionsBottomMenuView: UIView {
 
   func addActionView(_ view: UIView) {
     stackView.addArrangedSubview(view)
+  }
+
+  func setCompactInsets(_ compact: Bool) {
+    let inset: CGFloat = compact ? 8 : Constants.topInset
+    if topConstraint?.constant != inset { topConstraint?.constant = inset }
   }
 
   func setShadowVisible(_ visible: Bool) {

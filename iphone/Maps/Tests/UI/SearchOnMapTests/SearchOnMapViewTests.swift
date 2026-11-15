@@ -1146,6 +1146,11 @@ private func appendRendererCoverage(event: String, map: MapViewController, extra
     "rendererReady": map.mapView.drapeEngineCreated,
     "graphicsReady": map.mapView.graphicContextInitialized,
   ]
+  let memory = MikshatMemoryDiagnostics.Snapshot.capture()
+  if let footprint = memory.physicalFootprintBytes { entry["physicalFootprintBytes"] = footprint }
+  if let resident = memory.residentBytes { entry["residentBytes"] = resident }
+  if let available = memory.availableBytes { entry["availableBytes"] = available }
+  if let error = memory.error { entry["memorySampleError"] = error }
   entry.merge(extra) { _, new in new }
   var data = try JSONSerialization.data(withJSONObject: entry, options: [.sortedKeys])
   data.append(0x0a)

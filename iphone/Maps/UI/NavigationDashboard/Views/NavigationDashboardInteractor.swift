@@ -67,11 +67,10 @@ extension NavigationDashboard {
           let started = MikshatNavigationCoordinator.startCustomNavigation()
           return started && !MikshatNavigationCoordinator.compassSelected ? .setHidden(true) : .none
         }
-        guard let fix = LocationManager.lastLocation(), fix.horizontalAccuracy >= 0,
-              abs(fix.timestamp.timeIntervalSinceNow) < 15 else {
-          Toast.show(withText: L("mikshat_location_unavailable"))
-          return .none
-        }
+        // Position may be retained during weak reception. Freshness still gates speed/ETA,
+        // but must not block starting an already-built route from a real user position.
+        guard !LocationManager.isLocationProhibited(),
+              LocationManager.lastKnownLocation() != nil || MikshatHeading.navigationLocation != nil else { return .none }
         delegate?.routingStartButtonDidTap()
         return .none
 

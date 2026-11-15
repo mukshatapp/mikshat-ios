@@ -650,7 +650,7 @@ final class MikshatCompassViewController: UIViewController, MWMLocationObserver 
       locationCard.spacing = 6
       styleCard(locationCard)
       let copy = compactAction(L("mikshat_copy"), filled: true) { [weak self] in
-        guard let fix = self?.renderedLocation, MikshatHeading.isFresh(fix), MikshatHeading.currentLocation != nil else { return }
+        guard let self, let fix = self.positionForActions else { return }
         UIPasteboard.general.string = MikshatNavigationMath.coordinatePairs(latitude: fix.coordinate.latitude, longitude: fix.coordinate.longitude)[1]
         Toast.show(withText: L("copied_to_clipboard"))
       }
@@ -664,8 +664,8 @@ final class MikshatCompassViewController: UIViewController, MWMLocationObserver 
       locationCard.addArrangedSubview(coordinateRow)
       if general {
         let save = compactAction(L("save"), filled: false) { [weak self] in
-          guard let self else { return }
-          MikshatLocationActions.saveCurrent(from: self)
+          guard let self, let fix = self.positionForActions else { return }
+          MikshatLocationActions.save(fix.coordinate, from: self)
         }
         save.accessibilityIdentifier = "mikshat.compass.save"
         saveButton = save
@@ -871,8 +871,17 @@ final class MikshatCompassViewController: UIViewController, MWMLocationObserver 
     let now = ProcessInfo.processInfo.systemUptime
     guard now - lastCompassRefresh >= 0.1 else { return }
     lastCompassRefresh = now
-    updateReadings(position: MikshatHeading.currentLocation ?? MikshatHeading.navigationLocation,
+    let fallback = general ? MikshatHeading.knownLocation ?? MikshatHeading.navigationLocation : MikshatHeading.navigationLocation
+    updateReadings(position: MikshatHeading.currentLocation ?? fallback,
                    reading: MikshatHeading.reading(forceSensor: isQibla))
+  }
+
+  private var positionForActions: CLLocation? {
+    guard let fix = MikshatHeading.positionForAction(renderedLocation,
+                                                    locationProhibited: LocationManager.isLocationProhibited()) else { return nil }
+    // General-compass actions use exactly the displayed position, including a retained fix.
+    // Destination-compass actions retain their existing current-position policy.
+    return general || (MikshatHeading.isFresh(fix) && MikshatHeading.currentLocation != nil) ? fix : nil
   }
 
   func updateReadings(position: CLLocation?, reading: (degrees: Double?, gps: Bool)) {
@@ -884,7 +893,7 @@ final class MikshatCompassViewController: UIViewController, MWMLocationObserver 
     if valid {
       headingStatus = L(reading.gps ? "mikshat_heading_gps" : "mikshat_heading_sensor")
     } else if reading.gps {
-      headingStatus = L(fresh ? "mikshat_waiting" : "mikshat_location_unavailable")
+      headingStatus = L(general && position != nil || fresh ? "mikshat_waiting" : "mikshat_location_unavailable")
     } else {
       headingStatus = L("mikshat_heading_unavailable")
     }
@@ -908,12 +917,11 @@ final class MikshatCompassViewController: UIViewController, MWMLocationObserver 
     renderedLocation = fix
     let locationStatus = fresh ? "" : "\n" + L("mikshat_cached_location")
     coordinates.text = MikshatNavigationMath.coordinatePairs(latitude: fix.coordinate.latitude, longitude: fix.coordinate.longitude)[1]
-    // These actions deliberately keep their existing fresh-location requirement.
-    let canUseCurrentLocation = fresh && MikshatHeading.currentLocation != nil
-    copyButton?.isEnabled = canUseCurrentLocation; saveButton?.isEnabled = canUseCurrentLocation
+    let canUseDisplayedPosition = positionForActions != nil
+    copyButton?.isEnabled = canUseDisplayedPosition; saveButton?.isEnabled = canUseDisplayedPosition
     if general {
       speedValue.text = speedText(for: fresh ? fix : nil, multiline: false)
-      status.text = headingStatus + (valid ? " • " + L("mikshat_fixed_arrow") : "") + locationStatus
+      status.text = headingStatus + (valid ? " • " + L("mikshat_fixed_arrow") : "")
       return
     }
     let destination = target ?? CLLocationCoordinate2D(latitude: 21.422487, longitude: 39.826206)
@@ -1011,10 +1019,25 @@ enum MikshatHeading {
       && abs(fix.timestamp.timeIntervalSinceNow) <= 15
   }
 
-  // Freshness is required for speed, ETA and saving/sharing the current GPS fix.
+  // Speed and course estimates still require a fresh fix.
   static var currentLocation: CLLocation? {
     guard !LocationManager.isLocationProhibited(), let fix = LocationManager.lastLocation(), isFresh(fix) else { return nil }
     return fix
+  }
+
+  static var knownLocation: CLLocation? {
+    guard !LocationManager.isLocationProhibited() else { return nil }
+    return LocationManager.lastKnownLocation()
+  }
+
+  // The caller supplies a position already rendered from Core Location or the real map arrow.
+  // Actions must not silently substitute a newer/different coordinate after the user taps.
+  static func positionForAction(_ rendered: CLLocation?, locationProhibited: Bool) -> CLLocation? {
+    guard !locationProhibited, let rendered,
+          CLLocationCoordinate2DIsValid(rendered.coordinate),
+          rendered.timestamp.timeIntervalSince1970.isFinite,
+          rendered.horizontalAccuracy.isFinite else { return nil }
+    return rendered
   }
 
   // The map arrow owns navigation coordinates; neither the viewport nor a
@@ -1146,14 +1169,19 @@ enum MikshatLocationActions {
   }
 
   static func saveCurrent(from controller: UIViewController) {
-    guard MikshatHeading.currentLocation != nil else { showLocationError(from: controller); return }
+    guard let fix = MikshatHeading.currentLocation else { showLocationError(from: controller); return }
+    save(fix.coordinate, from: controller)
+  }
+
+  static func save(_ coordinate: CLLocationCoordinate2D, from controller: UIViewController) {
+    guard !LocationManager.isLocationProhibited(), CLLocationCoordinate2DIsValid(coordinate) else { return }
     let alert = UIAlertController(title: L("mikshat_save_location"), message: nil, preferredStyle: .alert)
     alert.addTextField { $0.text = L("mikshat_current_location"); $0.clearButtonMode = .whileEditing }
     alert.addAction(UIAlertAction(title: L("cancel"), style: .cancel))
     alert.addAction(UIAlertAction(title: L("save"), style: .default) { [weak alert] _ in
-      guard let fix = MikshatHeading.currentLocation else { Toast.show(withText: L("mikshat_location_unavailable")); return }
+      guard !LocationManager.isLocationProhibited() else { return }
       let text = alert?.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-      _ = BookmarksManager.shared().saveLocation(fix.coordinate, name: text.isEmpty ? L("mikshat_current_location") : text)
+      _ = BookmarksManager.shared().saveLocation(coordinate, name: text.isEmpty ? L("mikshat_current_location") : text)
       Toast.show(withText: L("mikshat_location_saved"))
     })
     controller.present(alert, animated: true)
@@ -1178,6 +1206,10 @@ enum MikshatLocationActions {
 }
 
 private final class MikshatSaveShareViewController: UIViewController {
+  private weak var contentStack: UIStackView?
+  private var preferredWidth: NSLayoutConstraint?
+  private var compactLayout: Bool?
+
   override func viewDidLoad() {
     super.viewDidLoad()
     view.backgroundColor = UIColor.black.withAlphaComponent(0.3)
@@ -1198,8 +1230,13 @@ private final class MikshatSaveShareViewController: UIViewController {
     let save = option("mikshat_save_location", symbol: "star.fill") { [weak self] in self?.perform(share: false) }
     let share = option("mikshat_share_location", symbol: "square.and.arrow.up") { [weak self] in self?.perform(share: true) }
     let cancel = option("cancel", symbol: "") { [weak self] in self?.dismiss(animated: true) }
+    save.accessibilityIdentifier = "saveShare.save"
+    share.accessibilityIdentifier = "saveShare.share"
+    cancel.accessibilityIdentifier = "saveShare.cancel"
     cancel.contentHorizontalAlignment = .leading
     let stack = UIStackView(arrangedSubviews: [title, save, share, cancel])
+    stack.accessibilityIdentifier = "saveShare.card"
+    contentStack = stack
     stack.axis = .vertical
     stack.spacing = 22
     stack.backgroundColor = .white
@@ -1211,9 +1248,13 @@ private final class MikshatSaveShareViewController: UIViewController {
     stack.translatesAutoresizingMaskIntoConstraints = false
     view.addSubview(scroll)
     scroll.addSubview(stack)
+    preferredWidth = scroll.widthAnchor.constraint(equalToConstant: 520)
+    preferredWidth?.priority = UILayoutPriority(999)
     NSLayoutConstraint.activate([
-      scroll.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 20),
-      scroll.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -20),
+      scroll.leadingAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 20),
+      scroll.trailingAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.trailingAnchor, constant: -20),
+      scroll.centerXAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerXAnchor),
+      preferredWidth!,
       scroll.centerYAnchor.constraint(equalTo: view.safeAreaLayoutGuide.centerYAnchor),
       scroll.heightAnchor.constraint(equalTo: stack.heightAnchor).withPriority(.defaultHigh),
       scroll.topAnchor.constraint(greaterThanOrEqualTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
@@ -1225,6 +1266,20 @@ private final class MikshatSaveShareViewController: UIViewController {
       stack.widthAnchor.constraint(equalTo: scroll.frameLayoutGuide.widthAnchor),
     ])
     view.accessibilityViewIsModal = true
+  }
+
+  override func viewDidLayoutSubviews() {
+    super.viewDidLayoutSubviews()
+    let compact = traitCollection.userInterfaceIdiom == .phone && view.bounds.width > view.bounds.height
+    if compactLayout != compact {
+      compactLayout = compact
+      contentStack?.spacing = compact ? 8 : 22
+      contentStack?.layoutMargins = compact ? UIEdgeInsets(top: 12, left: 20, bottom: 12, right: 20)
+                                           : UIEdgeInsets(top: 28, left: 24, bottom: 24, right: 24)
+    }
+    let availableWidth = max(0, view.safeAreaLayoutGuide.layoutFrame.width - 40)
+    let width = compact ? min(520, availableWidth) : availableWidth
+    if preferredWidth?.constant != width { preferredWidth?.constant = width }
   }
 
   private func perform(share: Bool) {

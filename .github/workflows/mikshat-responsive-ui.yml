@@ -2,7 +2,7 @@ name: Mikshat responsive iPhone and iPad validation
 'on':
   push:
     branches:
-    - feature/responsive-ios-ui
+    - feature/ios-layout-followup
   workflow_dispatch: null
 permissions:
   contents: read
@@ -117,6 +117,7 @@ jobs:
       shell: bash
       run: |-
         set -euo pipefail
+        defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool NO
         mkdir -p build/arrow-geometry
         xcodebuild -version | tee build/arrow-geometry/toolchain.txt
         xcrun simctl list --json runtimes > build/arrow-geometry/runtimes.json
@@ -151,36 +152,45 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
-        xcodebuild test \
-          -workspace xcode/omim.xcworkspace \
-          -scheme OMaps \
-          -configuration Debug \
-          -sdk iphonesimulator \
-          -destination "id=$MIKSHAT_SIMULATOR_UDID" \
-          -destination-timeout 120 \
-          -derivedDataPath build/SearchDerivedData \
-          -resultBundlePath build/SearchRegressions.xcresult \
-          -testLanguage ar \
-          -testRegion SA \
-          -parallel-testing-enabled NO \
-          -maximum-concurrent-test-simulator-destinations 1 \
-          -test-timeouts-enabled YES \
-          -default-test-execution-time-allowance 120 \
-          -maximum-test-execution-time-allowance 180 \
-          -only-testing:OMapsTests/MikshatResponsiveCompassTests \
-                  -only-testing:OMapsTests/MikshatResponsivePlaceCoordinatesTests \
-                  -only-testing:OMapsTests/MikshatResponsiveNavigationTests \
-          -only-testing:OMapsTests/MikshatResponsivePresentationTests \
-          -only-testing:OMapsTests/MikshatMapControlLayoutTests \
-                  -only-testing:OMapsTests/MikshatWeatherViewTests \
-                  -only-testing:OMapsTests/SearchThemeWindowLifecycleTests \
-                  -only-testing:OMapsTests/SearchHistoryOnlyTests \
-          -only-testing:OMapsTests/MikshatSearchDirectionIndicatorTests \
-          -only-testing:OMapsTests/MikshatHeadingCacheLifecycleTests \
-          ARCHS="$(uname -m)" \
-          ONLY_ACTIVE_ARCH=YES \
-          CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=NO \
+        test_args=(
+          -workspace xcode/omim.xcworkspace -scheme OMaps -configuration Debug
+          -sdk iphonesimulator -destination "id=$MIKSHAT_SIMULATOR_UDID"
+          -destination-timeout 120 -derivedDataPath build/SearchDerivedData
+          -testLanguage ar -testRegion SA -parallel-testing-enabled NO
+          -maximum-concurrent-test-simulator-destinations 1 -test-timeouts-enabled YES
+          -default-test-execution-time-allowance 120 -maximum-test-execution-time-allowance 180
+          -only-testing:OMapsTests/MikshatResponsiveCompassTests
+          -only-testing:OMapsTests/MikshatResponsivePlaceCoordinatesTests
+          -only-testing:OMapsTests/MikshatResponsiveNavigationTests
+          -only-testing:OMapsTests/MikshatResponsivePresentationTests
+          -only-testing:OMapsTests/MikshatMapSceneLayoutTests
+          -only-testing:OMapsTests/MikshatMapControlLayoutTests
+          -only-testing:OMapsTests/MikshatWeatherViewTests
+          -only-testing:OMapsTests/SearchThemeWindowLifecycleTests
+          -only-testing:OMapsTests/SearchHistoryOnlyTests
+          -only-testing:OMapsTests/MikshatSearchDirectionIndicatorTests
+          -only-testing:OMapsTests/MikshatHeadingCacheLifecycleTests
+          -only-testing:OMapsTests/MikshatCompassLocationIndependenceTests
+          "ARCHS=$(uname -m)" ONLY_ACTIVE_ARCH=YES CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+        )
+        xcodebuild build-for-testing "${test_args[@]}" -resultBundlePath build/SearchBuild.xcresult \
+          2>&1 | tee build/search-diagnostics/xcodebuild-search-build.log
+        python3 - <<'PYSETUP'
+        from pathlib import Path
+        import json, os, plistlib, subprocess
+        apps=list(Path('build/SearchDerivedData/Build/Products/Debug-iphonesimulator').glob('*.app'))
+        if len(apps)!=1:raise SystemExit(f'Expected one native test host, found {len(apps)}')
+        bundle=plistlib.loads((apps[0]/'Info.plist').read_bytes())['CFBundleIdentifier']
+        udid=os.environ['MIKSHAT_SIMULATOR_UDID']
+        subprocess.run(['xcrun','simctl','install',udid,str(apps[0])],check=True)
+        subprocess.run(['xcrun','simctl','privacy',udid,'grant','location',bundle],check=True)
+        subprocess.run(['xcrun','simctl','location',udid,'set','24.7136,46.6753'],check=True)
+        Path('build/search-diagnostics/synthetic-position.json').write_text(json.dumps({
+            'bundle':bundle,'coordinate':[24.7136,46.6753],
+            'source':'simctl synthetic test position; not a physical-device GPS reading',
+            'locationPermission':'granted in the isolated simulator only'},indent=2)+'\n')
+        PYSETUP
+        xcodebuild test-without-building "${test_args[@]}" -resultBundlePath build/SearchRegressions.xcresult \
           2>&1 | tee build/search-diagnostics/xcodebuild-search-tests.log
     - name: Require real native test execution
       if: always()
@@ -190,12 +200,12 @@ jobs:
         import importlib.util,json
         spec=importlib.util.spec_from_file_location('native_results','mikshat/tests/weather-data/verify-native-results.py')
         m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
-        m.EXPECTED_CLASSES={'MikshatResponsiveCompassTests':3,'MikshatResponsivePlaceCoordinatesTests':3,'MikshatResponsiveNavigationTests':4,'MikshatResponsivePresentationTests':2,'MikshatMapControlLayoutTests':1,'MikshatWeatherViewTests':6,'SearchThemeWindowLifecycleTests':4,'SearchHistoryOnlyTests':8,'MikshatSearchDirectionIndicatorTests':3,'MikshatHeadingCacheLifecycleTests':2}
+        m.EXPECTED_CLASSES={'MikshatResponsiveCompassTests':5,'MikshatResponsivePlaceCoordinatesTests':3,'MikshatResponsiveNavigationTests':4,'MikshatResponsivePresentationTests':2,'MikshatMapSceneLayoutTests':3,'MikshatMapControlLayoutTests':1,'MikshatWeatherViewTests':6,'SearchThemeWindowLifecycleTests':4,'SearchHistoryOnlyTests':8,'MikshatSearchDirectionIndicatorTests':3,'MikshatHeadingCacheLifecycleTests':2,'MikshatCompassLocationIndependenceTests':6}
         p=Path('build/search-diagnostics/xcodebuild-search-tests.log')
         report=m.analyze(p.read_text(errors='replace') if p.exists() else '')
         p.with_suffix('.summary.json').write_text(json.dumps(report,indent=2)+'\n')
         print(json.dumps(report))
-        if not report['passed']:raise SystemExit('All 36 native tests must execute once and pass without skips or cancellation')
+        if not report['passed']:raise SystemExit('All 47 native tests must execute once and pass without skips or cancellation')
         PYCODE
     - name: Collect app crash reports and simulator log
       if: always()
@@ -241,11 +251,10 @@ jobs:
         target=Path('build/responsive-screenshots/previews');target.mkdir(parents=True,exist_ok=True)
         files=sorted([*source.glob('responsive-*-fixture.png'),*source.glob('weather-*-fixture.png')])
         print('MIKSHAT_UI_IMAGES '+json.dumps([p.name for p in files]))
-        preferred=['compass-destination-compact-phone-landscape','compass-general-tablet-landscape',
-                   'navigation-joint-native-phone-expanded','navigation-joint-direct-compact-phone-collapsed',
-                   'place-preview','weather-light-landscape','weather-saved-after-failed-refresh',
-                   'weather-compact-phone-portrait-fixture','weather-compact-phone-landscape-fixture',
-                   'weather-large-type-small-phone-fixture']
+        preferred=['real-scene-selected-point-initial-4','real-scene-selected-point-initial-1',
+                   'real-scene-prestart','real-scene-native-trip','real-scene-direct-trip',
+                   'real-scene-home','real-scene-save-share','real-scene-search-keyboard',
+                   'real-scene-weather-sheet','weather-compact-phone-portrait-fixture']
         selected=[]
         for token in preferred:
             matches=[p for p in files if token in p.name]
@@ -268,6 +277,7 @@ jobs:
           build/search-diagnostics/
           build/weather-screenshots/
           build/SearchRegressions.xcresult/
+          build/SearchBuild.xcresult/
           build/responsive-screenshots/
     - name: Record current source timestamps for the next incremental build
       if: always()

@@ -59,6 +59,12 @@ final class NavigationDashboardViewController: UIViewController {
   private var navigationControlView: NavigationControlView!
   private let impactGenerator = UIImpactFeedbackGenerator(style: .medium)
   private var internalScrollViewContentOffset: CGFloat = .zero
+  private var bottomMenuViewportConstraint: NSLayoutConstraint?
+  private var bottomMenuCardConstraint: NSLayoutConstraint?
+  private var currentPresentationStep: NavigationDashboardModalPresentationStep = .hidden
+  private var previewViewport = CGRect.null
+  private var previewSafeArea = UIEdgeInsets.zero
+  private var previewContentCategory: UIContentSizeCategory?
 
   var interactor: NavigationDashboard.Interactor?
   private var presentationStepStrategy = NavigationDashboardModalPresentationStepStrategy()
@@ -116,6 +122,15 @@ final class NavigationDashboardViewController: UIViewController {
 
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
+    let category = traitCollection.preferredContentSizeCategory
+    if previewViewport != view.bounds || previewSafeArea != view.safeAreaInsets || previewContentCategory != category {
+      previewViewport = view.bounds
+      previewSafeArea = view.safeAreaInsets
+      previewContentCategory = category
+      updatePreviewMenuAnchor()
+      presentationStepsController.updateFrame()
+      updatePresentationStep(currentPresentationStep)
+    }
     let routePointsBottomPoint = availableAreaView.convert(routePointsView.contentBottom, to: view)
     bottomActionsMenu.setShadowVisible(routePointsBottomPoint.y + Constants.startButtonSpacing > bottomActionsMenu.origin.y)
   }
@@ -180,14 +195,15 @@ final class NavigationDashboardViewController: UIViewController {
       case .didUpdateFrame(let frame):
         self.interactor?.process(.updateVisibleAreaInsets(visibleAreaInsets(for: frame)))
       case .didUpdateStep(let step):
+        self.currentPresentationStep = step
         self.interactor?.process(.didUpdatePresentationStep(step))
       }
     }
   }
 
   private func visibleAreaInsets(for frame: CGRect) -> UIEdgeInsets {
-    let isCompact = traitCollection.verticalSizeClass == .compact
-    let bottom = (isCompact || isiPad) ? 0 : frame.height - frame.origin.y
+    let bottom = NavigationDashboardModalPresentationStepStrategy.usesCenteredLayout(in: self)
+      ? 0 : max(0, view.bounds.maxY - frame.minY)
     return UIEdgeInsets(top: 0, left: 0, bottom: bottom, right: 0)
   }
 
@@ -208,6 +224,7 @@ final class NavigationDashboardViewController: UIViewController {
 
   private func setupAvailableView() {
     availableAreaView.setStyle(.modalSheetBackground)
+    availableAreaView.accessibilityIdentifier = "navigation.preview"
   }
 
   private func setupGrabberView() {
@@ -215,6 +232,7 @@ final class NavigationDashboardViewController: UIViewController {
   }
 
   private func setupCloseButton() {
+    closeButton.accessibilityIdentifier = "navigation.preview.close"
     closeButton.setImage(UIImage(resource: .icClose))
     closeButton.addTarget(self, action: #selector(didTapCloseButton), for: .touchUpInside)
     closeButton.setStyle(.black)
@@ -280,6 +298,7 @@ final class NavigationDashboardViewController: UIViewController {
     saveRouteAsTrackButton = createButton(image: UIImage(resource: .ic24PxImport), action: #selector(didTapSaveRouteAsTrackButton))
 
     startRouteButton.addTarget(self, action: #selector(didTapStartRouteButton), for: .touchUpInside)
+    startRouteButton.accessibilityIdentifier = "navigation.preview.start"
 
     searchButton.isHidden = true
     bookmarksButton.isHidden = true
@@ -456,9 +475,21 @@ final class NavigationDashboardViewController: UIViewController {
 
       bottomActionsMenu.leadingAnchor.constraint(equalTo: availableAreaView.leadingAnchor),
       bottomActionsMenu.trailingAnchor.constraint(equalTo: availableAreaView.trailingAnchor),
-      bottomActionsMenu.bottomAnchor.constraint(equalTo: view.bottomAnchor),
     ])
+    bottomMenuViewportConstraint = bottomActionsMenu.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+    bottomMenuCardConstraint = bottomActionsMenu.bottomAnchor.constraint(equalTo: availableAreaView.bottomAnchor)
+    updatePreviewMenuAnchor()
     presentationStepsController.setInitialState()
+  }
+
+  private func updatePreviewMenuAnchor() {
+    let centered = NavigationDashboardModalPresentationStepStrategy.usesCenteredLayout(in: self)
+    bottomActionsMenu.setCompactInsets(centered)
+    guard bottomMenuCardConstraint?.isActive != centered || bottomMenuViewportConstraint?.isActive == centered else { return }
+    bottomMenuViewportConstraint?.isActive = false
+    bottomMenuCardConstraint?.isActive = false
+    bottomMenuCardConstraint?.isActive = centered
+    bottomMenuViewportConstraint?.isActive = !centered
   }
 
   private func updateFrameOfPresentedViewInContainerView() {
@@ -467,6 +498,8 @@ final class NavigationDashboardViewController: UIViewController {
   }
 
   private func updatePresentationStep(_ step: NavigationDashboardModalPresentationStep) {
+    currentPresentationStep = step
+    updatePreviewMenuAnchor()
     view.layoutIfNeeded()
     let regularHeight = routePointsView.contentBottom.y
       + bottomActionsMenu.frame.height
