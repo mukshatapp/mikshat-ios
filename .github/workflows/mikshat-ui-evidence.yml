@@ -1,0 +1,87 @@
+name: Mikshat UI failure evidence
+'on':
+  push:
+    branches: [diagnostics/ui-followup-evidence]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download the completed phone result artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/14161284010/zip" > evidence.zip
+      - name: Extract actual UI images and main-thread diagnostics
+        run: |
+          python3 - <<'PY'
+          import base64, json, zipfile
+          from pathlib import Path
+          archive=zipfile.ZipFile('evidence.zip')
+          names=archive.namelist()
+          output=Path('ui-evidence');output.mkdir()
+          print('EVIDENCE_FILES '+json.dumps([n for n in names if n.endswith(('.ips','.hang','.crash')) or 'manifest' in n.lower()]))
+          mapping={}
+          def walk(value):
+              if isinstance(value,dict):
+                  strings=[v for v in value.values() if isinstance(v,str)]
+                  labels=[v for v in strings if 'responsive-real-scene-' in v]
+                  files=[v for v in strings if v.lower().endswith('.png')]
+                  for filename in files:
+                      if labels:mapping[Path(filename).name]=labels[0]
+                  for child in value.values():walk(child)
+              elif isinstance(value,list):
+                  for child in value:walk(child)
+          for name in names:
+              if 'manifest' in name.lower() and name.endswith('.json'):
+                  try:walk(json.loads(archive.read(name)))
+                  except (ValueError,KeyError):pass
+          images=[]
+          for name in names:
+              if not name.endswith('.png'):continue
+              label=mapping.get(Path(name).name,Path(name).name)
+              if 'responsive-real-scene-' in label:images.append((label,name))
+          print('EVIDENCE_SCENE_IMAGES '+json.dumps(images))
+          selected=[]
+          for token in ['save-share','search-keyboard-4','search-keyboard-1','native-trip-4','direct-trip-4','prestart-4','home-landscape','selected-point-initial']:
+              candidates=sorted((label,name) for label,name in images if token in label)
+              if candidates and candidates[0] not in selected:selected.append(candidates[0])
+          for index,(label,name) in enumerate(selected):
+              data=archive.read(name)
+              target=output/f'scene-{index}.png';target.write_bytes(data)
+              if len(data)<=300000:
+                  print('MIKSHAT_DIAGNOSTIC_PREVIEW '+json.dumps({'name':label,'file':target.name,'pngBase64':base64.b64encode(data).decode()}))
+              else:print('EVIDENCE_LARGE_IMAGE '+json.dumps({'name':label,'file':target.name,'bytes':len(data)}))
+          for name in names:
+              if not name.endswith(('.ips','.crash','.hang')):continue
+              raw=archive.read(name).decode(errors='replace')
+              try:
+                  try:payload=json.loads(raw)
+                  except ValueError:payload=json.loads(raw.split('\n',1)[1])
+                  images=payload.get('usedImages',[])
+                  threads=payload.get('threads',[])
+                  indices=sorted(set([0,payload.get('faultingThread',0)]))
+                  stacks=[]
+                  for index in indices:
+                      if not isinstance(index,int) or index>=len(threads):continue
+                      thread=threads[index]
+                      frames=[]
+                      for frame in thread.get('frames',[])[:100]:
+                          image_index=frame.get('imageIndex')
+                          image=images[image_index].get('name') if isinstance(image_index,int) and image_index<len(images) else None
+                          frames.append({'symbol':frame.get('symbol'),'image':image,'offset':frame.get('imageOffset')})
+                      stacks.append({'thread':index,'name':thread.get('name'),'queue':thread.get('queue'),'frames':frames})
+                  report={'file':name,'process':payload.get('procName'),'exception':payload.get('exception'),'termination':payload.get('termination'),'stacks':stacks}
+                  print('EVIDENCE_MAIN_STACK '+json.dumps(report))
+              except (ValueError,KeyError,TypeError):
+                  print('EVIDENCE_DIAGNOSTIC_TEXT '+name+'\n'+raw[:18000])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mikshat-ui-extracted-evidence
+          path: ui-evidence/
+          retention-days: 3
