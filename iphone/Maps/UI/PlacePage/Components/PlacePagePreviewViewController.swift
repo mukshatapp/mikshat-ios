@@ -90,6 +90,9 @@ private final class PlacePageCoordinateFormatRow: UIStackView {
     spacing = 8
     semanticContentAttribute = .forceLeftToRight
     isLayoutMarginsRelativeArrangement = true
+    // The outer sheet owns system insets. Offscreen, self-sizing rows must
+    // retain their content padding instead of folding safe-area changes into it.
+    insetsLayoutMarginsFromSafeArea = false
     layoutMargins = UIEdgeInsets(top: 10, left: 12, bottom: 10, right: 12)
     let identifier = "placePage.coordinates.\(format.lowercased())"
     accessibilityIdentifier = identifier

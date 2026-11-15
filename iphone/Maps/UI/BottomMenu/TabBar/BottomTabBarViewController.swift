@@ -8,6 +8,19 @@ class BottomTabBarViewController: UIViewController {
   @IBOutlet var downloadBadge: UIView!
 
   private var avaliableArea = CGRect.zero
+  private var searchDiameterConstraints: [NSLayoutConstraint] = []
+  private var searchCenterYConstraint: NSLayoutConstraint?
+  private var searchCaptionGapConstraint: NSLayoutConstraint?
+  private weak var mikshatSearchButton: UIButton?
+  private var compactPhoneLayout: Bool?
+  private struct ButtonLayoutDefaults {
+    let button: UIButton
+    let insets: NSDirectionalEdgeInsets
+    let imagePadding: CGFloat
+    let lineBreakMode: NSLineBreakMode
+    let numberOfLines: Int
+  }
+  private var buttonLayoutDefaults: [ButtonLayoutDefaults] = []
   @objc var isHidden: Bool = false {
     didSet {
       updateFrame(animated: true)
@@ -29,8 +42,10 @@ class BottomTabBarViewController: UIViewController {
   }
 
   private func setupMikshatBar() {
+    view.accessibilityIdentifier = "home.bottomBar"
     view.subviews.forEach { $0.isHidden = true }
     let stack = UIStackView()
+    stack.accessibilityIdentifier = "home.bottomBar.content"
     stack.axis = .horizontal
     stack.distribution = .fillEqually
     stack.semanticContentAttribute = .forceLeftToRight
@@ -49,22 +64,28 @@ class BottomTabBarViewController: UIViewController {
       MikshatLocationActions.presentMenu(from: map)
     }
     let search = MikshatStyle.button(L("search"), symbol: "magnifyingglass") { [weak self] in self?.presenter.onSearchButtonPressed() }
+    mikshatSearchButton = search
     search.configuration?.baseForegroundColor = .white
     search.configuration?.background.backgroundColor = MikshatStyle.green
     search.configuration?.background.cornerRadius = 34
     search.configuration?.imagePadding = 6
     search.configuration?.title = nil
     let searchContainer = UIView()
+    searchContainer.accessibilityIdentifier = "home.searchContainer"
     search.translatesAutoresizingMaskIntoConstraints = false
     let searchLabel = MikshatStyle.label(L("search"), size: 12, color: MikshatStyle.green)
+    searchLabel.accessibilityIdentifier = "home.searchCaption"
     searchLabel.translatesAutoresizingMaskIntoConstraints = false
     searchContainer.addSubview(search)
     searchContainer.addSubview(searchLabel)
-    NSLayoutConstraint.activate([
-      search.widthAnchor.constraint(equalToConstant: 64), search.heightAnchor.constraint(equalToConstant: 64),
+    searchDiameterConstraints = [search.widthAnchor.constraint(equalToConstant: 64),
+                                 search.heightAnchor.constraint(equalToConstant: 64)]
+    searchCenterYConstraint = search.centerYAnchor.constraint(equalTo: searchContainer.centerYAnchor, constant: -24)
+    searchCaptionGapConstraint = searchLabel.topAnchor.constraint(equalTo: search.bottomAnchor, constant: 5)
+    NSLayoutConstraint.activate(searchDiameterConstraints + [
       search.centerXAnchor.constraint(equalTo: searchContainer.centerXAnchor),
-      search.centerYAnchor.constraint(equalTo: searchContainer.centerYAnchor, constant: -24),
-      searchLabel.topAnchor.constraint(equalTo: search.bottomAnchor, constant: 5),
+      searchCenterYConstraint!,
+      searchCaptionGapConstraint!,
       searchLabel.centerXAnchor.constraint(equalTo: searchContainer.centerXAnchor),
     ])
     let recording = MikshatStyle.button(L("mikshat_record_track"), symbol: "record.circle") {
@@ -84,6 +105,17 @@ class BottomTabBarViewController: UIViewController {
       recording?.accessibilityValue = L(state == .active ? "on" : "off")
     }
     let bookmarks = MikshatStyle.button(L("bookmarks"), symbol: "bookmark") { [weak self] in self?.presenter.onBookmarksButtonPressed() }
+    for (button, name) in [(settings, "settings"), (location, "saveShare"),
+                           (search, "search"), (recording, "record"), (bookmarks, "bookmarks")] {
+      button.accessibilityIdentifier = "home." + name
+      if let configuration = button.configuration, button !== search {
+        buttonLayoutDefaults.append(ButtonLayoutDefaults(button: button,
+                                                         insets: configuration.contentInsets,
+                                                         imagePadding: configuration.imagePadding,
+                                                         lineBreakMode: configuration.titleLineBreakMode,
+                                                         numberOfLines: button.titleLabel?.numberOfLines ?? 1))
+      }
+    }
     for item in [settings, location, searchContainer, recording, bookmarks] { stack.addArrangedSubview(item) }
     view.addSubview(stack)
     NSLayoutConstraint.activate([
@@ -92,6 +124,28 @@ class BottomTabBarViewController: UIViewController {
       stack.topAnchor.constraint(equalTo: view.topAnchor, constant: -12),
       stack.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -6),
     ])
+  }
+
+  override func viewDidLayoutSubviews() {
+    super.viewDidLayoutSubviews()
+    let viewport = view.superview?.bounds ?? view.bounds
+    let compact = traitCollection.userInterfaceIdiom == .phone && viewport.width > viewport.height
+    guard compactPhoneLayout != compact else { return }
+    compactPhoneLayout = compact
+    searchDiameterConstraints.forEach { $0.constant = compact ? 48 : 64 }
+    searchCenterYConstraint?.constant = compact ? -10 : -24
+    searchCaptionGapConstraint?.constant = compact ? 3 : 5
+    mikshatSearchButton?.configuration?.background.cornerRadius = compact ? 24 : 34
+    for defaults in buttonLayoutDefaults {
+      guard var configuration = defaults.button.configuration else { continue }
+      configuration.contentInsets = compact
+        ? NSDirectionalEdgeInsets(top: 5, leading: 4, bottom: 5, trailing: 4) : defaults.insets
+      configuration.imagePadding = compact ? 4 : defaults.imagePadding
+      configuration.titleLineBreakMode = compact ? .byWordWrapping : defaults.lineBreakMode
+      defaults.button.configuration = configuration
+      defaults.button.titleLabel?.numberOfLines = compact ? 2 : defaults.numberOfLines
+      defaults.button.titleLabel?.textAlignment = .center
+    }
   }
 
   override func viewWillAppear(_ animated: Bool) {

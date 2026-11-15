@@ -30,7 +30,8 @@
 extern NSString * const kMap2FBLoginSegue = @"Map2FBLogin";
 extern NSString * const kMap2GoogleLoginSegue = @"Map2GoogleLogin";
 
-static CGFloat kPlacePageCompactWidth = 350;
+static CGFloat const kPlacePageTabletMaximumWidth = 720;
+static CGFloat const kPlacePageLandscapeMaximumWidth = 900;
 
 typedef NS_ENUM(NSUInteger, UserTouchesAction) {
   UserTouchesActionNone,
@@ -157,10 +158,9 @@ NSString * const kCategorySelectorSegue = @"MapToCategorySelectorSegue";
 {
   self.placePageContainer.hidden = NO;
   self.placePageVC = [PlacePageBuilder buildFor:data];
-  [self.placePageContainer addSubview:self.placePageVC.view];
   [self addChildViewController:self.placePageVC];
-  [self.placePageVC didMoveToParentViewController:self];
   self.placePageVC.view.translatesAutoresizingMaskIntoConstraints = NO;
+  [self.placePageContainer addSubview:self.placePageVC.view];
   [NSLayoutConstraint activateConstraints:@[
     [self.placePageVC.view.topAnchor constraintEqualToAnchor:self.placePageContainer.topAnchor],
     [self.placePageVC.view.leadingAnchor constraintEqualToAnchor:self.placePageContainer.leadingAnchor],
@@ -168,11 +168,17 @@ NSString * const kCategorySelectorSegue = @"MapToCategorySelectorSegue";
     [self.placePageVC.view.trailingAnchor constraintEqualToAnchor:self.placePageContainer.trailingAnchor]
   ]];
   [self updatePlacePageContainerConstraints];
+  [self.placePageVC didMoveToParentViewController:self];
+  // Finish containment before UIKit lays out the sheet. Let the ordinary
+  // layout pass update the map's visible area after Framework's selection
+  // callback returns instead of forcing the entire map to lay out inside it.
+  [self.view setNeedsLayout];
 }
 
 - (void)setupPlacePageContainer
 {
   self.placePageContainer = [[TouchTransparentView alloc] initWithFrame:self.view.bounds];
+  self.placePageContainer.accessibilityIdentifier = @"placePage.host";
   self.placePageContainer.translatesAutoresizingMaskIntoConstraints = NO;
   [self.view addSubview:self.placePageContainer];
   [self.view bringSubviewToFront:self.placePageContainer];
@@ -181,8 +187,7 @@ NSString * const kCategorySelectorSegue = @"MapToCategorySelectorSegue";
       [self.placePageContainer.leadingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.leadingAnchor];
 
   self.placePageWidthConstraint =
-      [self.placePageContainer.widthAnchor constraintEqualToConstant:kPlacePageCompactWidth];
-  self.placePageWidthConstraint.priority = UILayoutPriorityRequired - 1;
+      [self.placePageContainer.widthAnchor constraintEqualToConstant:kPlacePageTabletMaximumWidth];
   self.placePageTrailingConstraint =
       [self.placePageContainer.trailingAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.trailingAnchor];
   self.placePageCenterXConstraint =
@@ -191,11 +196,10 @@ NSString * const kCategorySelectorSegue = @"MapToCategorySelectorSegue";
   NSLayoutConstraint * topConstraint =
       [self.placePageContainer.topAnchor constraintEqualToAnchor:self.view.safeAreaLayoutGuide.topAnchor];
 
-  NSLayoutConstraint * bottomConstraint;
-  if (IPAD)
-    bottomConstraint = [self.placePageContainer.bottomAnchor constraintLessThanOrEqualToAnchor:self.view.bottomAnchor];
-  else
-    bottomConstraint = [self.placePageContainer.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor];
+  // This is a transparent viewport for the bottom sheet, not a self-sizing sidebar.
+  // A <= bottom edge left the tablet scroll view without a determined height.
+  NSLayoutConstraint * bottomConstraint =
+      [self.placePageContainer.bottomAnchor constraintEqualToAnchor:self.view.bottomAnchor];
 
   [NSLayoutConstraint activateConstraints:@[
     [self.placePageContainer.widthAnchor constraintLessThanOrEqualToAnchor:self.view.safeAreaLayoutGuide.widthAnchor],
@@ -221,10 +225,19 @@ NSString * const kCategorySelectorSegue = @"MapToCategorySelectorSegue";
 
 - (void)updatePlacePageContainerConstraints
 {
+  if (self.placePageContainer == nil)
+    return;
   const BOOL isLimitedWidth = IPAD || CGRectGetWidth(self.view.bounds) > CGRectGetHeight(self.view.bounds);
 
   if (isLimitedWidth)
   {
+    CGFloat const safeWidth = CGRectGetWidth(self.view.safeAreaLayoutGuide.layoutFrame);
+    CGFloat const availableWidth = safeWidth > 0 ? safeWidth : CGRectGetWidth(self.view.bounds);
+    CGFloat const sideMargin = IPAD ? 16 : 12;
+    CGFloat const maximumWidth = IPAD ? kPlacePageTabletMaximumWidth : kPlacePageLandscapeMaximumWidth;
+    CGFloat const width = MIN(maximumWidth, MAX(0, availableWidth - sideMargin * 2));
+    if (self.placePageWidthConstraint.constant != width)
+      self.placePageWidthConstraint.constant = width;
     [self.placePageLeadingConstraint setActive:NO];
     [self.placePageTrailingConstraint setActive:NO];
     [self.placePageCenterXConstraint setActive:YES];
@@ -237,7 +250,6 @@ NSString * const kCategorySelectorSegue = @"MapToCategorySelectorSegue";
     [self.placePageLeadingConstraint setActive:YES];
     [self.placePageTrailingConstraint setActive:YES];
   }
-  [self.view layoutIfNeeded];
 }
 
 - (void)dismissPlacePage
@@ -556,9 +568,8 @@ NSString * const kCategorySelectorSegue = @"MapToCategorySelectorSegue";
 - (void)viewDidLayoutSubviews
 {
   [super viewDidLayoutSubviews];
-  const BOOL isLimitedPlacePageWidth = IPAD || CGRectGetWidth(self.view.bounds) > CGRectGetHeight(self.view.bounds);
-  if (self.placePageContainer && self.placePageCenterXConstraint.isActive != isLimitedPlacePageWidth)
-    [self updatePlacePageContainerConstraints];
+  // Split View and safe-area changes can resize the same orientation/size class.
+  [self updatePlacePageContainerConstraints];
   if (!self.mapView.drapeEngineCreated && !MapsAppDelegate.isTestsEnvironment)
     [self.mapView createDrapeEngine];
 }

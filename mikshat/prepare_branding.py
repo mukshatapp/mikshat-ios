@@ -1,6 +1,7 @@
 """Package the approved square artwork at Apple's required app-icon dimensions."""
 from pathlib import Path
 import json
+import shutil
 import subprocess
 root = Path(__file__).resolve().parents[1]
 artwork = root / 'mikshat/branding/app-icon.png'
@@ -11,3 +12,9 @@ for name in ('AppIcon', 'AppIconDebug'):
     (folder / 'Contents.json').write_text(json.dumps({
         'images': [{'filename': '1024.png', 'idiom': 'universal', 'platform': 'ios', 'size': '1024x1024'}],
         'info': {'author': 'xcode', 'version': 1}}, indent=2) + '\n')
+
+# Widget extensions have their own asset catalog and cannot use the host app's icon.
+# Keep Live Activities on the same approved artwork as the main application.
+widget_logo = root / 'iphone/Maps/OMapsWidgetExtension/Assets.xcassets/MikshatLogo.imageset/MikshatLogo.png'
+widget_logo.parent.mkdir(parents=True, exist_ok=True)
+shutil.copyfile(artwork, widget_logo)

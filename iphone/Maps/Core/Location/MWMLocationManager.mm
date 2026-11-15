@@ -9,6 +9,7 @@
 #include <CoreApi/Framework.h>
 
 #include "map/gps_tracker.hpp"
+#include <cmath>
 
 #if TARGET_OS_SIMULATOR
 #include "MountainElevationGenerator.hpp"
@@ -254,6 +255,17 @@ void setShowLocationAlert(BOOL needShow)
       manager.lastLocationStatus != MWMLocationStatusNoError)
     return nil;
   return manager.lastLocationInfo;
+}
+
++ (CLLocation *)lastKnownLocation
+{
+  if ([self isLocationProhibited])
+    return nil;
+  CLLocation * fix = [self manager].lastLocationInfo;
+  if (!fix || !CLLocationCoordinate2DIsValid(fix.coordinate) || !std::isfinite(fix.horizontalAccuracy) ||
+      fix.horizontalAccuracy < 0 || !std::isfinite(fix.timestamp.timeIntervalSince1970))
+    return nil;
+  return fix;
 }
 
 + (BOOL)isLocationProhibited

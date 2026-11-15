@@ -51,7 +51,7 @@ NSString * NormalizeSubtitle(NSString * subtitle)
 
 - (instancetype)initWithLastLocationAndType:(MWMRoutePointType)type intermediateIndex:(size_t)intermediateIndex
 {
-  auto lastLocation = [MWMLocationManager lastLocation];
+  auto lastLocation = [MWMLocationManager lastLocation] ?: [MWMLocationManager lastKnownLocation];
   if (!lastLocation)
     return nil;
 

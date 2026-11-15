@@ -24,6 +24,9 @@ NS_SWIFT_NAME(LocationManager)
 + (void)setUseNavigationOtherLocationActivity:(BOOL)enabled;
 
 + (nullable CLLocation *)lastLocation;
+// Last real Core Location position, including a retained fix while reception is weak.
+// Unlike lastLocation this does not require an active, error-free update session.
++ (nullable CLLocation *)lastKnownLocation;
 + (nullable CLHeading *)lastHeading;
 
 + (void)applicationDidBecomeActive;

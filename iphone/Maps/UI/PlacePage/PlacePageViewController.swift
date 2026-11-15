@@ -68,8 +68,9 @@ final class PlacePageScrollView: UIScrollView {
   override func viewDidLayoutSubviews() {
     super.viewDidLayoutSubviews()
     guard !layout.headerViewController.isEditingTitle else { return }
-    // See https://github.com/organicmaps/organicmaps/issues/6917 for the details.
-    panGesture.isEnabled = alternativeSizeClass(iPhone: false, iPad: true)
+    // Every device now presents a bottom sheet; the old tablet sidebar's
+    // horizontal-dismiss gesture must not move an Auto Layout constrained sheet.
+    panGesture.isEnabled = false
     previousTraitCollection = traitCollection
     updateBackgroundViewFrame()
     let size = view.bounds.size
@@ -104,8 +105,7 @@ final class PlacePageScrollView: UIScrollView {
         if self.layout.headerViewController.isEditingTitle {
           self.updateContentOffsetForTitleEditing()
         } else {
-          self.scrollView.contentInset = self.alternativeSizeClass(iPhone: UIEdgeInsets(top: self.scrollView.height, left: 0, bottom: 0, right: 0),
-                                                                   iPad: UIEdgeInsets.zero)
+          self.scrollView.contentInset.top = self.scrollView.height
           self.refreshContentSize()
         }
       }
@@ -139,6 +139,11 @@ final class PlacePageScrollView: UIScrollView {
 
   private func updateSteps() {
     layoutIfNeeded()
+    // viewDidLoad still has the storyboard's size. Use the laid-out viewport
+    // before calculating any negative offset, including the first tablet open.
+    if scrollView.contentInset.top != scrollView.height {
+      scrollView.contentInset.top = scrollView.height
+    }
     updateBackgroundViewFrame()
     scrollSteps = layout.calculateSteps(inScrollView: scrollView,
                                         compact: traitCollection.verticalSizeClass == .compact)
@@ -172,10 +177,17 @@ final class PlacePageScrollView: UIScrollView {
   }
 
   private func setupView() {
+    view.accessibilityIdentifier = "placePage.sheet"
+    scrollView.accessibilityIdentifier = "placePage.scroll"
+    stackView.accessibilityIdentifier = "placePage.content"
+    headerStackView.accessibilityIdentifier = "placePage.header"
+    backgroundView.accessibilityIdentifier = "placePage.background"
+    actionBarContainerView.accessibilityIdentifier = "placePage.actions"
     view.insertSubview(backgroundView, at: 0)
     backgroundView.setStyle(.ppBackgroundView)
 
     scrollView.decelerationRate = .fast
+    scrollView.contentInsetAdjustmentBehavior = .never
     scrollView.setStyle(.ppView)
 
     headerStackView.axis = .vertical
@@ -189,10 +201,8 @@ final class PlacePageScrollView: UIScrollView {
       actionBarContainerView.layer.masksToBounds = true
     }
 
-    // See https://github.com/organicmaps/organicmaps/issues/6917 for the details.
     if previousTraitCollection == nil {
-      scrollView.contentInset = alternativeSizeClass(iPhone: UIEdgeInsets(top: view.height, left: 0, bottom: 0, right: 0),
-                                                     iPad: UIEdgeInsets.zero)
+      scrollView.contentInset = UIEdgeInsets(top: view.height, left: 0, bottom: 0, right: 0)
       scrollView.layoutIfNeeded()
     }
   }
@@ -227,7 +237,12 @@ final class PlacePageScrollView: UIScrollView {
       if !stackView.arrangedSubviews.contains(headerStackView) {
         stackView.addArrangedSubview(headerStackView)
       }
+      // Header/preview contents size themselves against their root bounds. A
+      // nested safe-area guide here would include the offscreen scroll offset
+      // in the child's intrinsic height and feed that height back into layout.
+      addChild(viewController)
       headerStackView.addArrangedSubview(viewController.view)
+      viewController.didMove(toParent: self)
     }
     if showSeparator {
       headerStackView.addSeparator(.bottom)
@@ -297,11 +312,8 @@ final class PlacePageScrollView: UIScrollView {
   }
 
   private func scrollTo(_ point: CGPoint, animated: Bool = true, forced: Bool = false, completion: (() -> Void)? = nil) {
-    if alternativeSizeClass(iPhone: beginDragging, iPad: true), !forced {
+    if beginDragging, !forced {
       return
-    }
-    if forced {
-      beginDragging = true
     }
     let contentOffset = CGPoint(x: point.x, y: min(scrollView.contentSize.height - scrollView.height, point.y))
     let bound = view.frame.height + contentOffset.y
@@ -334,11 +346,9 @@ final class PlacePageScrollView: UIScrollView {
   }
 
   private func updateTopBound(_ bound: CGFloat, updatingViewport: Bool = true) {
-    alternativeSizeClass(iPhone: {
-      let isCompact = traitCollection.verticalSizeClass == .compact
-      let insets = UIEdgeInsets(top: 0, left: 0, bottom: isCompact ? 0 : bound, right: 0)
-      self.interactor?.updateVisibleAreaInsets(insets, updatingViewport: updatingViewport)
-    }, iPad: {})
+    let isCompactPhone = !isiPad && traitCollection.verticalSizeClass == .compact
+    let insets = UIEdgeInsets(top: 0, left: 0, bottom: isCompactPhone ? 0 : bound, right: 0)
+    interactor?.updateVisibleAreaInsets(insets, updatingViewport: updatingViewport)
   }
 
   private func updateBackgroundViewFrame() {
@@ -362,7 +372,7 @@ extension PlacePageViewController: PlacePageViewProtocol {
     let oldOffset = scrollView.contentOffset.y
     let oldPreviewOffset = scrollSteps.first { if case .preview = $0 { return true }; return false }?.offset
     let wasAtFullStop = scrollSteps.last.map { abs(oldOffset - boundedOffset(for: $0)) < 1 } ?? false
-    let topInset: CGFloat = alternativeSizeClass(iPhone: scrollView.height, iPad: 0)
+    let topInset = scrollView.height
     if scrollView.contentInset.top != topInset { scrollView.contentInset.top = topInset }
     updateSteps()
     guard isVisible, !beginDragging, !layout.headerViewController.isEditingTitle else { return }
@@ -435,7 +445,7 @@ extension PlacePageViewController: PlacePageViewProtocol {
   }
 
   func scrollToReveal(_ anchor: UIView) {
-    guard !isiPad, scrollView.isScrollEnabled else { return }
+    guard scrollView.isScrollEnabled else { return }
     let bottomY = scrollView.convert(anchor.bounds, from: anchor).maxY
     let offset = CGPoint(x: 0, y: bottomY - scrollView.height + Constants.additionalRevealOffset)
     scrollTo(offset, forced: true)
@@ -449,12 +459,10 @@ extension PlacePageViewController: PlacePageViewProtocol {
     updateTopBound(.zero)
     closingAnimator = ModalPresentationAnimator.animate(
       animations: {
-        self.alternativeSizeClass(iPhone: {
-          let frame = self.view.frame.offsetBy(dx: 0, dy: self.view.height - self.stackView.convert(self.stackView.origin, to: self.view).y)
-          self.view.frame = frame
-        }, iPad: {
-          self.view.alpha = 0
-        })
+        // Moving the full-height controller offscreen changes its inherited
+        // safe area while expanded child views are self-sizing. Fade the sheet
+        // with fixed geometry, as the existing tablet dismissal already did.
+        self.view.alpha = 0
       },
       completion: { _ in
         self.closingAnimator = nil
@@ -497,6 +505,14 @@ extension PlacePageViewController: UIScrollViewDelegate {
     beginDragging = true
   }
 
+  func scrollViewDidEndDragging(_: UIScrollView, willDecelerate _: Bool) {
+    beginDragging = false
+  }
+
+  func scrollViewDidEndDecelerating(_: UIScrollView) {
+    beginDragging = false
+  }
+
   func scrollViewWillEndDragging(_ scrollView: UIScrollView,
                                  withVelocity velocity: CGPoint,
                                  targetContentOffset: UnsafeMutablePointer<CGPoint>) {
@@ -520,7 +536,7 @@ extension PlacePageViewController: UIScrollViewDelegate {
     }
 
     let nextStep = findNextStop(scrollView.contentOffset.y, velocity: velocity.y)
-    if case .closed = nextStep, !isiPad, !layout.headerViewController.isEditingTitle {
+    if case .closed = nextStep, !layout.headerViewController.isEditingTitle {
       targetContentOffset.pointee = scrollView.contentOffset
       interactor?.close()
       return
@@ -549,7 +565,6 @@ extension PlacePageViewController: UIScrollViewDelegate {
   }
 
   private func updateContentOffsetForTitleEditing() {
-    guard !isiPad else { return }
     let keyboardHeight = MWMKeyboard.keyboardHeight()
     var yOffset: CGFloat?
     if keyboardHeight > 0 {

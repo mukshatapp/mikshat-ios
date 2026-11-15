@@ -51,11 +51,14 @@ struct SearchOnMapModalPresentationStepStrategy: ModalPresentationStepStrategy {
       containerSize = UIScreen.main.bounds.size
     }
     let safeAreaInsets = containerViewController.view.safeAreaInsets
-    let traitCollection = containerViewController.traitCollection
     var frame = CGRect(origin: .zero, size: containerSize)
     let safeWidth = max(0, containerSize.width - safeAreaInsets.left - safeAreaInsets.right)
     let safeHeight = max(0, containerSize.height - safeAreaInsets.top - safeAreaInsets.bottom)
-    let sheetWidth = min(Constants.iPadWidth, safeWidth)
+    let isPhoneLandscape = !isIPad && containerSize.width > containerSize.height
+    // Coordinate latitude and longitude share a row on a landscape phone.
+    // A tablet-sized 350 pt sheet cannot hold both sets of fields legibly.
+    let sheetWidth = isPhoneLandscape ? min(760, max(0, safeWidth - 2 * Constants.topInset))
+      : min(Constants.iPadWidth, safeWidth)
     let centeredX = safeAreaInsets.left + (safeWidth - sheetWidth) / 2
 
     if isIPad {
@@ -71,7 +74,7 @@ struct SearchOnMapModalPresentationStepStrategy: ModalPresentationStepStrategy {
       return frame
     }
 
-    let isPortraitOrientation = traitCollection.verticalSizeClass == .regular
+    let isPortraitOrientation = !isPhoneLandscape
     if isPortraitOrientation {
       switch step {
       case .expanded:

@@ -26,6 +26,7 @@ final class SearchOnMapViewController: UIViewController {
   private var presentationContainerSize = CGSize.zero
   private var isClosing = false
   private var lastRenderedModel: ViewModel?
+  private var keyboardFrameInScreen: CGRect?
   var interactor: SearchOnMapInteractor?
 
   @objc let availableAreaView = SearchOnMapAreaView()
@@ -86,7 +87,13 @@ final class SearchOnMapViewController: UIViewController {
     setupViews()
     layoutViews()
     presentationStepsController.setInitialState()
+    NotificationCenter.default.addObserver(self, selector: #selector(keyboardFrameWillChange(_:)),
+                                           name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
+    NotificationCenter.default.addObserver(self, selector: #selector(keyboardFrameWillChange(_:)),
+                                           name: UIResponder.keyboardWillHideNotification, object: nil)
   }
+
+  deinit { NotificationCenter.default.removeObserver(self) }
 
   override func viewWillDisappear(_ animated: Bool) {
     super.viewWillDisappear(animated)
@@ -99,6 +106,7 @@ final class SearchOnMapViewController: UIViewController {
     if presentationContainerSize != view.bounds.size {
       updateFrameOfPresentedViewInContainerView()
     }
+    updateCoordinateViewport()
   }
 
   override func viewSafeAreaInsetsDidChange() {
@@ -121,6 +129,27 @@ final class SearchOnMapViewController: UIViewController {
   }
 
   // MARK: - Private methods
+
+  @objc private func keyboardFrameWillChange(_ notification: Notification) {
+    keyboardFrameInScreen = notification.name == UIResponder.keyboardWillHideNotification ? nil
+      : notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect
+    updateCoordinateViewport()
+  }
+
+  private func updateCoordinateViewport(sheetFrame: CGRect? = nil) {
+    let phoneLandscape = traitCollection.userInterfaceIdiom == .phone && view.bounds.width > view.bounds.height
+    let frame = sheetFrame ?? availableAreaView.frame
+    var visibleBottom = view.safeAreaLayoutGuide.layoutFrame.maxY
+    if phoneLandscape, let screenFrame = keyboardFrameInScreen, let window = view.window {
+      let windowFrame = window.screen.coordinateSpace.convert(screenFrame, to: window)
+      let keyboardFrame = view.convert(windowFrame, from: window)
+      if keyboardFrame.height > 0, keyboardFrame.intersects(frame) {
+        visibleBottom = min(visibleBottom, keyboardFrame.minY)
+      }
+    }
+    headerView.updateCoordinateViewport(availableHeight: max(0, visibleBottom - frame.minY),
+                                        phoneLandscape: phoneLandscape)
+  }
 
   private func setupViews() {
     availableAreaView.accessibilityIdentifier = "search.sheet"
@@ -462,6 +491,7 @@ extension SearchOnMapViewController: ModallyPresentedViewController {
     historyViewController.presentationFrameDidChange(contentFrame)
     searchNoResultsView.presentationFrameDidChange(contentFrame)
     searchingActivityView.presentationFrameDidChange(contentFrame)
+    updateCoordinateViewport(sheetFrame: frame)
   }
 }
 

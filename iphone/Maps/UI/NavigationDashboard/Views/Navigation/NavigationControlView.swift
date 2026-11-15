@@ -1,6 +1,6 @@
 final class NavigationControlView: SolidTouchView {
   private enum Constants {
-    static let buttonContentInset: CGFloat = 15
+    static let buttonContentInset: CGFloat = 7
     static var metricFont: UIFont { UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: 38, weight: .regular)) }
     static var metricLegendFont: UIFont { UIFontMetrics.default.scaledFont(for: .systemFont(ofSize: 18, weight: .regular)) }
   }
@@ -99,6 +99,7 @@ final class NavigationControlView: SolidTouchView {
   private var lastMetricsLayout: (width: CGFloat, category: UIContentSizeCategory)?
   private var metricsHeightConstraint: NSLayoutConstraint?
   private var horizontalActionConstraints: [NSLayoutConstraint] = []
+  private weak var metricsStack: UIStackView?
 
   override func awakeFromNib() {
     super.awakeFromNib()
@@ -212,6 +213,7 @@ final class NavigationControlView: SolidTouchView {
     extended.isHidden = true
     let stack = UIStackView(arrangedSubviews: [handle, metrics, progress, extended])
     stack.axis = .vertical; stack.spacing = 12
+    metricsStack = stack
     stack.translatesAutoresizingMaskIntoConstraints = false
     addSubview(stack)
     NSLayoutConstraint.activate([
@@ -245,6 +247,7 @@ final class NavigationControlView: SolidTouchView {
                                             left: Constants.buttonContentInset,
                                             bottom: Constants.buttonContentInset,
                                             right: Constants.buttonContentInset)
+    button.setPreferredSymbolConfiguration(UIImage.SymbolConfiguration(pointSize: 28, weight: .regular), forImageIn: .normal)
   }
 
   private func configureStopButton(_ button: UIButton) {
@@ -278,8 +281,9 @@ final class NavigationControlView: SolidTouchView {
   }
 
   private func updateResponsiveMetrics() {
-    let compactLandscape = (superview?.bounds.width ?? 0) > (superview?.bounds.height ?? 0) && bounds.width < 360
-    metricsHeightConstraint?.constant = compactLandscape ? 88 : 102
+    let compactLandscape = (superview?.bounds.width ?? 0) > (superview?.bounds.height ?? 0)
+    metricsHeightConstraint?.constant = compactLandscape ? 82 : 102
+    metricsStack?.spacing = compactLandscape ? 8 : 12
     let metrics = UIFontMetrics.default
     // Theme rendering can restore the nib's dynamic font without changing the
     // card width or content category, so keep this cap outside the metrics cache.
@@ -347,10 +351,14 @@ final class NavigationControlView: SolidTouchView {
     NSLayoutConstraint.deactivate(placementConstraints)
     let safe = parent.safeAreaLayoutGuide
     let landscape = parent.bounds.width > parent.bounds.height
-    if landscape {
-      let width = min(560, max(180, safe.layoutFrame.width - 2 * (railWidth + 8)))
-      placementConstraints = [centerXAnchor.constraint(equalTo: safe.centerXAnchor), centerYAnchor.constraint(equalTo: safe.centerYAnchor), widthAnchor.constraint(equalToConstant: width)]
-      layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner, .layerMinXMaxYCorner, .layerMaxXMaxYCorner]
+    if landscape || traitCollection.userInterfaceIdiom == .pad {
+      let availableWidth = max(1, safe.layoutFrame.width - 24 - (landscape ? railWidth + 8 : 0))
+      let width = min(900, availableWidth)
+      placementConstraints = [
+        leftAnchor.constraint(equalTo: safe.leftAnchor, constant: 12 + (availableWidth - width) / 2),
+        bottomAnchor.constraint(equalTo: safe.bottomAnchor), widthAnchor.constraint(equalToConstant: width),
+      ]
+      layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
     } else {
       placementConstraints = [leadingAnchor.constraint(equalTo: safe.leadingAnchor), trailingAnchor.constraint(equalTo: safe.trailingAnchor), bottomAnchor.constraint(equalTo: safe.bottomAnchor)]
       layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
@@ -418,9 +426,8 @@ final class NavigationControlView: SolidTouchView {
 
   private func updateVisibleViewportArea(onClose: Bool = false) {
     let parent = superview ?? ownerView
-    let landscape = (parent?.bounds.width ?? 0) > (parent?.bounds.height ?? 0)
     let bottom = max(0, (parent?.bounds.maxY ?? 0) - frame.minY)
-    let insets = UIEdgeInsets(top: 0, left: 0, bottom: onClose || landscape ? 0 : bottom, right: 0)
+    let insets = UIEdgeInsets(top: 0, left: 0, bottom: onClose ? 0 : bottom, right: 0)
     guard onClose || insets != lastViewportInsets else { return }
     lastViewportInsets = insets
     MapViewController.shared()?.updateVisibleAreaInsets(for: self, insets: insets, updatingViewport: true)
@@ -479,7 +486,7 @@ final class NavigationControlView: SolidTouchView {
     }
 
     var speedMps = 0.0
-    if let s = LocationManager.lastLocation()?.speed, s > 0 {
+    if let s = MikshatHeading.currentLocation?.speed, s > 0 {
       speedMps = s
     }
     let speedMeasure = Measure(asSpeed: speedMps)

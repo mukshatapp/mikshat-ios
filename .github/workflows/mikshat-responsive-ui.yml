@@ -2,7 +2,7 @@ name: Mikshat responsive iPhone and iPad validation
 'on':
   push:
     branches:
-    - feature/responsive-ios-ui
+    - feature/ios-layout-followup
   workflow_dispatch: null
 permissions:
   contents: read
@@ -117,6 +117,7 @@ jobs:
       shell: bash
       run: |-
         set -euo pipefail
+        defaults write com.apple.iphonesimulator ConnectHardwareKeyboard -bool NO
         mkdir -p build/arrow-geometry
         xcodebuild -version | tee build/arrow-geometry/toolchain.txt
         xcrun simctl list --json runtimes > build/arrow-geometry/runtimes.json
@@ -151,37 +152,157 @@ jobs:
       shell: bash
       run: |
         set -euo pipefail
-        xcodebuild test \
-          -workspace xcode/omim.xcworkspace \
-          -scheme OMaps \
-          -configuration Debug \
-          -sdk iphonesimulator \
-          -destination "id=$MIKSHAT_SIMULATOR_UDID" \
-          -destination-timeout 120 \
-          -derivedDataPath build/SearchDerivedData \
-          -resultBundlePath build/SearchRegressions.xcresult \
-          -testLanguage ar \
-          -testRegion SA \
-          -parallel-testing-enabled NO \
-          -maximum-concurrent-test-simulator-destinations 1 \
-          -test-timeouts-enabled YES \
-          -default-test-execution-time-allowance 120 \
-          -maximum-test-execution-time-allowance 180 \
-          -only-testing:OMapsTests/MikshatResponsiveCompassTests \
-                  -only-testing:OMapsTests/MikshatResponsivePlaceCoordinatesTests \
-                  -only-testing:OMapsTests/MikshatResponsiveNavigationTests \
-          -only-testing:OMapsTests/MikshatResponsivePresentationTests \
-          -only-testing:OMapsTests/MikshatMapControlLayoutTests \
-                  -only-testing:OMapsTests/MikshatWeatherViewTests \
-                  -only-testing:OMapsTests/SearchThemeWindowLifecycleTests \
-                  -only-testing:OMapsTests/SearchHistoryOnlyTests \
-          -only-testing:OMapsTests/MikshatSearchDirectionIndicatorTests \
-          -only-testing:OMapsTests/MikshatHeadingCacheLifecycleTests \
-          ARCHS="$(uname -m)" \
-          ONLY_ACTIVE_ARCH=YES \
-          CODE_SIGNING_REQUIRED=NO \
-          CODE_SIGNING_ALLOWED=NO \
+        test_args=(
+          -workspace xcode/omim.xcworkspace -scheme OMaps -configuration Debug
+          -sdk iphonesimulator -destination "id=$MIKSHAT_SIMULATOR_UDID"
+          -destination-timeout 120 -derivedDataPath build/SearchDerivedData
+          -testLanguage ar -testRegion SA -parallel-testing-enabled NO
+          -maximum-concurrent-test-simulator-destinations 1 -test-timeouts-enabled YES
+          -default-test-execution-time-allowance 120 -maximum-test-execution-time-allowance 180
+          -only-testing:OMapsTests/MikshatResponsiveCompassTests
+          -only-testing:OMapsTests/MikshatResponsivePlaceCoordinatesTests
+          -only-testing:OMapsTests/MikshatResponsiveNavigationTests
+          -only-testing:OMapsTests/MikshatResponsivePresentationTests
+          -only-testing:OMapsTests/MikshatMapSceneLayoutTests
+          -only-testing:OMapsTests/MikshatMapControlLayoutTests
+          -only-testing:OMapsTests/MikshatWeatherViewTests
+          -only-testing:OMapsTests/SearchThemeWindowLifecycleTests
+          -only-testing:OMapsTests/SearchHistoryOnlyTests
+          -only-testing:OMapsTests/MikshatSearchDirectionIndicatorTests
+          -only-testing:OMapsTests/MikshatHeadingCacheLifecycleTests
+          -only-testing:OMapsTests/MikshatCompassLocationIndependenceTests
+          "ARCHS=$(uname -m)" ONLY_ACTIVE_ARCH=YES CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+        )
+        xcodebuild build-for-testing "${test_args[@]}" -resultBundlePath build/SearchBuild.xcresult \
+          2>&1 | tee build/search-diagnostics/xcodebuild-search-build.log
+        python3 - <<'PYSETUP'
+        from pathlib import Path
+        import json, os, plistlib, subprocess
+        apps=[app for app in Path('build/SearchDerivedData/Build/Products/Debug-iphonesimulator').glob('*.app')
+              if plistlib.loads((app/'Info.plist').read_bytes()).get('CFBundleIdentifier')=='com.mikshat.maps.debug']
+        if len(apps)!=1:raise SystemExit(f'Expected one native test host, found {len(apps)}')
+        bundle=plistlib.loads((apps[0]/'Info.plist').read_bytes())['CFBundleIdentifier']
+        udid=os.environ['MIKSHAT_SIMULATOR_UDID']
+        subprocess.run(['xcrun','simctl','install',udid,str(apps[0])],check=True)
+        subprocess.run(['xcrun','simctl','privacy',udid,'grant','location',bundle],check=True)
+        subprocess.run(['xcrun','simctl','location',udid,'set','24.7136,46.6753'],check=True)
+        Path('build/search-diagnostics/synthetic-position.json').write_text(json.dumps({
+            'bundle':bundle,'coordinate':[24.7136,46.6753],
+            'source':'simctl synthetic test position; not a physical-device GPS reading',
+            'locationPermission':'granted in the isolated simulator only'},indent=2)+'\n')
+        PYSETUP
+        if [[ "$MIKSHAT_TEST_DEVICE" == "iPad" ]]; then
+          # iPadOS 27 windowed mode rejects scene orientation requests. Select
+          # the supported Full Screen Apps mode through Settings on this fresh
+          # simulator; keep production windowing settings and all 47 tests intact.
+          xcodebuild test \
+            -workspace xcode/omim.xcworkspace -scheme MikshatSimulatorSetup -configuration Debug \
+            -sdk iphonesimulator -destination "id=$MIKSHAT_SIMULATOR_UDID" \
+            -derivedDataPath build/SearchDerivedData -resultBundlePath build/SimulatorSetup.xcresult \
+            -testLanguage en -testRegion US -parallel-testing-enabled NO \
+            -test-timeouts-enabled YES -maximum-test-execution-time-allowance 180 \
+            -only-testing:MikshatSimulatorSetupUITests/SimulatorWindowingSetupTests/testSelectFullScreenAppsOnTheIsolatedIPad \
+            "ARCHS=$(uname -m)" ONLY_ACTIVE_ARCH=YES CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee build/search-diagnostics/xcodebuild-simulator-setup.log
+          python3 - <<'PYWINDOWING'
+        from pathlib import Path
+        import importlib.util,json
+        spec=importlib.util.spec_from_file_location('native_results','mikshat/tests/weather-data/verify-native-results.py')
+        m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+        m.EXPECTED_CLASSES={'SimulatorWindowingSetupTests':1}
+        p=Path('build/search-diagnostics/xcodebuild-simulator-setup.log')
+        report=m.analyze(p.read_text(errors='replace'))
+        report['scope']='Public XCUITest Settings setup on an isolated iPad simulator; native scene geometry is verified separately'
+        p.with_suffix('.summary.json').write_text(json.dumps(report,indent=2)+'\n')
+        print(json.dumps(report))
+        if not report['passed']:raise SystemExit('The iPad Settings setup must execute once and pass without skips')
+        PYWINDOWING
+        fi
+        if [[ "$MIKSHAT_TEST_DEVICE" == "iPad" ]]; then
+          # Drive the simulated device's physical orientation through the public
+          # Xcode CLI. The hosted tests still require UIKit to rotate its actual
+          # scene, window and map bounds before any layout assertion can pass.
+          rm -f build/search-diagnostics/scene-rotation-ready.json
+          python3 -u mikshat/tests/scene_rotation_driver.py \
+            --udid "$MIKSHAT_SIMULATOR_UDID" --bundle com.mikshat.maps.debug \
+            --ready-output build/search-diagnostics/scene-rotation-ready.json \
+            > build/search-diagnostics/scene-rotation-driver.log 2>&1 &
+          rotation_driver_pid=$!
+          trap 'kill "$rotation_driver_pid" 2>/dev/null || true; wait "$rotation_driver_pid" 2>/dev/null || true' EXIT
+          python3 - "$rotation_driver_pid" <<'PYDRIVER'
+        from pathlib import Path
+        import os,sys,time
+        ready=Path('build/search-diagnostics/scene-rotation-ready.json')
+        deadline=time.monotonic()+150
+        while not (ready.exists() and ready.stat().st_size):
+            try:os.kill(int(sys.argv[1]),0)
+            except ProcessLookupError:raise SystemExit('Physical rotation driver exited before becoming ready; inspect scene-rotation-driver.log')
+            if time.monotonic()>=deadline:raise SystemExit('Physical rotation driver bootstrap did not become ready within 150 seconds; inspect scene-rotation-driver.log for its three bounded startup attempts')
+            time.sleep(.1)
+        print('MIKSHAT_PHYSICAL_ROTATION_DRIVER_READY '+ready.read_text())
+        PYDRIVER
+        fi
+        xcodebuild test-without-building "${test_args[@]}" -resultBundlePath build/SearchRegressions.xcresult \
           2>&1 | tee build/search-diagnostics/xcodebuild-search-tests.log
+        if [[ "$MIKSHAT_TEST_DEVICE" == "iPhone 16" ]]; then
+          # Repetition is an additional stability check, not a retry of failed
+          # cases. Keep the original 47-case log and once-only gate untouched.
+          repeat_args=()
+          for argument in "${test_args[@]}"; do
+            if [[ "$argument" != -only-testing:* ]]; then repeat_args+=("$argument"); fi
+          done
+          set +e
+          xcodebuild test-without-building "${repeat_args[@]}" \
+            -resultBundlePath build/SelectedPointRepetitions.xcresult \
+            -test-iterations 3 -test-repetition-relaunch-enabled YES \
+            -only-testing:OMapsTests/MikshatMapSceneLayoutTests/testSelectedPointUsesTheRealBottomSheetAndKeepsAllContentReachableAfterSceneRotation \
+            2>&1 | tee build/search-diagnostics/xcodebuild-selected-point-repetitions.log
+          repeat_status=$?
+          set -e
+          MIKSHAT_SELECTED_POINT_REPEAT_STATUS="$repeat_status" python3 - <<'PYREPEAT'
+        from collections import Counter
+        from pathlib import Path
+        import importlib.util,json,os,re
+        spec=importlib.util.spec_from_file_location('native_results','mikshat/tests/weather-data/verify-native-results.py')
+        m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+        expected=('MikshatMapSceneLayoutTests','testSelectedPointUsesTheRealBottomSheetAndKeepsAllContentReachableAfterSceneRotation')
+
+        def analyze_selected_point_repetitions(text,exit_status):
+            text=re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]','',text)
+            events=[]
+            unexpected=[]
+            unrecognized=[]
+            for event in m.CASE_EVENT.finditer(text):
+                identity=m.case_identity(event[2])
+                if identity is None:unrecognized.append(event[2])
+                elif identity!=expected:unexpected.append('.'.join(identity))
+                else:events.append(event[3].lower())
+            failures=[line for line in text.splitlines() if m.BLOCKED.search(line)
+                      or re.search(r'\bunexpected\b.*\b(?:exit|restart|crash)\b|\b(?:exit|restart)\b.*\bunexpected\b',line,re.I)]
+            summaries=[dict(executed=int(a),skipped=int(b or 0),failures=int(c))
+                       for a,b,c in m.SUMMARY.findall(text)]
+            succeeded=any(marker in text for marker in ('** TEST SUCCEEDED **','** TEST EXECUTE SUCCEEDED **'))
+            counts=Counter(events)
+            passed=(exit_status==0 and succeeded and events==['started','passed']*3
+                    and not unexpected and not unrecognized and not failures
+                    and any(row['executed'] in (1,3) for row in summaries)
+                    and all(row['failures']==row['skipped']==0 for row in summaries))
+            return dict(expectedCase='.'.join(expected),expectedIterations=3,commandExitStatus=exit_status,
+                        started=counts['started'],passedCases=counts['passed'],events=events,
+                        unexpectedCases=unexpected,unrecognizedCases=unrecognized,testFailures=failures[-30:],
+                        executionCounts=summaries,xcodebuildSucceeded=succeeded,passed=passed,
+                        scope='Three fresh-host executions of the real selected-point scene test using the same compiled products')
+
+        if __name__=='__main__':
+            path=Path('build/search-diagnostics/xcodebuild-selected-point-repetitions.log')
+            report=analyze_selected_point_repetitions(path.read_text(errors='replace') if path.exists() else '',
+                                                     int(os.environ['MIKSHAT_SELECTED_POINT_REPEAT_STATUS']))
+            path.with_suffix('.summary.json').write_text(json.dumps(report,indent=2)+'\n')
+            print('MIKSHAT_SELECTED_POINT_REPETITIONS '+json.dumps(report))
+            if not report['passed']:
+                raise SystemExit('All three selected-point executions must start and pass without failure, skips, cancellation or unexpected restart')
+        PYREPEAT
+        fi
     - name: Require real native test execution
       if: always()
       run: |-
@@ -190,12 +311,12 @@ jobs:
         import importlib.util,json
         spec=importlib.util.spec_from_file_location('native_results','mikshat/tests/weather-data/verify-native-results.py')
         m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
-        m.EXPECTED_CLASSES={'MikshatResponsiveCompassTests':3,'MikshatResponsivePlaceCoordinatesTests':3,'MikshatResponsiveNavigationTests':4,'MikshatResponsivePresentationTests':2,'MikshatMapControlLayoutTests':1,'MikshatWeatherViewTests':6,'SearchThemeWindowLifecycleTests':4,'SearchHistoryOnlyTests':8,'MikshatSearchDirectionIndicatorTests':3,'MikshatHeadingCacheLifecycleTests':2}
+        m.EXPECTED_CLASSES={'MikshatResponsiveCompassTests':5,'MikshatResponsivePlaceCoordinatesTests':3,'MikshatResponsiveNavigationTests':4,'MikshatResponsivePresentationTests':2,'MikshatMapSceneLayoutTests':3,'MikshatMapControlLayoutTests':1,'MikshatWeatherViewTests':6,'SearchThemeWindowLifecycleTests':4,'SearchHistoryOnlyTests':8,'MikshatSearchDirectionIndicatorTests':3,'MikshatHeadingCacheLifecycleTests':2,'MikshatCompassLocationIndependenceTests':6}
         p=Path('build/search-diagnostics/xcodebuild-search-tests.log')
         report=m.analyze(p.read_text(errors='replace') if p.exists() else '')
         p.with_suffix('.summary.json').write_text(json.dumps(report,indent=2)+'\n')
         print(json.dumps(report))
-        if not report['passed']:raise SystemExit('All 36 native tests must execute once and pass without skips or cancellation')
+        if not report['passed']:raise SystemExit('All 47 native tests must execute once and pass without skips or cancellation')
         PYCODE
     - name: Collect app crash reports and simulator log
       if: always()
@@ -226,6 +347,9 @@ jobs:
         if [[ -d build/SearchRegressions.xcresult ]]; then
           xcrun xcresulttool export attachments --path build/SearchRegressions.xcresult --output-path build/responsive-screenshots
         fi
+        if [[ -d build/SimulatorSetup.xcresult ]]; then
+          xcrun xcresulttool export attachments --path build/SimulatorSetup.xcresult --output-path build/simulator-setup-screenshots
+        fi
     - name: Prepare small previews for visual review
       if: always()
       shell: bash
@@ -239,17 +363,21 @@ jobs:
         if container.returncode:raise SystemExit(0)
         source=Path(container.stdout.strip())/'Documents'
         target=Path('build/responsive-screenshots/previews');target.mkdir(parents=True,exist_ok=True)
-        files=sorted([*source.glob('responsive-*-fixture.png'),*source.glob('weather-*-fixture.png')])
+        files=sorted([*source.glob('responsive-*-fixture.png'),*source.glob('responsive-real-scene-*.png'),*source.glob('weather-*-fixture.png')])
         print('MIKSHAT_UI_IMAGES '+json.dumps([p.name for p in files]))
-        preferred=['compass-destination-compact-phone-landscape','compass-general-tablet-landscape',
-                   'navigation-joint-native-phone-expanded','navigation-joint-direct-compact-phone-collapsed',
-                   'place-preview','weather-light-landscape','weather-saved-after-failed-refresh',
-                   'weather-compact-phone-portrait-fixture','weather-compact-phone-landscape-fixture',
-                   'weather-large-type-small-phone-fixture']
+        preferred=['real-scene-selected-point-initial-3','real-scene-selected-point-initial-4',
+                   'real-scene-selected-point-initial-1',
+                   'real-scene-prestart-3','real-scene-prestart',
+                   'real-scene-native-trip-3','real-scene-native-trip',
+                   'real-scene-direct-trip-3','real-scene-direct-trip',
+                   'real-scene-home','real-scene-save-share',
+                   'real-scene-search-keyboard-3','real-scene-search-keyboard',
+                   'real-scene-weather-sheet-3','real-scene-weather-sheet',
+                   'weather-compact-phone-portrait-fixture']
         selected=[]
         for token in preferred:
             matches=[p for p in files if token in p.name]
-            if matches:selected.append(matches[0])
+            if matches and matches[0] not in selected:selected.append(matches[0])
         for image in selected:
             preview=target/image.name
             subprocess.run(['sips','-Z','700',str(image),'--out',str(preview)],check=True,stdout=subprocess.DEVNULL)
@@ -268,6 +396,10 @@ jobs:
           build/search-diagnostics/
           build/weather-screenshots/
           build/SearchRegressions.xcresult/
+          build/SelectedPointRepetitions.xcresult/
+          build/SearchBuild.xcresult/
+          build/SimulatorSetup.xcresult/
+          build/simulator-setup-screenshots/
           build/responsive-screenshots/
     - name: Record current source timestamps for the next incremental build
       if: always()
@@ -277,7 +409,7 @@ jobs:
           python3 build/search-diagnostics/cache-input-mtimes.py record
         fi
     - name: Save compiled objects even when a test or test compilation fails
-      if: always() && hashFiles('build/SearchDerivedData/mikshat-input-mtimes.json') != ''
+      if: always() && matrix.device == 'iPad' && hashFiles('build/SearchDerivedData/mikshat-input-mtimes.json') != ''
       timeout-minutes: 4
       uses: actions/cache/save@v4
       with:

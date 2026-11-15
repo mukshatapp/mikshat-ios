@@ -101,6 +101,58 @@ final class MikshatResponsiveCompassTests: XCTestCase {
       try attachResponsiveScreenshot(host.container.view, name: "compass-accessibility-\(device)", test: self)
     }
   }
+
+  @MainActor
+  func testWeakAndCachedDisplayedPositionsRemainCopyableWithoutAWarning() throws {
+    XCTAssertFalse(LocationManager.isLocationProhibited(), "The simulator profile must grant location access")
+    let compass = MikshatCompassViewController(target: nil, name: "البوصلة", general: true)
+    let host = ResponsiveUIKitHost(compass, size: CGSize(width: 390, height: 844))
+    defer { host.close() }
+    let previousClipboard = UIPasteboard.general.string
+    defer { UIPasteboard.general.string = previousClipboard }
+    let copy = try responsiveElement("mikshat.compass.copy", in: compass.view, as: UIButton.self)
+    let save = try responsiveElement("mikshat.compass.save", in: compass.view, as: UIButton.self)
+    let coordinates = try responsiveElement("mikshat.compass.coordinates", in: compass.view, as: UILabel.self)
+    let status = try responsiveElement("mikshat.compass.status", in: compass.view, as: UILabel.self)
+    for (accuracy, timestamp) in [(5_000.0, Date()), (400.0, Date(timeIntervalSinceNow: -1_800)),
+                                  (-1.0, Date.distantPast)] {
+      let position = CLLocation(coordinate: responsiveSelectedPoint, altitude: 0,
+                                horizontalAccuracy: accuracy, verticalAccuracy: -1, timestamp: timestamp)
+      compass.updateReadings(position: position, reading: (degrees: 72, gps: false))
+      host.layout()
+      XCTAssertEqual(coordinates.text, responsiveCoordinateText["ddm"])
+      XCTAssertTrue(copy.isEnabled, "An existing displayed point must not be blocked by age or poor accuracy")
+      XCTAssertTrue(save.isEnabled)
+      XCTAssertFalse((status.text ?? "").contains(L("mikshat_cached_location")))
+      UIPasteboard.general.string = "old clipboard"
+      copy.sendActions(for: .touchUpInside)
+      XCTAssertEqual(UIPasteboard.general.string, coordinates.text,
+                     "Copy must use the rendered coordinate pair, not refetch a different live GPS position")
+      XCTAssertNil(compass.presentedViewController, "Copying a weak position must not display a GPS warning")
+    }
+    compass.updateReadings(position: nil, reading: (degrees: 72, gps: false))
+    host.layout()
+    XCTAssertFalse(copy.isEnabled)
+    XCTAssertFalse(save.isEnabled)
+    XCTAssertEqual(coordinates.text, "—")
+  }
+
+  @MainActor
+  func testPositionActionsRespectPermissionAndRejectMissingOrInvalidCoordinates() {
+    let weak = CLLocation(coordinate: responsiveSelectedPoint, altitude: 0,
+                          horizontalAccuracy: 8_000, verticalAccuracy: -1,
+                          timestamp: Date(timeIntervalSinceNow: -3_600))
+    XCTAssertTrue(MikshatHeading.positionForAction(weak, locationProhibited: false) === weak)
+    XCTAssertNil(MikshatHeading.positionForAction(weak, locationProhibited: true))
+    XCTAssertNil(MikshatHeading.positionForAction(nil, locationProhibited: false))
+    let invalid = CLLocation(coordinate: CLLocationCoordinate2D(latitude: 91, longitude: 47), altitude: 0,
+                             horizontalAccuracy: 5, verticalAccuracy: -1, timestamp: Date())
+    XCTAssertNil(MikshatHeading.positionForAction(invalid, locationProhibited: false))
+    let invalidMetadata = CLLocation(coordinate: responsiveSelectedPoint, altitude: 0,
+                                     horizontalAccuracy: .nan, verticalAccuracy: -1, timestamp: Date())
+    XCTAssertNil(MikshatHeading.positionForAction(invalidMetadata, locationProhibited: false))
+    XCTAssertFalse(MikshatHeading.isFresh(weak), "Accepting a displayed point must not make stale speed/course fresh")
+  }
 }
 
 final class MikshatResponsivePlaceCoordinatesTests: XCTestCase {
@@ -276,7 +328,7 @@ final class MikshatResponsiveNavigationTests: XCTestCase {
   }
 
   @MainActor
-  func testNativeAndDirectInformationCardsCenterInLandscapeAndReturnToPortraitBottom() throws {
+  func testNativeAndDirectInformationCardsStayAtTheBottomAfterRotation() throws {
     for direct in [false, true] {
       for category in [UIContentSizeCategory.large, .accessibilityExtraExtraExtraLarge] {
         let controller = UIViewController()
@@ -311,13 +363,16 @@ final class MikshatResponsiveNavigationTests: XCTestCase {
             time.text = "12:59"
             host.layout()
             let safe = controller.view.safeAreaLayoutGuide.layoutFrame
-            if size.width > size.height {
-              XCTAssertEqual(card.frame.midX, safe.midX, accuracy: 1)
-              XCTAssertEqual(card.frame.midY, safe.midY, accuracy: 1)
-            } else {
-              XCTAssertEqual(card.frame.maxY, safe.maxY, accuracy: 1)
+            XCTAssertEqual(card.frame.maxY, safe.maxY, accuracy: 1,
+                           "Both navigation modes must stay at the bottom in every orientation")
+            XCTAssertGreaterThanOrEqual(card.frame.minX, safe.minX - 1)
+            XCTAssertLessThanOrEqual(card.frame.maxX, safe.maxX + 1)
+            if size.width <= size.height && size.width < 600 {
               XCTAssertEqual(card.frame.minX, safe.minX, accuracy: 1)
               XCTAssertEqual(card.frame.maxX, safe.maxX, accuracy: 1)
+            } else {
+              XCTAssertGreaterThan(card.frame.width, min(360, safe.width * 0.6),
+                                   "Landscape and tablet trip information must be a wide bottom strip")
             }
             assertResponsiveVisible(card, in: controller.view, context: "\(device) \(orientation)")
             for label in [speed, distance, time] {
@@ -340,6 +395,12 @@ final class MikshatResponsiveNavigationTests: XCTestCase {
               assertResponsiveVisible(action, in: controller.view, context: "expanded \(device) \(orientation)")
               XCTAssertGreaterThanOrEqual(action.bounds.width, 44)
               XCTAssertGreaterThanOrEqual(action.bounds.height, 44)
+              if !direct, let button = action as? UIButton,
+                 ["navigation.sound", "navigation.settings"].contains(action.accessibilityIdentifier ?? "") {
+                XCTAssertGreaterThanOrEqual(button.imageView?.bounds.width ?? 0, 26,
+                                           "The sound/settings glyph itself must be readable, not only its touch target")
+                XCTAssertGreaterThanOrEqual(button.imageView?.bounds.height ?? 0, 26)
+              }
             }
             for (index, action) in actions.enumerated() {
               for next in actions.dropFirst(index + 1) {
@@ -358,7 +419,7 @@ final class MikshatResponsiveNavigationTests: XCTestCase {
   }
 
   @MainActor
-  func testManeuversRightControlsAndCenteredNavigationCardsShareLandscapeViewport() async throws {
+  func testManeuversRightControlsAndBottomNavigationCardsShareLandscapeViewport() async throws {
     defer { restoreResponsiveMapControls() }
     for direct in [false, true] {
       let controller = UIViewController()
@@ -421,8 +482,9 @@ final class MikshatResponsiveNavigationTests: XCTestCase {
           showingExpanded = expanded
           host.layout()
           let safe = controller.view.safeAreaLayoutGuide.layoutFrame
-          XCTAssertEqual(card.frame.midX, safe.midX, accuracy: 1)
-          XCTAssertEqual(card.frame.midY, safe.midY, accuracy: 1)
+          XCTAssertEqual(card.frame.maxY, safe.maxY, accuracy: 1)
+          XCTAssertGreaterThanOrEqual(card.frame.minX, safe.minX - 1)
+          XCTAssertLessThanOrEqual(card.frame.maxX, safe.maxX + 1)
           assertResponsiveVisible(card, in: controller.view, context: device)
           let panels = try ["navigation.maneuverPanel", "navigation.nextManeuver", "navigation.streetPanel"]
             .map { try responsiveElement($0, in: maneuvers) }
@@ -574,8 +636,9 @@ private func assertResponsiveVisible(_ view: UIView, in viewport: UIView, contex
     ancestor = current.superview
   }
   XCTAssertTrue(view === viewport || view.isDescendant(of: viewport), context, file: file, line: line)
-  XCTAssertGreaterThan(rect.width, 0, context, file: file, line: line)
-  XCTAssertGreaterThan(rect.height, 0, context, file: file, line: line)
+  let geometry = "\(view.accessibilityIdentifier ?? String(describing: type(of: view))) rect=\(rect) viewport=\(viewport.bounds) \(context)"
+  XCTAssertGreaterThan(rect.width, 0, geometry, file: file, line: line)
+  XCTAssertGreaterThan(rect.height, 0, geometry, file: file, line: line)
   XCTAssertTrue(viewport.bounds.insetBy(dx: -1, dy: -1).contains(rect),
                 "\(view.accessibilityIdentifier ?? "view") \(rect) outside \(viewport.bounds) \(context)", file: file, line: line)
 }

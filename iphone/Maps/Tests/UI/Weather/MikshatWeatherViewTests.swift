@@ -52,6 +52,7 @@ final class MikshatWeatherViewTests: XCTestCase {
       }
       layout(container)
       try assertNormalForecastFits(in: weather.view, context: name)
+      try assertSheetPolicy(weather, size: size, context: name)
       let hours = try XCTUnwrap(try element("weather.hours", in: weather.view) as? UIScrollView)
       let cards = try XCTUnwrap(hours.subviews.compactMap { $0 as? UIStackView }.first).arrangedSubviews
       try assertHorizontalHours(in: hours, context: name)
@@ -89,6 +90,7 @@ final class MikshatWeatherViewTests: XCTestCase {
       resize(window: window, container: container, size: CGSize(width: size.height, height: size.width))
       try assertHourlyAnchor(identifier, fraction: fraction, in: hours)
       try assertNormalForecastFits(in: weather.view, context: name + "-rotated")
+      try assertSheetPolicy(weather, size: CGSize(width: size.height, height: size.width), context: name + "-rotated")
       try assertHorizontalHours(in: hours, context: name + "-rotated")
       try writeScreenshot(container.view, name: name + "-rotated")
 
@@ -96,6 +98,7 @@ final class MikshatWeatherViewTests: XCTestCase {
       hours.setContentOffset(CGPoint(x: hours.contentSize.width - hours.bounds.width, y: 0), animated: false)
       resize(window: window, container: container, size: size)
       XCTAssertEqual(hours.contentOffset.x, max(0, hours.contentSize.width - hours.bounds.width), accuracy: 1)
+      try assertSheetPolicy(weather, size: size, context: name + "-returned")
       window.isHidden = true
     }
   }
@@ -230,6 +233,37 @@ final class MikshatWeatherViewTests: XCTestCase {
 
   @MainActor
   private func descendants(_ root: UIView) -> [UIView] { [root] + root.subviews.flatMap { descendants($0) } }
+
+  @MainActor
+  private func assertSheetPolicy(_ weather: MikshatWeatherViewController, size: CGSize, context: String,
+                                 file: StaticString = #filePath, line: UInt = #line) throws {
+    let sheet = try XCTUnwrap(weather.sheetPresentationController, file: file, line: line)
+    XCTAssertEqual(sheet.detents.count, 1, file: file, line: line)
+    let phonePortrait = min(size.width, size.height) < 600 && size.height >= size.width
+    XCTAssertEqual(sheet.selectedDetentIdentifier?.rawValue,
+                   phonePortrait ? "mikshat.weather.content" : UISheetPresentationController.Detent.Identifier.large.rawValue,
+                   "Sheet policy must follow the device and window orientation: \(context)", file: file, line: line)
+    guard phonePortrait else { return }
+    XCTAssertGreaterThan(weather.preferredContentSize.height, 0, file: file, line: line)
+    if size.height >= 800 {
+      XCTAssertLessThan(weather.preferredContentSize.height, size.height - 100,
+                        "A normal portrait forecast must not leave a nearly full-height empty sheet: \(context)",
+                        file: file, line: line)
+    }
+    let page = try element("weather.scroll", in: weather.view, file: file, line: line)
+    let content = try element("weather.content", in: weather.view, file: file, line: line)
+    XCTAssertEqual(content.convert(content.bounds, to: page).minY, 4, accuracy: 1,
+                   "Content must start directly below the sheet header: \(context)", file: file, line: line)
+    let hours = try XCTUnwrap(try element("weather.hours", in: weather.view, file: file, line: line) as? UIScrollView,
+                             file: file, line: line)
+    let stack = try XCTUnwrap(hours.subviews.compactMap { $0 as? UIStackView }.first, file: file, line: line)
+    for card in stack.arrangedSubviews {
+      let body = try XCTUnwrap(card.subviews.first, file: file, line: line)
+      XCTAssertEqual(body.frame.minY, 11, accuracy: 1, "Hourly cards need portrait vertical breathing room: \(context)",
+                     file: file, line: line)
+      XCTAssertEqual(card.bounds.height - body.frame.maxY, 11, accuracy: 1, file: file, line: line)
+    }
+  }
 
   @MainActor
   private func assertNormalForecastFits(in root: UIView, context: String,
@@ -478,7 +512,7 @@ final class MikshatWeatherViewTests: XCTestCase {
   }
 }
 
-private actor WeatherFixtureClient: MikshatWeatherClient {
+actor WeatherFixtureClient: MikshatWeatherClient {
   private(set) var calls = 0
   let fails: Bool
   let delayNanoseconds: UInt64

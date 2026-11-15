@@ -26,7 +26,7 @@ SUMMARY = re.compile(
 BLOCKED = re.compile(
     r"Test Case .* (?:failed|skipped|cancelled|canceled)\b|"
     r":\d+(?::\d+)?: error: -\[|Test Suite .* failed\b|"
-    r"\*\* TEST (?:FAILED|CANCELLED|CANCELED)\b|"
+    r"\*\* TEST (?:EXECUTE )?(?:FAILED|CANCELLED|CANCELED)\b|"
     r"\b(?:Testing|Test (?:run|session))\b.*\b(?:cancelled|canceled)\b|"
     r"Restarting after unexpected exit|Test runner .*\bcrashed\b", re.IGNORECASE
 )
@@ -65,7 +65,8 @@ def analyze(log):
                   if events != Counter(started=1, passed=1)]
     unexpected = sorted({name for name, _ in outcomes} - EXPECTED_CLASSES.keys())
     expected_total = sum(EXPECTED_CLASSES.values())
-    succeeded = "** TEST SUCCEEDED **" in log
+    # test-without-building reports EXECUTE; a successful test build alone is insufficient.
+    succeeded = any(marker in log for marker in ("** TEST SUCCEEDED **", "** TEST EXECUTE SUCCEEDED **"))
     passed = (succeeded and not failures and not unrecognized and not incomplete and not unexpected
               and all(values["uniqueCases"] == values["started"] == values["passed"] == values["expected"]
                       for values in class_counts.values())
