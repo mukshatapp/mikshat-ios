@@ -344,7 +344,7 @@ jobs:
           python3 build/search-diagnostics/cache-input-mtimes.py record
         fi
     - name: Save compiled objects even when a test or test compilation fails
-      if: always() && hashFiles('build/SearchDerivedData/mikshat-input-mtimes.json') != ''
+      if: always() && matrix.device == 'iPad' && hashFiles('build/SearchDerivedData/mikshat-input-mtimes.json') != ''
       timeout-minutes: 4
       uses: actions/cache/save@v4
       with:

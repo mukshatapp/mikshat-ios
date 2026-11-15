@@ -73,8 +73,11 @@ def main():
             raise RuntimeError("Public devicectl command did not produce its required JSON result")
 
     def resolve_documents():
-        result = subprocess.run(["xcrun", "simctl", "get_app_container", options.udid, options.bundle, "data"],
-                                text=True, capture_output=True, timeout=10)
+        try:
+            result = subprocess.run(["xcrun", "simctl", "get_app_container", options.udid, options.bundle, "data"],
+                                    text=True, capture_output=True, timeout=10)
+        except subprocess.TimeoutExpired as error:
+            raise RuntimeError("Public simctl get_app_container timed out after 10 seconds") from error
         if result.returncode:
             raise RuntimeError("Cannot resolve installed test host container: " + result.stderr)
         directory = Path(result.stdout.strip()) / "Documents"
@@ -104,11 +107,16 @@ def main():
                 # rather than publishing a stale marker into an old sandbox.
                 try:
                     current_documents = resolve_documents()
-                except RuntimeError:
+                except RuntimeError as error:
                     if container_unavailable_at is None:
                         container_unavailable_at = now
+                    event("MIKSHAT_SCENE_DRIVER_RESOLUTION_RETRY",
+                          {"error": str(error), "elapsedSeconds": now - container_unavailable_at,
+                           "documents": str(documents)})
                     if now - container_unavailable_at > 30:
                         raise
+                    if documents.is_dir():
+                        publish_ready(documents)
                     time.sleep(0.2)
                     continue
                 container_unavailable_at = None

@@ -457,14 +457,12 @@ extension PlacePageViewController: PlacePageViewProtocol {
     guard closingAnimator?.state != .active else { return }
     view.isUserInteractionEnabled = false
     updateTopBound(.zero)
-    updateBackgroundViewFrame()
-    let visibleTop = max(0, min(backgroundView.frame.minY, actionBarContainerView.frame.minY))
-    let dismissalDistance = max(0, view.bounds.maxY - visibleTop)
     closingAnimator = ModalPresentationAnimator.animate(
       animations: {
-        // Keep the bottom/width constraints intact during dismissal and any
-        // concurrent rotation. Both devices now dismiss the sheet downward.
-        self.view.transform = CGAffineTransform(translationX: 0, y: dismissalDistance)
+        // Moving the full-height controller offscreen changes its inherited
+        // safe area while expanded child views are self-sizing. Fade the sheet
+        // with fixed geometry, as the existing tablet dismissal already did.
+        self.view.alpha = 0
       },
       completion: { _ in
         self.closingAnimator = nil
