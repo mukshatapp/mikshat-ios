@@ -62,9 +62,28 @@ def main():
         if orientation is not None:
             command.append(orientation)
         command += ["--timeout", "20", "--json-output", str(artifacts / (name + ".json"))]
-        result = subprocess.run(command, text=True, capture_output=True, timeout=25)
+        started_at = time.time()
+        started_monotonic = time.monotonic()
+        event("MIKSHAT_SCENE_DRIVER_COMMAND_START", {"command": command, "startedAt": started_at})
+        try:
+            result = subprocess.run(command, text=True, capture_output=True, timeout=25)
+        except subprocess.TimeoutExpired as error:
+            # TimeoutExpired may carry bytes even with text=True. Preserve any
+            # partial public-command output before returning the strict failure ACK.
+            stdout, stderr = error.stdout or "", error.stderr or ""
+            if isinstance(stdout, bytes):
+                stdout = stdout.decode("utf-8", errors="replace")
+            if isinstance(stderr, bytes):
+                stderr = stderr.decode("utf-8", errors="replace")
+            record = {"command": command, "returncode": None, "timedOut": True,
+                      "stdout": stdout, "stderr": stderr, "startedAt": started_at,
+                      "completedAt": time.time(), "durationSeconds": time.monotonic() - started_monotonic}
+            atomic_json(artifacts / (name + "-command.json"), record)
+            event("MIKSHAT_SCENE_DRIVER_COMMAND", record)
+            raise RuntimeError("Public devicectl orientation command timed out after 25 seconds") from error
         record = {"command": command, "returncode": result.returncode,
-                  "stdout": result.stdout, "stderr": result.stderr}
+                  "stdout": result.stdout, "stderr": result.stderr, "startedAt": started_at,
+                  "completedAt": time.time(), "durationSeconds": time.monotonic() - started_monotonic}
         atomic_json(artifacts / (name + "-command.json"), record)
         event("MIKSHAT_SCENE_DRIVER_COMMAND", record)
         if result.returncode:

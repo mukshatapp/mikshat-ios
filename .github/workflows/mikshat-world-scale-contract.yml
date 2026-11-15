@@ -17,8 +17,9 @@ jobs:
       CC: gcc-15
       CXX: g++-15
       QT_QPA_PLATFORM: offscreen
+      MIKSHAT_UNCORRECTED_QUERY_REVISION: ee1eec8b5c65df38103ff665636d3f62e031921d
     steps:
-    - name: Check out candidate and its unchanged baseline
+    - name: Check out candidate for comparison with the pinned uncorrected query
       uses: actions/checkout@v4
       with:
         fetch-depth: 2
@@ -42,7 +43,9 @@ jobs:
         sha256sum data/World.mwm data/WorldCoasts.mwm data/minsk-pass.mwm | tee build/world-scale-diagnostics/fixtures.sha256
         cp libs/indexer/data_source.cpp build/world-scale-diagnostics/fixed-data-source.cpp
         trap 'cp build/world-scale-diagnostics/fixed-data-source.cpp libs/indexer/data_source.cpp' EXIT
-        git show HEAD^:libs/indexer/data_source.cpp > libs/indexer/data_source.cpp
+        # Keep this proof repeatable after later candidate commits already contain the fix.
+        git fetch --no-tags --depth=1 origin "$MIKSHAT_UNCORRECTED_QUERY_REVISION"
+        git show "$MIKSHAT_UNCORRECTED_QUERY_REVISION":libs/indexer/data_source.cpp > libs/indexer/data_source.cpp
         python3 - <<'PYBASELINE'
         from pathlib import Path
         baseline=Path('libs/indexer/data_source.cpp').read_text()

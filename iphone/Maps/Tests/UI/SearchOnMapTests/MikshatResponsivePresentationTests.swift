@@ -449,12 +449,22 @@ private func attachedMapScene() async throws -> (MapViewController, UIWindow, UI
 @available(iOS 16.0, *)
 private func rotateMapScene(_ scene: UIWindowScene, window: UIWindow, map: MapViewController,
                             to orientation: UIInterfaceOrientation) async throws {
+  func actualGeometryMatches() -> Bool {
+    scene.interfaceOrientation == orientation
+      && (orientation.isLandscape ? window.bounds.width > window.bounds.height : window.bounds.height > window.bounds.width)
+      && abs(map.view.bounds.width - window.bounds.width) < 1
+      && abs(map.view.bounds.height - window.bounds.height) < 1
+  }
   var geometryError: Error?
+  print("Mikshat real-scene rotation requested=\(orientation.rawValue) actual=\(scene.interfaceOrientation.rawValue)"
+        + " window=\(window.bounds) map=\(map.view.bounds) alreadyMatches=\(actualGeometryMatches())")
   if UIDevice.current.userInterfaceIdiom == .pad {
     // A multitasking iPad app may reject programmatic scene rotation even in
     // Full Screen Apps mode. CI instead rotates the actual simulated device
     // through the public CLI, previously verified against native screen pixels.
-    try await requestPhysicalSceneRotation(to: orientation)
+    if !actualGeometryMatches() {
+      try await requestPhysicalSceneRotation(to: orientation)
+    }
   } else {
     let mask: UIInterfaceOrientationMask = orientation == .portrait ? .portrait
       : (orientation == .landscapeLeft ? .landscapeLeft : .landscapeRight)
@@ -465,10 +475,7 @@ private func rotateMapScene(_ scene: UIWindowScene, window: UIWindow, map: MapVi
     }
   }
   try await sceneWait("UIKit must perform the requested real scene rotation") {
-    scene.interfaceOrientation == orientation
-      && (orientation.isLandscape ? window.bounds.width > window.bounds.height : window.bounds.height > window.bounds.width)
-      && abs(map.view.bounds.width - window.bounds.width) < 1
-      && abs(map.view.bounds.height - window.bounds.height) < 1
+    actualGeometryMatches()
   }
   if let geometryError { throw geometryError }
   await settleMapScene(map)
@@ -506,6 +513,8 @@ private func requestPhysicalSceneRotation(to orientation: UIInterfaceOrientation
                                "physicalOrientation": physical, "interfaceOrientation": orientation.rawValue]
   let data = try JSONSerialization.data(withJSONObject: request, options: [.sortedKeys])
   try data.write(to: directory.appendingPathComponent(prefix + "request.json"), options: .atomic)
+  print("Mikshat public physical rotation requested id=\(identifier) documents=\(directory.path)"
+        + " createdAt=\(Date().timeIntervalSince1970) physical=\(physical) interface=\(orientation.rawValue)")
   var response: [String: Any]?
   let deadline = Date().addingTimeInterval(30)
   repeat {

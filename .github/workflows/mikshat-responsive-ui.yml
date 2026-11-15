@@ -306,14 +306,19 @@ jobs:
         target=Path('build/responsive-screenshots/previews');target.mkdir(parents=True,exist_ok=True)
         files=sorted([*source.glob('responsive-*-fixture.png'),*source.glob('responsive-real-scene-*.png'),*source.glob('weather-*-fixture.png')])
         print('MIKSHAT_UI_IMAGES '+json.dumps([p.name for p in files]))
-        preferred=['real-scene-selected-point-initial-4','real-scene-selected-point-initial-1',
-                   'real-scene-prestart','real-scene-native-trip','real-scene-direct-trip',
-                   'real-scene-home','real-scene-save-share','real-scene-search-keyboard',
-                   'real-scene-weather-sheet','weather-compact-phone-portrait-fixture']
+        preferred=['real-scene-selected-point-initial-3','real-scene-selected-point-initial-4',
+                   'real-scene-selected-point-initial-1',
+                   'real-scene-prestart-3','real-scene-prestart',
+                   'real-scene-native-trip-3','real-scene-native-trip',
+                   'real-scene-direct-trip-3','real-scene-direct-trip',
+                   'real-scene-home','real-scene-save-share',
+                   'real-scene-search-keyboard-3','real-scene-search-keyboard',
+                   'real-scene-weather-sheet-3','real-scene-weather-sheet',
+                   'weather-compact-phone-portrait-fixture']
         selected=[]
         for token in preferred:
             matches=[p for p in files if token in p.name]
-            if matches:selected.append(matches[0])
+            if matches and matches[0] not in selected:selected.append(matches[0])
         for image in selected:
             preview=target/image.name
             subprocess.run(['sips','-Z','700',str(image),'--out',str(preview)],check=True,stdout=subprocess.DEVNULL)

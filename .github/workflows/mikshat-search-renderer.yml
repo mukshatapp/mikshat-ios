@@ -209,12 +209,134 @@ jobs:
             stream.write(f'MIKSHAT_NATIVE_XCTESTRUN={original}\n')
         print(f'Native candidate test plan: {original}; -IsTests retained')
         PYCODE
+    - name: Prepare the isolated native host before checking search
+      shell: bash
+      run: |
+        set -euo pipefail
+        python3 - <<'PYCODE'
+        from pathlib import Path
+        import json,os,plistlib,subprocess
+        bundle='com.mikshat.maps.debug'
+        products=Path('build/SearchDerivedData/Build/Products/Debug-iphonesimulator')
+        apps=[app for app in products.glob('*.app')
+              if plistlib.loads((app/'Info.plist').read_bytes()).get('CFBundleIdentifier')==bundle]
+        if len(apps)!=1:raise SystemExit(f'Expected one native Debug test host, found {len(apps)}')
+        udid=os.environ['MIKSHAT_SIMULATOR_UDID']
+        # Match the responsive suite's native setup. A first-launch permission
+        # dialog must not hold the host inactive before XCTest begins running.
+        subprocess.run(['xcrun','simctl','install',udid,str(apps[0])],check=True,timeout=60)
+        subprocess.run(['xcrun','simctl','privacy',udid,'grant','location',bundle],check=True,timeout=30)
+        subprocess.run(['xcrun','simctl','location',udid,'set','24.7136,46.6753'],check=True,timeout=30)
+        report=dict(bundleIdentifier=bundle,locationPermission='granted in the isolated simulator only',
+                    syntheticLocation=[24.7136,46.6753],
+                    scope='Native -IsTests precheck setup; not user GPS or normal renderer coverage',
+                    originalTestPlan='unchanged')
+        Path('build/search-diagnostics/native-host-setup.json').write_text(json.dumps(report,indent=2)+'\n')
+        print(json.dumps(report))
+        PYCODE
     - name: Recheck all 17 native search regressions with candidate production code
       id: native-tests
       timeout-minutes: 8
       shell: bash
       run: |
         set -euo pipefail
+        cat > build/search-diagnostics/native-startup-watchdog.py <<'PYWATCH'
+        from pathlib import Path
+        import json,os,re,signal,subprocess,sys,threading,time
+
+        stopping=threading.Event()
+        active_child=None
+
+        def stop_watchdog(_signum,_frame):
+            stopping.set()
+            child=active_child
+            if child is not None and child.poll() is None:
+                try:child.terminate()
+                except ProcessLookupError:pass
+
+        def read_log(path):
+            try:return path.read_text(errors='replace')
+            except OSError:return ''
+
+        def capture(command,path,timeout):
+            global active_child
+            if stopping.is_set():return ''
+            child=subprocess.Popen(command,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
+            active_child=child
+            if stopping.is_set():child.terminate()
+            try:
+                output,_=child.communicate(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                child.terminate()
+                try:output,_=child.communicate(timeout=2)
+                except subprocess.TimeoutExpired:
+                    child.kill()
+                    output,_=child.communicate()
+                output+='\nDiagnostic command exceeded its bounded timeout.\n'
+            finally:
+                active_child=None
+            path.write_text(output)
+            print(json.dumps(dict(event='startup-diagnostic-command',command=command,
+                                  returncode=child.returncode,output=str(path))),flush=True)
+            return output
+
+        def watch(udid,log,destination,grace=90,poll=1):
+            deadline=time.monotonic()+grace
+            while not stopping.is_set():
+                text=read_log(log)
+                if re.search(r'Test (?:Suite|Case).*started',text):
+                    print(json.dumps(dict(event='native-tests-started',diagnosticsRequired=False)),flush=True)
+                    return
+                if time.monotonic()>=deadline:break
+                stopping.wait(min(poll,max(0,deadline-time.monotonic())))
+            if stopping.is_set():return
+            destination.mkdir(parents=True,exist_ok=True)
+            print(json.dumps(dict(event='native-startup-diagnostics',reason='No test suite or case started',
+                                  graceSeconds=grace,scope='Diagnostic capture only; no verdict, retry or timeout changes')),flush=True)
+            capture(['xcrun','simctl','io',udid,'screenshot',str(destination/'no-test-start.png')],
+                    destination/'screenshot-command.log',20)
+            # comm reports executable names/paths, not arguments or environment.
+            metadata=capture(['ps','-axo','pid=,ppid=,etime=,state=,pcpu=,comm='],
+                             destination/'process-metadata.log',5)
+            processes={}
+            for line in metadata.splitlines():
+                fields=line.split(None,5)
+                if len(fields)==6 and fields[0].isdigit():processes[int(fields[0])]=fields[5]
+            app_ids=re.findall(r'Organic Maps \(Debug\)\[(\d+):',read_log(log))
+            if app_ids:
+                app_pid=int(app_ids[-1])
+                name=processes.get(app_pid,'').lower()
+                if 'organic' in name or 'omaps' in name:
+                    capture(['sample',str(app_pid),'5','-file',str(destination/'app-startup.sample.txt')],
+                            destination/'app-sample-command.log',20)
+            daemon_ids=[pid for pid,name in processes.items() if 'testmanagerd_sim' in name]
+            if daemon_ids:
+                daemon_pid=max(daemon_ids)
+                capture(['sample',str(daemon_pid),'5','-file',str(destination/'testmanagerd-startup.sample.txt')],
+                        destination/'testmanagerd-sample-command.log',20)
+            print(json.dumps(dict(event='native-startup-diagnostics-finished',cancelled=stopping.is_set())),flush=True)
+
+        if __name__=='__main__':
+            signal.signal(signal.SIGTERM,stop_watchdog)
+            signal.signal(signal.SIGINT,stop_watchdog)
+            watch(sys.argv[1],Path(sys.argv[2]),Path(sys.argv[3]))
+        PYWATCH
+        native_startup_watchdog_pid=""
+        cleanup_native_startup_watchdog() {
+          if [[ -n "$native_startup_watchdog_pid" ]]; then
+            kill -TERM "$native_startup_watchdog_pid" 2>/dev/null || true
+            wait "$native_startup_watchdog_pid" 2>/dev/null || true
+            native_startup_watchdog_pid=""
+          fi
+        }
+        trap cleanup_native_startup_watchdog EXIT
+        trap 'exit 143' TERM
+        trap 'exit 130' INT
+        python3 -u build/search-diagnostics/native-startup-watchdog.py \
+          "$MIKSHAT_SIMULATOR_UDID" build/search-diagnostics/xcodebuild-native-search-recheck.log \
+          build/search-diagnostics/native-startup \
+          > build/search-diagnostics/native-startup-watchdog.log 2>&1 &
+        native_startup_watchdog_pid=$!
         xcodebuild test-without-building \
           -xctestrun "$MIKSHAT_NATIVE_XCTESTRUN" \
           -destination "id=$MIKSHAT_SIMULATOR_UDID" \
