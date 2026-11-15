@@ -68,11 +68,16 @@ final class SearchOnMapHeaderViewTests: XCTestCase {
       input.leadingAnchor.constraint(equalTo: host.leadingAnchor, constant: 16),
       input.trailingAnchor.constraint(equalTo: host.trailingAnchor, constant: -16),
     ])
-    let rows = input.arrangedSubviews.compactMap { $0 as? UIStackView }
+    let rows = try ["latitudeRow", "longitudeRow"].map { name in
+      try XCTUnwrap(input.firstDescendant {
+        $0.accessibilityIdentifier == "search.coordinates." + name
+      } as? UIStackView)
+    }
     XCTAssertEqual(rows.count, 2)
     let widths: [CGFloat] = [320, 390, 844]
     for width in widths {
       host.frame.size.width = width
+      input.setHorizontalRows(width > 500)
       host.setNeedsLayout()
       host.layoutIfNeeded()
       for row in rows {
@@ -183,8 +188,15 @@ final class SearchOnMapManagerTests: XCTestCase {
     let history = try XCTUnwrap(tabs.children.compactMap { $0 as? SearchHistoryViewController }.first)
     let historyTable = try XCTUnwrap(history.view.subviews.compactMap { $0 as? UITableView }.first)
     XCTAssertEqual(searchController.view.safeAreaInsets.left, expectedLeadingInset, accuracy: 1)
-    XCTAssertEqual(searchController.availableAreaView.frame.minX,
-                   searchController.view.safeAreaInsets.left, accuracy: 1)
+    let safeFrame = searchController.view.safeAreaLayoutGuide.layoutFrame
+    let sheetFrame = searchController.availableAreaView.frame
+    XCTAssertTrue(safeFrame.insetBy(dx: -1, dy: -1).contains(sheetFrame),
+                  "The widened search sheet must remain inside the actual landscape safe area")
+    XCTAssertEqual(sheetFrame.midX, safeFrame.midX, accuracy: 1)
+    XCTAssertGreaterThanOrEqual(sheetFrame.minX - safeFrame.minX, 7)
+    XCTAssertGreaterThanOrEqual(safeFrame.maxX - sheetFrame.maxX, 7)
+    XCTAssertEqual(sheetFrame.width, min(760, safeFrame.width - 16), accuracy: 1,
+                   "Phone landscape uses the available width with at least 8 pt of safe padding per side")
     XCTAssertEqual(tabs.view.safeAreaInsets.left, 0, accuracy: 1)
     XCTAssertEqual(historyTable.adjustedContentInset.left, 0, accuracy: 1)
     XCTAssertEqual(history.view.frame, tabs.view.bounds)

@@ -249,7 +249,7 @@ jobs:
         if container.returncode:raise SystemExit(0)
         source=Path(container.stdout.strip())/'Documents'
         target=Path('build/responsive-screenshots/previews');target.mkdir(parents=True,exist_ok=True)
-        files=sorted([*source.glob('responsive-*-fixture.png'),*source.glob('weather-*-fixture.png')])
+        files=sorted([*source.glob('responsive-*-fixture.png'),*source.glob('responsive-real-scene-*.png'),*source.glob('weather-*-fixture.png')])
         print('MIKSHAT_UI_IMAGES '+json.dumps([p.name for p in files]))
         preferred=['real-scene-selected-point-initial-4','real-scene-selected-point-initial-1',
                    'real-scene-prestart','real-scene-native-trip','real-scene-direct-trip',
