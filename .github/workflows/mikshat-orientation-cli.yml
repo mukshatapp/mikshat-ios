@@ -1,0 +1,23 @@
+name: Mikshat public simulator orientation CLI probe
+on:
+  push:
+    branches: [diagnostics/orientation-cli-4615]
+permissions:
+  contents: read
+jobs:
+  public-cli:
+    runs-on: xcode-27
+    timeout-minutes: 10
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+    steps:
+      - name: Probe installed public CLI help without changing application sources
+        shell: bash
+        run: |
+          xcodebuild -version
+          xcrun devicectl help || true
+          xcrun devicectl help device || true
+          xcrun devicectl help device orientation || true
+          xcrun devicectl help device orientation set || true
+          xcrun simctl help io || true
+          xcrun simctl help ui || true
