@@ -24,7 +24,10 @@ final class MikshatResponsivePresentationTests: XCTestCase {
         XCTAssertTrue(sheet.window === host.window)
         XCTAssertGreaterThan(sheet.bounds.width, 0)
         let safe = search.view.safeAreaLayoutGuide.layoutFrame
-        let bounded = UIDevice.current.userInterfaceIdiom == .pad || search.traitCollection.verticalSizeClass == .compact
+        // A wide phone window can retain a regular vertical size class (for
+        // example the large resizable viewport below). The production sheet
+        // follows its actual aspect ratio, not just that trait shortcut.
+        let bounded = search.traitCollection.userInterfaceIdiom == .pad || size.width > size.height
         if bounded {
           assertHorizontallyContained(sheet.frame, in: safe)
           XCTAssertEqual(sheet.frame.midX, safe.midX, accuracy: 1,
@@ -370,6 +373,8 @@ final class MikshatMapSceneLayoutTests: XCTestCase {
       await settleMapScene(map)
       let latitude = try XCTUnwrap(try sceneElement("search.coordinates.mikshat_lat_degrees", in: search.view) as? UITextField)
       let longitude = try XCTUnwrap(try sceneElement("search.coordinates.mikshat_lon_degrees", in: search.view) as? UITextField)
+      let coordinateScroll = try XCTUnwrap(try sceneElement("search.coordinateScroll", in: search.view) as? UIScrollView)
+      let coordinateInput = try sceneElement("search.coordinateInput", in: search.view)
       XCTAssertTrue(latitude.becomeFirstResponder())
       try await sceneWait("The real coordinate keyboard must be visible") {
         latitude.isFirstResponder && keyboardFrame.map { $0.minY < window.bounds.maxY } == true
@@ -386,6 +391,13 @@ final class MikshatMapSceneLayoutTests: XCTestCase {
       for field in [latitude, longitude] {
         XCTAssertTrue(field.becomeFirstResponder())
         await settleMapScene(map)
+        print("Mikshat real-search field=\(field.accessibilityIdentifier ?? "") orientation=\(orientation.rawValue)"
+          + " fieldRect=\(field.convert(field.bounds, to: window)) window=\(window.bounds)"
+          + " sheet=\(search.availableAreaView.frame) searchView=\(search.view.bounds) safe=\(search.view.safeAreaLayoutGuide.layoutFrame)"
+          + " coordinateScroll=\(coordinateScroll.convert(coordinateScroll.bounds, to: window))"
+          + " scrollBounds=\(coordinateScroll.bounds) contentSize=\(coordinateScroll.contentSize)"
+          + " offset=\(coordinateScroll.contentOffset) insets=\(coordinateScroll.adjustedContentInset)"
+          + " input=\(coordinateInput.frame) keyboardScreen=\(String(describing: keyboardFrame))")
         assertSceneVisible(field, in: window, context: "focused coordinate field")
         let rect = field.convert(field.bounds, to: window)
         let keyboard = try XCTUnwrap(keyboardFrame)
@@ -485,17 +497,22 @@ private func sceneElement(_ identifier: String, in root: UIView) throws -> UIVie
 @MainActor
 private func assertSceneVisible(_ element: UIView, in viewport: UIView, context: String,
                                 file: StaticString = #filePath, line: UInt = #line) {
+  let rect = element.convert(element.bounds, to: viewport)
+  let expectedWindow = (viewport as? UIWindow) ?? viewport.window
+  let details = "\(context); id=\(element.accessibilityIdentifier ?? String(describing: type(of: element)))"
+    + " rect=\(rect) viewportBounds=\(viewport.bounds) viewportSafe=\(viewport.safeAreaInsets)"
+    + " expectedWindow=\(String(describing: expectedWindow)) actualWindow=\(String(describing: element.window))"
+    + " orientation=\(expectedWindow?.windowScene?.interfaceOrientation.rawValue ?? 0)"
   var ancestor: UIView? = element
   while let view = ancestor {
-    XCTAssertFalse(view.isHidden || view.alpha < 0.01, context, file: file, line: line)
+    XCTAssertFalse(view.isHidden || view.alpha < 0.01, details, file: file, line: line)
     if view === viewport { break }
     ancestor = view.superview
   }
-  XCTAssertTrue(element.window === viewport.window || element === viewport, context, file: file, line: line)
-  let rect = element.convert(element.bounds, to: viewport)
-  XCTAssertGreaterThan(rect.width, 0, context, file: file, line: line)
-  XCTAssertGreaterThan(rect.height, 0, context, file: file, line: line)
-  XCTAssertTrue(viewport.bounds.insetBy(dx: -1, dy: -1).contains(rect), context, file: file, line: line)
+  XCTAssertTrue(element.window === expectedWindow || element === viewport, "Window mismatch: " + details, file: file, line: line)
+  XCTAssertGreaterThan(rect.width, 0, details, file: file, line: line)
+  XCTAssertGreaterThan(rect.height, 0, details, file: file, line: line)
+  XCTAssertTrue(viewport.bounds.insetBy(dx: -1, dy: -1).contains(rect), "Outside viewport: " + details, file: file, line: line)
 }
 
 @MainActor

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A61500500000000000000004 /* SimulatorWindowingSetupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A61500500000000000000003 /* SimulatorWindowingSetupTests.swift */; };
 		A61400200000000000000001 /* MikshatResponsivePresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A61400200000000000000002 /* MikshatResponsivePresentationTests.swift */; };
 		A61400100000000000000001 /* MikshatResponsiveUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A61400100000000000000002 /* MikshatResponsiveUITests.swift */; };
 		C01F84D927D2414E9A530001 /* BookmarksListSortingTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C01F84D927D2414E9A530002 /* BookmarksListSortingTests.swift */; };
@@ -711,6 +712,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		A6150050000000000000000C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 29B97313FDCFA39411CA2CEA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6741A93D1BF340DE002C974C;
+			remoteInfo = OMaps;
+		};
 		ED097E7A2BB80C320006ED01 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 29B97313FDCFA39411CA2CEA /* Project object */;
@@ -792,6 +800,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A61500500000000000000002 /* MikshatSimulatorSetupUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MikshatSimulatorSetupUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A61500500000000000000003 /* SimulatorWindowingSetupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimulatorWindowingSetupTests.swift; sourceTree = "<group>"; };
 		A61400200000000000000002 /* MikshatResponsivePresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/UI/SearchOnMapTests/MikshatResponsivePresentationTests.swift; sourceTree = SOURCE_ROOT; };
 		A61400100000000000000002 /* MikshatResponsiveUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/UI/SearchOnMapTests/MikshatResponsiveUITests.swift; sourceTree = SOURCE_ROOT; };
 		C01F84D927D2414E9A530002 /* BookmarksListSortingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarksListSortingTests.swift; sourceTree = "<group>"; };
@@ -1905,6 +1915,12 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		A61500500000000000000006 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		6741AA311BF340DE002C974C /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -1967,11 +1983,20 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		A6150050000000000000000D /* SimulatorSetupUITests */ = {
+			isa = PBXGroup;
+			children = (
+				A61500500000000000000003 /* SimulatorWindowingSetupTests.swift */,
+			);
+			path = SimulatorSetupUITests;
+			sourceTree = "<group>";
+		};
 		19C28FACFE9D520D11CA2CBB /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				6741AA5D1BF340DE002C974C /* Organic Maps (Debug).app */,
 				ED097E762BB80C320006ED01 /* OMapsTests.xctest */,
+				A61500500000000000000002 /* MikshatSimulatorSetupUITests.xctest */,
 				ED46DDCC2D098A0B007CACD6 /* OMapsWidgetExtension.appex */,
 			);
 			name = Products;
@@ -1992,6 +2017,7 @@
 				ED82C73F2F90186300FA103D /* Core */,
 				ED82C4F12F90180300FA103D /* UI */,
 				ED1ADA312BC6B19E0029209F /* Tests */,
+				A6150050000000000000000D /* SimulatorSetupUITests */,
 				ED2D74372D14337500660FBF /* OMapsWidgetExtension */,
 			);
 			indentWidth = 2;
@@ -4299,6 +4325,23 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		A61500500000000000000001 /* MikshatSimulatorSetupUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A61500500000000000000008 /* Build configuration list for PBXNativeTarget "MikshatSimulatorSetupUITests" */;
+			buildPhases = (
+				A61500500000000000000005 /* Sources */,
+				A61500500000000000000006 /* Frameworks */,
+				A61500500000000000000007 /* Resources */,
+			);
+			buildRules = ();
+			dependencies = (
+				A6150050000000000000000B /* PBXTargetDependency */,
+			);
+			name = MikshatSimulatorSetupUITests;
+			productName = MikshatSimulatorSetupUITests;
+			productReference = A61500500000000000000002 /* MikshatSimulatorSetupUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		6741A93D1BF340DE002C974C /* OMaps */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 6741AA541BF340DE002C974C /* Build configuration list for PBXNativeTarget "OMaps" */;
@@ -4369,6 +4412,10 @@
 				LastUpgradeCheck = 2700;
 				ORGANIZATIONNAME = "Organic Maps";
 				TargetAttributes = {
+					A61500500000000000000001 = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = 6741A93D1BF340DE002C974C;
+					};
 					6741A93D1BF340DE002C974C = {
 						LastSwiftMigration = 1110;
 						SystemCapabilities = {
@@ -4462,6 +4509,7 @@
 			targets = (
 				6741A93D1BF340DE002C974C /* OMaps */,
 				ED097E752BB80C320006ED01 /* OMapsTests */,
+				A61500500000000000000001 /* MikshatSimulatorSetupUITests */,
 				ED46DDCB2D098A0B007CACD6 /* OMapsWidgetExtension */,
 			);
 		};
@@ -4492,6 +4540,12 @@
 /* End PBXReferenceProxy section */
 
 /* Begin PBXResourcesBuildPhase section */
+		A61500500000000000000007 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		6741A9411BF340DE002C974C /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -4625,6 +4679,14 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		A61500500000000000000005 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A61500500000000000000004 /* SimulatorWindowingSetupTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		6741A9A01BF340DE002C974C /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -5199,6 +5261,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		A6150050000000000000000B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6741A93D1BF340DE002C974C /* OMaps */;
+			targetProxy = A6150050000000000000000C /* PBXContainerItemProxy */;
+		};
 		ED097E7B2BB80C320006ED01 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 6741A93D1BF340DE002C974C /* OMaps */;
@@ -5476,6 +5543,74 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
+		A6150050000000000000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				BUNDLE_IDENTIFIER = com.mikshat.maps.simulator-setup-uitests;
+				BUNDLE_LOADER = "";
+				CODE_SIGN_ENTITLEMENTS = "";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GCC_PREFIX_HEADER = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "";
+				INFOPLIST_FILE = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				MARKETING_VERSION = 1.0;
+				OTHER_CFLAGS = "";
+				OTHER_CPLUSPLUSFLAGS = "";
+				OTHER_LDFLAGS = "";
+				OTHER_SWIFT_FLAGS = "";
+				PRODUCT_BUNDLE_IDENTIFIER = com.mikshat.maps.simulator-setup-uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos";
+				SWIFT_OBJC_BRIDGING_HEADER = "";
+				SWIFT_OBJC_INTERFACE_HEADER_NAME = "";
+				SWIFT_VERSION = 5.5;
+				TARGETED_DEVICE_FAMILY = 2;
+				TEST_HOST = "";
+				TEST_TARGET_NAME = OMaps;
+			};
+			name = Release;
+		};
+		A61500500000000000000009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				BUNDLE_IDENTIFIER = com.mikshat.maps.simulator-setup-uitests;
+				BUNDLE_LOADER = "";
+				CODE_SIGN_ENTITLEMENTS = "";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GCC_PREFIX_HEADER = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = "";
+				INFOPLIST_FILE = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks @loader_path/Frameworks";
+				MARKETING_VERSION = 1.0;
+				OTHER_CFLAGS = "";
+				OTHER_CPLUSPLUSFLAGS = "";
+				OTHER_LDFLAGS = "";
+				OTHER_SWIFT_FLAGS = "";
+				PRODUCT_BUNDLE_IDENTIFIER = com.mikshat.maps.simulator-setup-uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphonesimulator iphoneos";
+				SWIFT_OBJC_BRIDGING_HEADER = "";
+				SWIFT_OBJC_INTERFACE_HEADER_NAME = "";
+				SWIFT_VERSION = 5.5;
+				TARGETED_DEVICE_FAMILY = 2;
+				TEST_HOST = "";
+				TEST_TARGET_NAME = OMaps;
+			};
+			name = Debug;
+		};
 		6741AA571BF340DE002C974C /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -5691,6 +5826,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		A61500500000000000000008 /* Build configuration list for PBXNativeTarget "MikshatSimulatorSetupUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A61500500000000000000009 /* Debug */,
+				A6150050000000000000000A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		6741AA541BF340DE002C974C /* Build configuration list for PBXNativeTarget "OMaps" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

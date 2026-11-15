@@ -486,7 +486,7 @@ final class NavigationControlView: SolidTouchView {
     }
 
     var speedMps = 0.0
-    if let s = LocationManager.lastLocation()?.speed, s > 0 {
+    if let s = MikshatHeading.currentLocation?.speed, s > 0 {
       speedMps = s
     }
     let speedMeasure = Measure(asSpeed: speedMps)

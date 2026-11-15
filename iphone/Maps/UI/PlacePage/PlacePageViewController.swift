@@ -237,6 +237,9 @@ final class PlacePageScrollView: UIScrollView {
       if !stackView.arrangedSubviews.contains(headerStackView) {
         stackView.addArrangedSubview(headerStackView)
       }
+      // Header/preview contents size themselves against their root bounds. A
+      // nested safe-area guide here would include the offscreen scroll offset
+      // in the child's intrinsic height and feed that height back into layout.
       addChild(viewController)
       headerStackView.addArrangedSubview(viewController.view)
       viewController.didMove(toParent: self)

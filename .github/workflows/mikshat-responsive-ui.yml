@@ -178,7 +178,8 @@ jobs:
         python3 - <<'PYSETUP'
         from pathlib import Path
         import json, os, plistlib, subprocess
-        apps=list(Path('build/SearchDerivedData/Build/Products/Debug-iphonesimulator').glob('*.app'))
+        apps=[app for app in Path('build/SearchDerivedData/Build/Products/Debug-iphonesimulator').glob('*.app')
+              if plistlib.loads((app/'Info.plist').read_bytes()).get('CFBundleIdentifier')=='com.mikshat.maps.debug']
         if len(apps)!=1:raise SystemExit(f'Expected one native test host, found {len(apps)}')
         bundle=plistlib.loads((apps[0]/'Info.plist').read_bytes())['CFBundleIdentifier']
         udid=os.environ['MIKSHAT_SIMULATOR_UDID']
@@ -190,6 +191,33 @@ jobs:
             'source':'simctl synthetic test position; not a physical-device GPS reading',
             'locationPermission':'granted in the isolated simulator only'},indent=2)+'\n')
         PYSETUP
+        if [[ "$MIKSHAT_TEST_DEVICE" == "iPad" ]]; then
+          # iPadOS 27 windowed mode rejects scene orientation requests. Select
+          # the supported Full Screen Apps mode through Settings on this fresh
+          # simulator; keep production windowing settings and all 47 tests intact.
+          xcodebuild test \
+            -workspace xcode/omim.xcworkspace -scheme MikshatSimulatorSetup -configuration Debug \
+            -sdk iphonesimulator -destination "id=$MIKSHAT_SIMULATOR_UDID" \
+            -derivedDataPath build/SearchDerivedData -resultBundlePath build/SimulatorSetup.xcresult \
+            -testLanguage en -testRegion US -parallel-testing-enabled NO \
+            -test-timeouts-enabled YES -maximum-test-execution-time-allowance 180 \
+            -only-testing:MikshatSimulatorSetupUITests/SimulatorWindowingSetupTests/testSelectFullScreenAppsOnTheIsolatedIPad \
+            "ARCHS=$(uname -m)" ONLY_ACTIVE_ARCH=YES CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee build/search-diagnostics/xcodebuild-simulator-setup.log
+          python3 - <<'PYWINDOWING'
+        from pathlib import Path
+        import importlib.util,json
+        spec=importlib.util.spec_from_file_location('native_results','mikshat/tests/weather-data/verify-native-results.py')
+        m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+        m.EXPECTED_CLASSES={'SimulatorWindowingSetupTests':1}
+        p=Path('build/search-diagnostics/xcodebuild-simulator-setup.log')
+        report=m.analyze(p.read_text(errors='replace'))
+        report['scope']='Public XCUITest Settings setup on an isolated iPad simulator; native scene geometry is verified separately'
+        p.with_suffix('.summary.json').write_text(json.dumps(report,indent=2)+'\n')
+        print(json.dumps(report))
+        if not report['passed']:raise SystemExit('The iPad Settings setup must execute once and pass without skips')
+        PYWINDOWING
+        fi
         xcodebuild test-without-building "${test_args[@]}" -resultBundlePath build/SearchRegressions.xcresult \
           2>&1 | tee build/search-diagnostics/xcodebuild-search-tests.log
     - name: Require real native test execution
@@ -236,6 +264,9 @@ jobs:
         if [[ -d build/SearchRegressions.xcresult ]]; then
           xcrun xcresulttool export attachments --path build/SearchRegressions.xcresult --output-path build/responsive-screenshots
         fi
+        if [[ -d build/SimulatorSetup.xcresult ]]; then
+          xcrun xcresulttool export attachments --path build/SimulatorSetup.xcresult --output-path build/simulator-setup-screenshots
+        fi
     - name: Prepare small previews for visual review
       if: always()
       shell: bash
@@ -278,6 +309,8 @@ jobs:
           build/weather-screenshots/
           build/SearchRegressions.xcresult/
           build/SearchBuild.xcresult/
+          build/SimulatorSetup.xcresult/
+          build/simulator-setup-screenshots/
           build/responsive-screenshots/
     - name: Record current source timestamps for the next incremental build
       if: always()
