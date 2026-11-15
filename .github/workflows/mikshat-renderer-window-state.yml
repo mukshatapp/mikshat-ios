@@ -1,0 +1,27 @@
+name: Mikshat renderer window setup state
+on:
+  push:
+    branches: [diagnostics/renderer-window-state-4615]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  read-recorded-state:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read recorded renderer setup state without rerunning the application
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14164200273/zip > renderer.zip
+          python3 - <<'PY'
+          import zipfile
+          with zipfile.ZipFile('renderer.zip') as archive:
+              names=[n for n in archive.namelist() if 'coverage' in n.lower() and n.endswith(('.jsonl','.json'))]
+              print('RECORDED_STATE_FILES',names)
+              for name in names:
+                  print('RECORDED_STATE_FILE',name)
+                  print(archive.read(name).decode('utf-8',errors='replace'))
+          PY
