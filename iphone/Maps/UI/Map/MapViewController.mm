@@ -168,8 +168,11 @@ NSString * const kCategorySelectorSegue = @"MapToCategorySelectorSegue";
     [self.placePageVC.view.trailingAnchor constraintEqualToAnchor:self.placePageContainer.trailingAnchor]
   ]];
   [self updatePlacePageContainerConstraints];
-  [self.view layoutIfNeeded];
   [self.placePageVC didMoveToParentViewController:self];
+  // Finish containment before UIKit lays out the sheet. Let the ordinary
+  // layout pass update the map's visible area after Framework's selection
+  // callback returns instead of forcing the entire map to lay out inside it.
+  [self.view setNeedsLayout];
 }
 
 - (void)setupPlacePageContainer
