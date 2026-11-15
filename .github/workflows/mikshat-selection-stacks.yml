@@ -1,0 +1,79 @@
+name: Mikshat exported selection hang diagnostics
+on:
+  push:
+    branches: [diagnostics/selection-stacks-4615]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  export-diagnostics:
+    runs-on: xcode-27
+    timeout-minutes: 15
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Fetch already recorded test failures
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/pad evidence/phone
+          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14163204085/zip > pad.zip
+          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14161284010/zip > phone.zip
+          unzip -q pad.zip -d evidence/pad
+          unzip -q phone.zip -d evidence/phone
+      - name: Export diagnostics and actual Settings screenshot
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          for result in Path('evidence').rglob('*.xcresult'):
+              if result.name not in ('SearchRegressions.xcresult','SimulatorSetup.xcresult'):continue
+              prefix='exported/'+result.parts[1]+'-'+result.stem
+              for kind in ('diagnostics','attachments'):
+                  output=prefix+'-'+kind
+                  process=subprocess.run(['xcrun','xcresulttool','export',kind,'--path',str(result),'--output-path',output],text=True,capture_output=True)
+                  print('EXPORT_RESULT',result,kind,process.returncode,process.stdout,process.stderr,flush=True)
+          PY
+      - name: Print diagnostic file inventory and recorded main-thread evidence
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64,json,subprocess,zipfile
+          root=Path('exported')
+          for _ in range(3):
+              for path in list(root.rglob('*.zip')):
+                  target=path.with_suffix('.unpacked')
+                  if not target.exists():
+                      target.mkdir()
+                      try:
+                          with zipfile.ZipFile(path) as archive:archive.extractall(target)
+                      except Exception as error:print('UNPACK_ERROR',path,str(error))
+          files=sorted(p for p in root.rglob('*') if p.is_file())
+          print('EXPORTED_FILES',json.dumps([dict(path=str(p),bytes=p.stat().st_size) for p in files]),flush=True)
+          emitted=0
+          for path in files:
+              if path.suffix.lower() in ('.png','.jpg','.jpeg','.zip','.trace','.logarchive'):continue
+              if path.stat().st_size>15000000:continue
+              data=path.read_bytes()
+              if b'\x00' in data[:4000]:continue
+              value=data.decode('utf-8',errors='replace')
+              match=any(token in value.lower() for token in ('com.apple.main-thread','main thread','thread 0','call graph','sampling process'))
+              if match and ('organic maps' in value.lower() or 'placepage' in value.lower()):
+                  print('MAIN_STACK_CANDIDATE',str(path),flush=True)
+                  print(value[:240000],flush=True)
+                  emitted+=1
+                  if emitted>=8:break
+          print('MAIN_STACK_FILES_EMITTED',emitted,flush=True)
+          for path in files:
+              if path.suffix.lower()=='.png' and 'full-screen-apps-selected' in path.name:
+                  preview=Path('selected-full-screen-apps.png')
+                  subprocess.run(['sips','-Z','800',str(path),'--out',str(preview)],check=True,capture_output=True)
+                  print('SETTINGS_SELECTION_PREVIEW '+json.dumps(dict(name=path.name,pngBase64=base64.b64encode(preview.read_bytes()).decode())),flush=True)
+          PY
+      - name: Retain exported diagnostic files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mikshat-exported-selection-diagnostics
+          path: exported/
+          retention-days: 3
