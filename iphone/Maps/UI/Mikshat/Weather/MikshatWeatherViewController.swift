@@ -395,7 +395,7 @@ final class MikshatWeatherViewController: UIViewController {
     guard let sheet = sheetPresentationController else { return }
     if portraitPhoneSheet != portrait {
       portraitPhoneSheet = portrait
-      if portrait {
+      if portrait, #available(iOS 16.0, *) {
         let identifier = UISheetPresentationController.Detent.Identifier("mikshat.weather.content")
         sheet.detents = [.custom(identifier: identifier) { [weak self] context in
           guard let self else { return context.maximumDetentValue }
@@ -421,7 +421,7 @@ final class MikshatWeatherViewController: UIViewController {
     guard abs(height - lastSheetHeight) > 1 else { return }
     lastSheetHeight = height
     preferredContentSize = CGSize(width: view.bounds.width, height: height)
-    sheet.invalidateDetents()
+    if #available(iOS 16.0, *) { sheet.invalidateDetents() }
   }
 
   private var coordinateText: String {

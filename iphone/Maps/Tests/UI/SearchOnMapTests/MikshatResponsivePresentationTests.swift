@@ -149,6 +149,7 @@ final class MikshatResponsivePresentationTests: XCTestCase {
 // resizing an isolated preview would miss the broken full place-page hierarchy.
 // The ordinary hosted suite still uses -IsTests (no Drape), so this is UIKit
 // integration coverage, not a rendered-map/GPS-trip or memory-performance claim.
+@available(iOS 16.0, *)
 final class MikshatMapSceneLayoutTests: XCTestCase {
   @MainActor
   func testSelectedPointUsesTheRealBottomSheetAndKeepsAllContentReachableAfterSceneRotation() async throws {
@@ -412,6 +413,7 @@ final class MikshatMapSceneLayoutTests: XCTestCase {
 }
 
 @MainActor
+@available(iOS 16.0, *)
 private func attachedMapScene() async throws -> (MapViewController, UIWindow, UIWindowScene) {
   let map = try XCTUnwrap(MapViewController.shared())
   map.loadViewIfNeeded()
@@ -432,6 +434,7 @@ private func attachedMapScene() async throws -> (MapViewController, UIWindow, UI
 }
 
 @MainActor
+@available(iOS 16.0, *)
 private func rotateMapScene(_ scene: UIWindowScene, window: UIWindow, map: MapViewController,
                             to orientation: UIInterfaceOrientation) async throws {
   let mask: UIInterfaceOrientationMask = orientation == .portrait ? .portrait
@@ -539,6 +542,7 @@ private func sceneNavigationEntity() -> MWMNavigationDashboardEntity {
 }
 
 @MainActor
+@available(iOS 16.0, *)
 private func assertActualWeatherSheet(in map: MapViewController, window: UIWindow, scene: UIWindowScene) async throws {
   let directory = FileManager.default.temporaryDirectory.appendingPathComponent("MikshatSceneWeather-" + UUID().uuidString)
   defer { try? FileManager.default.removeItem(at: directory) }
