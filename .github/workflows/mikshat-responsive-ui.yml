@@ -244,6 +244,65 @@ jobs:
         fi
         xcodebuild test-without-building "${test_args[@]}" -resultBundlePath build/SearchRegressions.xcresult \
           2>&1 | tee build/search-diagnostics/xcodebuild-search-tests.log
+        if [[ "$MIKSHAT_TEST_DEVICE" == "iPhone 16" ]]; then
+          # Repetition is an additional stability check, not a retry of failed
+          # cases. Keep the original 47-case log and once-only gate untouched.
+          repeat_args=()
+          for argument in "${test_args[@]}"; do
+            if [[ "$argument" != -only-testing:* ]]; then repeat_args+=("$argument"); fi
+          done
+          set +e
+          xcodebuild test-without-building "${repeat_args[@]}" \
+            -resultBundlePath build/SelectedPointRepetitions.xcresult \
+            -test-iterations 3 -test-repetition-relaunch-enabled YES \
+            -only-testing:OMapsTests/MikshatMapSceneLayoutTests/testSelectedPointUsesTheRealBottomSheetAndKeepsAllContentReachableAfterSceneRotation \
+            2>&1 | tee build/search-diagnostics/xcodebuild-selected-point-repetitions.log
+          repeat_status=$?
+          set -e
+          MIKSHAT_SELECTED_POINT_REPEAT_STATUS="$repeat_status" python3 - <<'PYREPEAT'
+        from collections import Counter
+        from pathlib import Path
+        import importlib.util,json,os,re
+        spec=importlib.util.spec_from_file_location('native_results','mikshat/tests/weather-data/verify-native-results.py')
+        m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+        expected=('MikshatMapSceneLayoutTests','testSelectedPointUsesTheRealBottomSheetAndKeepsAllContentReachableAfterSceneRotation')
+
+        def analyze_selected_point_repetitions(text,exit_status):
+            text=re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]','',text)
+            events=[]
+            unexpected=[]
+            unrecognized=[]
+            for event in m.CASE_EVENT.finditer(text):
+                identity=m.case_identity(event[2])
+                if identity is None:unrecognized.append(event[2])
+                elif identity!=expected:unexpected.append('.'.join(identity))
+                else:events.append(event[3].lower())
+            failures=[line for line in text.splitlines() if m.BLOCKED.search(line)
+                      or re.search(r'\bunexpected\b.*\b(?:exit|restart|crash)\b|\b(?:exit|restart)\b.*\bunexpected\b',line,re.I)]
+            summaries=[dict(executed=int(a),skipped=int(b or 0),failures=int(c))
+                       for a,b,c in m.SUMMARY.findall(text)]
+            succeeded=any(marker in text for marker in ('** TEST SUCCEEDED **','** TEST EXECUTE SUCCEEDED **'))
+            counts=Counter(events)
+            passed=(exit_status==0 and succeeded and events==['started','passed']*3
+                    and not unexpected and not unrecognized and not failures
+                    and any(row['executed'] in (1,3) for row in summaries)
+                    and all(row['failures']==row['skipped']==0 for row in summaries))
+            return dict(expectedCase='.'.join(expected),expectedIterations=3,commandExitStatus=exit_status,
+                        started=counts['started'],passedCases=counts['passed'],events=events,
+                        unexpectedCases=unexpected,unrecognizedCases=unrecognized,testFailures=failures[-30:],
+                        executionCounts=summaries,xcodebuildSucceeded=succeeded,passed=passed,
+                        scope='Three fresh-host executions of the real selected-point scene test using the same compiled products')
+
+        if __name__=='__main__':
+            path=Path('build/search-diagnostics/xcodebuild-selected-point-repetitions.log')
+            report=analyze_selected_point_repetitions(path.read_text(errors='replace') if path.exists() else '',
+                                                     int(os.environ['MIKSHAT_SELECTED_POINT_REPEAT_STATUS']))
+            path.with_suffix('.summary.json').write_text(json.dumps(report,indent=2)+'\n')
+            print('MIKSHAT_SELECTED_POINT_REPETITIONS '+json.dumps(report))
+            if not report['passed']:
+                raise SystemExit('All three selected-point executions must start and pass without failure, skips, cancellation or unexpected restart')
+        PYREPEAT
+        fi
     - name: Require real native test execution
       if: always()
       run: |-
@@ -337,6 +396,7 @@ jobs:
           build/search-diagnostics/
           build/weather-screenshots/
           build/SearchRegressions.xcresult/
+          build/SelectedPointRepetitions.xcresult/
           build/SearchBuild.xcresult/
           build/SimulatorSetup.xcresult/
           build/simulator-setup-screenshots/
