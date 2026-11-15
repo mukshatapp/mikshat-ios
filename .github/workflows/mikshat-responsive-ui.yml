@@ -233,11 +233,11 @@ jobs:
         from pathlib import Path
         import os,sys,time
         ready=Path('build/search-diagnostics/scene-rotation-ready.json')
-        deadline=time.monotonic()+30
+        deadline=time.monotonic()+150
         while not (ready.exists() and ready.stat().st_size):
             try:os.kill(int(sys.argv[1]),0)
             except ProcessLookupError:raise SystemExit('Physical rotation driver exited before becoming ready; inspect scene-rotation-driver.log')
-            if time.monotonic()>=deadline:raise SystemExit('Physical rotation driver did not become ready within 30 seconds')
+            if time.monotonic()>=deadline:raise SystemExit('Physical rotation driver bootstrap did not become ready within 150 seconds; inspect scene-rotation-driver.log for its three bounded startup attempts')
             time.sleep(.1)
         print('MIKSHAT_PHYSICAL_ROTATION_DRIVER_READY '+ready.read_text())
         PYDRIVER

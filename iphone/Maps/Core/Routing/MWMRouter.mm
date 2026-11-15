@@ -774,6 +774,15 @@ char const kMikshatBaseline[] = "mikshat-direct-baseline";
 
 + (void)restoreRouteIfNeeded
 {
+  // The unit-test profile deliberately disables Drape. It cannot restore a
+  // saved route, so complete its bookkeeping instead of polling the main queue
+  // forever for an engine that this profile will never create.
+  if ([MapsAppDelegate isTestsEnvironment])
+  {
+    self.router.isRestoreProcessCompleted = YES;
+    return;
+  }
+
   if ([MapsAppDelegate theApp].isDrapeEngineCreated)
   {
     auto & rm = GetFramework().GetRoutingManager();

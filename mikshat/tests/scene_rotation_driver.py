@@ -45,13 +45,21 @@ def main():
     artifacts.mkdir(parents=True, exist_ok=True)
     session = str(uuid.uuid4())
     stopping = False
+    bootstrapping = True
     documents = None
     discovery = None
     lookup = None
 
+    class StartupCancelled(Exception):
+        pass
+
     def stop(_signum, _frame):
         nonlocal stopping
         stopping = True
+        if bootstrapping:
+            # subprocess.run kills and reaps its child when interrupted. Do not
+            # wait for another startup attempt after the CI job is cancelled.
+            raise StartupCancelled()
 
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
@@ -125,9 +133,26 @@ def main():
         return directory, record
 
     try:
-        # Fail before announcing readiness if the public device service is not available.
-        device_command("get", "prewarm")
-        documents = resolve_documents()
+        # Cold simulator services can miss the first bounded GET. Recovery is
+        # limited to bootstrap; runtime SET commands are never retried.
+        for attempt in range(1, 4):
+            try:
+                event("MIKSHAT_SCENE_DRIVER_STARTUP_ATTEMPT", {"attempt": attempt, "startedAt": time.time()})
+                name = "prewarm" if attempt == 1 else "prewarm-attempt-" + str(attempt)
+                device_command("get", name)
+                documents = resolve_documents()
+                break
+            except StartupCancelled:
+                raise
+            except Exception as error:
+                event("MIKSHAT_SCENE_DRIVER_STARTUP_FAILURE",
+                      {"attempt": attempt, "error": str(error), "completedAt": time.time()})
+                if attempt == 3:
+                    raise RuntimeError("Physical rotation driver bootstrap failed after three startup attempts") from error
+                time.sleep(1)
+        bootstrapping = False
+        if stopping:
+            return
         ready = publish_ready(documents)
         atomic_json(options.ready_output, dict(ready, documents=str(documents)))
         event("MIKSHAT_SCENE_DRIVER_READY", dict(ready, documents=str(documents)))
@@ -192,7 +217,10 @@ def main():
                 if not response["success"]:
                     raise RuntimeError(response["error"])
             time.sleep(0.1)
+    except StartupCancelled:
+        event("MIKSHAT_SCENE_DRIVER_STARTUP_CANCELLED", {"completedAt": time.time()})
     finally:
+        bootstrapping = False
         if lookup is not None:
             lookup.cancel()
         if discovery is not None:
