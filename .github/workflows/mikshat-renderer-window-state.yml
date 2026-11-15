@@ -15,8 +15,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14167095788/zip > pad.zip
-          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14166787179/zip > renderer.zip
+          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14168964227/zip > pad.zip
           python3 - <<'PY'
           import json,zipfile
           with zipfile.ZipFile('pad.zip') as archive:
@@ -25,28 +24,4 @@ jobs:
               for name in names:
                   print('DRIVER_EVIDENCE_FILE',name)
                   print(archive.read(name).decode('utf-8',errors='replace')[:70000])
-          with zipfile.ZipFile('renderer.zip') as archive:
-              for name in archive.namelist():
-                  if name.endswith(('renderer-launch.json','renderer-coverage.jsonl')):
-                      print('RENDERER_STATE_FILE',name)
-                      print(archive.read(name).decode('utf-8',errors='replace')[:70000])
-              crashes=[n for n in archive.namelist() if n.endswith('.ips') and ('organic' in n.lower() or 'omaps' in n.lower())]
-              print('RENDERER_CRASH_FILES',crashes)
-              for name in crashes:
-                  value=archive.read(name).decode('utf-8',errors='replace').lstrip()
-                  first,offset=json.JSONDecoder().raw_decode(value)
-                  remaining=value[offset:].strip()
-                  report=json.loads(remaining) if remaining else first
-                  images=report.get('usedImages',[])
-                  index=report.get('faultingThread')
-                  threads=report.get('threads',[])
-                  selected=[(i,t) for i,t in enumerate(threads) if i==index or t.get('triggered')]
-                  print('RENDERER_CRASH',json.dumps(dict(file=name,exception=report.get('exception'),termination=report.get('termination'),faultingThread=index,asi=report.get('asi')))[:12000])
-                  for number,thread in selected:
-                      frames=[]
-                      for frame in thread.get('frames',[])[:70]:
-                          imageIndex=frame.get('imageIndex')
-                          binary=images[imageIndex] if isinstance(imageIndex,int) and imageIndex<len(images) else {}
-                          frames.append(dict(symbol=frame.get('symbol'),offset=frame.get('symbolLocation'),image=binary.get('name'),imageOffset=frame.get('imageOffset')))
-                      print('RENDERER_CRASH_THREAD',json.dumps(dict(index=number,name=thread.get('name'),queue=thread.get('queue'),frames=frames)))
           PY
