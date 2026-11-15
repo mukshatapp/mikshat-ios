@@ -1,4 +1,4 @@
-name: Mikshat renderer window setup state
+name: Mikshat recorded setup state and Settings preview
 on:
   push:
     branches: [diagnostics/renderer-window-state-4615]
@@ -10,18 +10,29 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Read recorded renderer setup state without rerunning the application
+      - name: Read recorded setup state and selected iPad windowing mode
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14164200273/zip > renderer.zip
+          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14163204085/zip > pad.zip
+          python3 -m pip install --quiet Pillow
           python3 - <<'PY'
-          import zipfile
+          import base64,io,json,zipfile
+          from PIL import Image
           with zipfile.ZipFile('renderer.zip') as archive:
-              names=[n for n in archive.namelist() if 'coverage' in n.lower() and n.endswith(('.jsonl','.json'))]
-              print('RECORDED_STATE_FILES',names)
+              for name in archive.namelist():
+                  if name.endswith(('renderer-launch.json','renderer-coverage.jsonl')):
+                      print('RECORDED_STATE_FILE',name)
+                      print(archive.read(name).decode('utf-8',errors='replace'))
+          with zipfile.ZipFile('pad.zip') as archive:
+              names=[n for n in archive.namelist() if 'simulator-setup-screenshots' in n and n.endswith('.png')]
+              print('SETTINGS_EXPORTED_IMAGES',names)
               for name in names:
-                  print('RECORDED_STATE_FILE',name)
-                  print(archive.read(name).decode('utf-8',errors='replace'))
+                  image=Image.open(io.BytesIO(archive.read(name)))
+                  image.thumbnail((900,900))
+                  output=io.BytesIO()
+                  image.save(output,format='PNG')
+                  print('SETTINGS_SELECTION_PREVIEW '+json.dumps(dict(name=name,pngBase64=base64.b64encode(output.getvalue()).decode())))
           PY
