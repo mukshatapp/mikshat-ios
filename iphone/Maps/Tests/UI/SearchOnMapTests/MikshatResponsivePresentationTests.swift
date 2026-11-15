@@ -147,8 +147,8 @@ final class MikshatResponsivePresentationTests: XCTestCase {
 }
 
 // Exercise the production MapViewController, its actual storyboard outlets and
-// child/presentation containers in the real app window. These cases request a
-// public scene orientation change and verify UIKit actually changed geometry;
+// child/presentation containers in the real app window. These cases use public
+// scene (phone) or physical-device (iPad CI) rotation and verify UIKit changed geometry;
 // resizing an isolated preview would miss the broken full place-page hierarchy.
 // The ordinary hosted suite still uses -IsTests (no Drape), so this is UIKit
 // integration coverage, not a rendered-map/GPS-trip or memory-performance claim.
@@ -449,13 +449,20 @@ private func attachedMapScene() async throws -> (MapViewController, UIWindow, UI
 @available(iOS 16.0, *)
 private func rotateMapScene(_ scene: UIWindowScene, window: UIWindow, map: MapViewController,
                             to orientation: UIInterfaceOrientation) async throws {
-  let mask: UIInterfaceOrientationMask = orientation == .portrait ? .portrait
-    : (orientation == .landscapeLeft ? .landscapeLeft : .landscapeRight)
-  window.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
   var geometryError: Error?
-  scene.requestGeometryUpdate(.iOS(interfaceOrientations: mask)) {
-    geometryError = $0
-    print("Mikshat real-scene geometry request failed: \($0)")
+  if UIDevice.current.userInterfaceIdiom == .pad {
+    // A multitasking iPad app may reject programmatic scene rotation even in
+    // Full Screen Apps mode. CI instead rotates the actual simulated device
+    // through the public CLI, previously verified against native screen pixels.
+    try await requestPhysicalSceneRotation(to: orientation)
+  } else {
+    let mask: UIInterfaceOrientationMask = orientation == .portrait ? .portrait
+      : (orientation == .landscapeLeft ? .landscapeLeft : .landscapeRight)
+    window.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+    scene.requestGeometryUpdate(.iOS(interfaceOrientations: mask)) {
+      geometryError = $0
+      print("Mikshat real-scene geometry request failed: \($0)")
+    }
   }
   try await sceneWait("UIKit must perform the requested real scene rotation") {
     scene.interfaceOrientation == orientation
@@ -465,6 +472,58 @@ private func rotateMapScene(_ scene: UIWindowScene, window: UIWindow, map: MapVi
   }
   if let geometryError { throw geometryError }
   await settleMapScene(map)
+}
+
+@MainActor
+private func requestPhysicalSceneRotation(to orientation: UIInterfaceOrientation) async throws {
+  let directory = try XCTUnwrap(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first)
+  let prefix = "mikshat-scene-rotation-"
+  func read(_ name: String) -> [String: Any]? {
+    guard let data = try? Data(contentsOf: directory.appendingPathComponent(prefix + name + ".json")) else { return nil }
+    return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+  }
+  var ready: [String: Any]?
+  try await sceneWait("The isolated iPad must have a ready public physical-rotation driver") {
+    ready = read("ready")
+    guard ready?["version"] as? Int == 1, ready?["driver"] as? String == "devicectl",
+          let session = ready?["session"] as? String, UUID(uuidString: session) != nil,
+          let heartbeat = ready?["heartbeatAt"] as? Double else { return false }
+    return abs(Date().timeIntervalSince1970 - heartbeat) < 15
+  }
+  let session = try XCTUnwrap(ready?["session"] as? String)
+  let identifier = UUID().uuidString
+  // Physical and interface landscape names are opposites in UIKit.
+  let physical: String
+  switch orientation {
+  case .portrait: physical = "portrait"
+  case .portraitUpsideDown: physical = "portraitUpsideDown"
+  case .landscapeLeft: physical = "landscapeRight"
+  case .landscapeRight: physical = "landscapeLeft"
+  default: throw NSError(domain: "MikshatSceneRotation", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "Unsupported test orientation"])
+  }
+  let request: [String: Any] = ["version": 1, "session": session, "id": identifier,
+                               "physicalOrientation": physical, "interfaceOrientation": orientation.rawValue]
+  let data = try JSONSerialization.data(withJSONObject: request, options: [.sortedKeys])
+  try data.write(to: directory.appendingPathComponent(prefix + "request.json"), options: .atomic)
+  var response: [String: Any]?
+  let deadline = Date().addingTimeInterval(30)
+  repeat {
+    response = read("response")
+    if response?["version"] as? Int == 1, response?["session"] as? String == session,
+       response?["id"] as? String == identifier { break }
+    try await Task.sleep(nanoseconds: 50_000_000)
+  } while Date() < deadline
+  guard response?["version"] as? Int == 1, response?["id"] as? String == identifier,
+        response?["session"] as? String == session,
+        response?["success"] as? Bool == true, response?["physicalOrientation"] as? String == physical else {
+    XCTFail("The public physical-rotation command failed or timed out: \(String(describing: response))")
+    throw NSError(domain: "MikshatSceneRotation", code: 2,
+                  userInfo: [NSLocalizedDescriptionKey: "The physical iPad rotation driver did not acknowledge success"])
+  }
+  print("Mikshat public physical rotation acknowledged id=\(identifier) physical=\(physical) interface=\(orientation.rawValue)")
+  // The caller still requires actual scene orientation plus window/map aspect
+  // and dimensions. An acknowledged CLI command alone never passes the test.
 }
 
 @MainActor

@@ -17,8 +17,8 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p evidence/pad evidence/phone
-          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14163204085/zip > pad.zip
-          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14161284010/zip > phone.zip
+          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14167095788/zip > pad.zip
+          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14166901356/zip > phone.zip
           unzip -q pad.zip -d evidence/pad
           unzip -q phone.zip -d evidence/phone
       - name: Export diagnostics and actual Settings screenshot
@@ -53,12 +53,12 @@ jobs:
           emitted=0
           for path in files:
               if path.suffix.lower() in ('.png','.jpg','.jpeg','.zip','.trace','.logarchive'):continue
-              if path.stat().st_size>15000000:continue
+              if path.stat().st_size>50000000:continue
               data=path.read_bytes()
               if b'\x00' in data[:4000]:continue
               value=data.decode('utf-8',errors='replace')
               match=any(token in value.lower() for token in ('com.apple.main-thread','main thread','thread 0','call graph','sampling process'))
-              if match and ('organic maps' in value.lower() or 'placepage' in value.lower()):
+              if match and '-attachments/' in str(path) and ('organic maps' in value.lower() or 'placepage' in value.lower()):
                   print('MAIN_STACK_CANDIDATE',str(path),flush=True)
                   print(value[:240000],flush=True)
                   emitted+=1

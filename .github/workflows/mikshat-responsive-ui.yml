@@ -218,6 +218,30 @@ jobs:
         if not report['passed']:raise SystemExit('The iPad Settings setup must execute once and pass without skips')
         PYWINDOWING
         fi
+        if [[ "$MIKSHAT_TEST_DEVICE" == "iPad" ]]; then
+          # Drive the simulated device's physical orientation through the public
+          # Xcode CLI. The hosted tests still require UIKit to rotate its actual
+          # scene, window and map bounds before any layout assertion can pass.
+          rm -f build/search-diagnostics/scene-rotation-ready.json
+          python3 -u mikshat/tests/scene_rotation_driver.py \
+            --udid "$MIKSHAT_SIMULATOR_UDID" --bundle com.mikshat.maps.debug \
+            --ready-output build/search-diagnostics/scene-rotation-ready.json \
+            > build/search-diagnostics/scene-rotation-driver.log 2>&1 &
+          rotation_driver_pid=$!
+          trap 'kill "$rotation_driver_pid" 2>/dev/null || true; wait "$rotation_driver_pid" 2>/dev/null || true' EXIT
+          python3 - "$rotation_driver_pid" <<'PYDRIVER'
+        from pathlib import Path
+        import os,sys,time
+        ready=Path('build/search-diagnostics/scene-rotation-ready.json')
+        deadline=time.monotonic()+30
+        while not (ready.exists() and ready.stat().st_size):
+            try:os.kill(int(sys.argv[1]),0)
+            except ProcessLookupError:raise SystemExit('Physical rotation driver exited before becoming ready; inspect scene-rotation-driver.log')
+            if time.monotonic()>=deadline:raise SystemExit('Physical rotation driver did not become ready within 30 seconds')
+            time.sleep(.1)
+        print('MIKSHAT_PHYSICAL_ROTATION_DRIVER_READY '+ready.read_text())
+        PYDRIVER
+        fi
         xcodebuild test-without-building "${test_args[@]}" -resultBundlePath build/SearchRegressions.xcresult \
           2>&1 | tee build/search-diagnostics/xcodebuild-search-tests.log
     - name: Require real native test execution
