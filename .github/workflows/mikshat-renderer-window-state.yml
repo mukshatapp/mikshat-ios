@@ -15,7 +15,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14173083700/zip > pad.zip
+          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14175430694/zip > pad.zip
           python3 - <<'PY'
           import json,zipfile
           with zipfile.ZipFile('pad.zip') as archive:
