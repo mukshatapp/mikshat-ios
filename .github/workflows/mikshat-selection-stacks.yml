@@ -16,18 +16,20 @@ jobs:
       - name: Fetch already recorded test failures
         run: |
           set -euo pipefail
-          mkdir -p evidence/pad evidence/phone
+          mkdir -p evidence/pad evidence/phone evidence/renderer
           gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14167095788/zip > pad.zip
           gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14166901356/zip > phone.zip
           unzip -q pad.zip -d evidence/pad
           unzip -q phone.zip -d evidence/phone
+          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14166787179/zip > renderer.zip
+          unzip -q renderer.zip -d evidence/renderer
       - name: Export diagnostics and actual Settings screenshot
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import subprocess
           for result in Path('evidence').rglob('*.xcresult'):
-              if result.name not in ('SearchRegressions.xcresult','SimulatorSetup.xcresult'):continue
+              if result.name not in ('SearchRegressions.xcresult','SimulatorSetup.xcresult','RendererArabicSearch.xcresult'):continue
               prefix='exported/'+result.parts[1]+'-'+result.stem
               for kind in ('diagnostics','attachments'):
                   output=prefix+'-'+kind
@@ -58,7 +60,7 @@ jobs:
               if b'\x00' in data[:4000]:continue
               value=data.decode('utf-8',errors='replace')
               match=any(token in value.lower() for token in ('com.apple.main-thread','main thread','thread 0','call graph','sampling process'))
-              if match and '-attachments/' in str(path) and ('organic maps' in value.lower() or 'placepage' in value.lower()):
+              if match and ('-attachments/' in str(path) or ('renderer' in str(path) and path.suffix in ('.ips','.crash'))) and ('organic maps' in value.lower() or 'placepage' in value.lower()):
                   print('MAIN_STACK_CANDIDATE',str(path),flush=True)
                   print(value[:240000],flush=True)
                   emitted+=1
