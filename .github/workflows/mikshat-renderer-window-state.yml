@@ -15,7 +15,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14171730772/zip > pad.zip
+          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14173083700/zip > pad.zip
           python3 - <<'PY'
           import json,zipfile
           with zipfile.ZipFile('pad.zip') as archive:
@@ -25,4 +25,12 @@ jobs:
               for name in names:
                   print('DRIVER_EVIDENCE_FILE',name)
                   print(archive.read(name).decode('utf-8',errors='replace')[:70000])
+              for name in archive.namelist():
+                  if name.endswith(('xcodebuild-search-build.log','xcodebuild-simulator-setup.log','xcodebuild-search-tests.log')):
+                      lines=archive.read(name).decode('utf-8',errors='replace').splitlines()
+                      fatal=[line for line in lines if ' error:' in line or '** TEST' in line or 'Traceback' in line or 'TimeoutExpired' in line]
+                      print('NATIVE_LOG_FAILURES',name)
+                      print('\n'.join(fatal[-35:]))
+                      print('NATIVE_LOG_END',name)
+                      print('\n'.join(lines[-12:]))
           PY
