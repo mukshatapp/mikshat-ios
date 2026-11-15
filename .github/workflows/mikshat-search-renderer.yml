@@ -164,7 +164,7 @@ jobs:
         python3 - <<'PYCODE'
         from pathlib import Path
         source = Path('iphone/Maps/Tests/UI/SearchOnMapTests/SearchOnMapViewTests.swift').read_text()
-        if source.count('try requireRenderedArabicMapIfRequested(map)') < 2 or 'renderer-ready=true' not in source:
+        if source.count('try await requireRenderedArabicMapIfRequested(map)') < 2 or 'renderer-ready=true' not in source:
             raise SystemExit('Renderer/Arabic precondition helper is not installed in both selected tests; refusing a false coverage run.')
         PYCODE
         xcodebuild build-for-testing \
