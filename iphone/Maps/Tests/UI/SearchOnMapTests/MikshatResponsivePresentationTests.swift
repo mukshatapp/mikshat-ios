@@ -613,7 +613,7 @@ private func sceneScreenshot(_ window: UIWindow, name: String) throws {
   let attachment = XCTAttachment(image: image)
   attachment.name = "responsive-real-scene-\(name)"
   attachment.lifetime = .keepAlways
-  XCTContext.runActivity(named: attachment.name) { $0.add(attachment) }
+  XCTContext.runActivity(named: "responsive-real-scene-\(name)") { $0.add(attachment) }
   print("Mikshat real-scene screenshot=\(name) orientation=\(window.windowScene?.interfaceOrientation.rawValue ?? 0) bounds=\(window.bounds) safeInsets=\(window.safeAreaInsets)")
 }
 
