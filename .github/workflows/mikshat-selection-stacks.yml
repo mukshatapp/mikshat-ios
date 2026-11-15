@@ -17,7 +17,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p evidence/phone
-          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14172390639/zip > phone.zip
+          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14174066204/zip > phone.zip
           unzip -q phone.zip -d evidence/phone
       - name: Export diagnostics and actual Settings screenshot
         run: |
