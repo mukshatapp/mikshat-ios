@@ -15,11 +15,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14168964227/zip > pad.zip
+          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14171730772/zip > pad.zip
           python3 - <<'PY'
           import json,zipfile
           with zipfile.ZipFile('pad.zip') as archive:
-              names=[n for n in archive.namelist() if n.endswith('scene-rotation-driver.log') or '/scene-rotation/' in n and n.endswith('.json')]
+              names=[n for n in archive.namelist() if n.endswith(('scene-rotation-driver.log','xcodebuild-search-tests.summary.json')) or '/scene-rotation/' in n and n.endswith('.json')]
+              print('ACTUAL_SCENE_PREVIEWS',[n for n in archive.namelist() if 'responsive-real-scene-' in n])
               print('DRIVER_EVIDENCE_FILES',names)
               for name in names:
                   print('DRIVER_EVIDENCE_FILE',name)
