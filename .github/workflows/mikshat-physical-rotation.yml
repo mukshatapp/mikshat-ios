@@ -1,0 +1,60 @@
+name: Mikshat real iPad simulator physical rotation probe
+on:
+  push:
+    branches: [diagnostics/physical-rotation-4615]
+permissions:
+  contents: read
+jobs:
+  physical-rotation:
+    runs-on: xcode-27
+    timeout-minutes: 10
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+    steps:
+      - name: Rotate the actual simulated device and verify screenshot pixel orientation
+        run: |
+          python3 - <<'PY'
+          import json,struct,subprocess,time
+          from pathlib import Path
+          root=Path('physical-rotation');root.mkdir()
+          def simctl(*args):
+              return subprocess.check_output(['xcrun','simctl',*args],text=True)
+          runtimes=json.loads(simctl('list','--json','runtimes'))['runtimes']
+          runtime=next(r for r in runtimes if r.get('isAvailable') and r.get('version')=='27.0' and 'iOS' in r['identifier'])
+          devices=json.loads(simctl('list','--json','devicetypes'))['devicetypes']
+          pads=[d for d in devices if d['name'].startswith('iPad')]
+          preferred=[d for d in pads if 'Air 11' in d['name'] and 'M3' in d['name']]
+          device=(preferred or pads)[-1]
+          udid=simctl('create','Mikshat Physical Orientation Proof',device['identifier'],runtime['identifier']).strip()
+          simctl('boot',udid)
+          subprocess.run(['xcrun','simctl','bootstatus',udid,'-b'],check=True)
+          records=[]
+          for index,orientation in enumerate(['portrait','landscapeLeft','portrait']):
+              result=root/f'{index}-{orientation}.json'
+              command=['xcrun','devicectl','device','orientation','set','--device',udid,orientation,'--json-output',str(result),'--timeout','15']
+              process=subprocess.run(command,text=True,capture_output=True)
+              print('PHYSICAL_ROTATION_COMMAND',json.dumps(dict(command=command,returncode=process.returncode,stdout=process.stdout,stderr=process.stderr)),flush=True)
+              process.check_returncode()
+              screenshot=root/f'{index}-{orientation}.png'
+              deadline=time.monotonic()+20
+              correct=False
+              while time.monotonic()<deadline:
+                  subprocess.run(['xcrun','simctl','io',udid,'screenshot',str(screenshot)],check=True,capture_output=True)
+                  width,height=struct.unpack('>II',screenshot.read_bytes()[16:24])
+                  correct=(width>height) if orientation.startswith('landscape') else (height>width)
+                  if correct:break
+                  time.sleep(.25)
+              record=dict(orientation=orientation,width=width,height=height,actualPngAspectMatches=correct,udid=udid)
+              records.append(record)
+              print('ACTUAL_PHYSICAL_SCREENSHOT',json.dumps(record),flush=True)
+              subprocess.run(['xcrun','devicectl','device','orientation','get','--device',udid,'--json-output',str(root/f'{index}-get.json'),'--timeout','15'],check=True)
+              if not correct:raise SystemExit('Real screenshot pixels did not rotate; this is not physical-orientation proof')
+          (root/'summary.json').write_text(json.dumps(dict(device=device,runtime=runtime,records=records),indent=2))
+          PY
+      - name: Retain actual screenshots and orientation records
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mikshat-physical-orientation-proof
+          path: physical-rotation/
+          retention-days: 3
