@@ -16,20 +16,16 @@ jobs:
       - name: Fetch already recorded test failures
         run: |
           set -euo pipefail
-          mkdir -p evidence/pad evidence/phone evidence/renderer
-          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14167095788/zip > pad.zip
-          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14166901356/zip > phone.zip
-          unzip -q pad.zip -d evidence/pad
+          mkdir -p evidence/phone
+          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14172390639/zip > phone.zip
           unzip -q phone.zip -d evidence/phone
-          gh api repos/mukshatapp/mikshat-ios/actions/artifacts/14166787179/zip > renderer.zip
-          unzip -q renderer.zip -d evidence/renderer
       - name: Export diagnostics and actual Settings screenshot
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import subprocess
           for result in Path('evidence').rglob('*.xcresult'):
-              if result.name not in ('SearchRegressions.xcresult','SimulatorSetup.xcresult','RendererArabicSearch.xcresult'):continue
+              if result.name != 'SearchRegressions.xcresult':continue
               prefix='exported/'+result.parts[1]+'-'+result.stem
               for kind in ('diagnostics','attachments'):
                   output=prefix+'-'+kind
