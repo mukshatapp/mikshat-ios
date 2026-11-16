@@ -158,7 +158,10 @@ using namespace osm_auth_ios;
   [self enableTTSForTheFirstTime];
 
   if (![MapsAppDelegate isTestsEnvironment])
+  {
     [[iCloudSynchronizaionManager shared] start];
+    [MikshatSubscriptions start];
+  }
 
   // Launch URLs, user activities and quick actions arrive with the scene connection options in
   // MainSceneDelegate; launchOptions carries none of them for a scene-based app.

@@ -159,10 +159,10 @@ private extension AboutController {
 
     func setupTermsAndPrivacy() {
       termsOfUseAndPrivacyPolicyView.addButton(title: L("privacy_policy"), didTapHandler: { [weak self] in
-        self?.openUrl(L("translated_om_site_url") + "privacy/")
+        self?.openUrl(MikshatSubscriptionLinks.privacy.absoluteString)
       })
       termsOfUseAndPrivacyPolicyView.addButton(title: L("terms_of_use"), didTapHandler: { [weak self] in
-        self?.openUrl(L("translated_om_site_url") + "terms/")
+        self?.openUrl(MikshatSubscriptionLinks.terms.absoluteString)
       })
       termsOfUseAndPrivacyPolicyView.addButton(title: L("copyright"), didTapHandler: { [weak self] in
         self?.showCopyright()

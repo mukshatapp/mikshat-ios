@@ -1,33 +1,3 @@
-## Routing
-• Improved alternative routes and their estimated arrival times
-• Added buttons for adding or replacing a stop in a planned route
-• Added a setting to optimize the order of intermediate route stops
-• The selected alternative route is now preserved when navigation recalculates the route
-• The order of route stops is now restored after restarting the app
+An annual subscription unlocks direct navigation, compass guidance to a selected destination, and saving new places, with subscription restoration and management in the app.
 
-## Map
-• OpenStreetMap data as of September 28
-• Wikipedia data as of September 21
-• Water reservoirs are now visible when zoomed further out
-• Waterway tunnels are no longer shown on the map
-• Fixed Suzhou Metro station and entrance icons
-• Fixed rare cases where labels shifted out of position on the metro map layer
-
-## CarPlay
-• Added maneuver instructions on supported car head-up displays (HUDs) and the CarPlay dashboard
-• Fixed CarPlay buttons and search
-
-## Tracks
-• Added an eye icon to hide individual tracks
-• Fixed bugs and improved track recording
-• Fixed importing KMB files
-
-## Search
-• Fixed searches when the visible map area crosses the 180° meridian (±180° longitude)
-• Restored category search in Spotlight
-
-## UI
-• Opening hours now display “Noon” for 12:00 and “Midnight” for 00:00 or 24:00
-• Fixed various bugs and improved the user interface
-• Corrected English, French and Asturian translations
-• Added support for choosing and previewing an installed navigation voice
+The app download, car navigation, general compass, Qibla, copying coordinates, sharing locations, and viewing existing saved places remain free. Subscription expiry does not delete locally saved places or tracks.

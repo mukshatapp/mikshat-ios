@@ -1,0 +1,1 @@
+outdoors,trip,compass,qibla,coordinates,track,camping,desert,favorites,direction,places

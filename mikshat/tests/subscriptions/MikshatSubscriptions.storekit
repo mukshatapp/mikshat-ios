@@ -1,0 +1,44 @@
+{
+  "identifier": "1D65B1ED-8EB9-460A-8CA4-D8B9339811A0",
+  "nonRenewingSubscriptions": [],
+  "products": [],
+  "settings": {
+    "_applicationInternalID": "6828427541",
+    "_failTransactionsEnabled": false,
+    "_locale": "ar_SA",
+    "_storefront": "SAU",
+    "_storeKitErrors": []
+  },
+  "subscriptionGroups": [
+    {
+      "id": "4BC877E8",
+      "localizations": [
+        { "description": "مزايا مكشات المدفوعة", "displayName": "مكشات بلس", "locale": "ar_SA" },
+        { "description": "Premium Mikshat features", "displayName": "Mikshat Plus", "locale": "en_US" }
+      ],
+      "name": "Mikshat Premium",
+      "subscriptions": [
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "39.00",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "418C5038",
+          "introductoryOffer": null,
+          "localizations": [
+            { "description": "ملاحة مباشرة وتوجيه بالبوصلة وحفظ مواقع جديدة", "displayName": "اشتراك مكشات السنوي", "locale": "ar_SA" },
+            { "description": "Direct navigation, destination compass and new saved locations", "displayName": "Mikshat annual subscription", "locale": "en_US" }
+          ],
+          "productID": "com.mikshat.maps.premium.annual",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "Mikshat Annual",
+          "subscriptionGroupID": "4BC877E8",
+          "type": "RecurringSubscription",
+          "winBackOffers": []
+        }
+      ]
+    }
+  ],
+  "version": { "major": 3, "minor": 0 }
+}

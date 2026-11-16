@@ -1,0 +1,24 @@
+name: Mikshat subscription checks
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/annual-subscription
+    paths:
+      - iphone/Maps/UI/Mikshat/Subscriptions/**
+      - iphone/Maps/Tests/UI/Subscriptions/**
+      - mikshat/tests/subscriptions/**
+      - .github/workflows/mikshat-subscriptions.yml
+
+permissions:
+  contents: read
+
+jobs:
+  subscription-checks:
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run entitlement decisions and typecheck the actual StoreKit and paywall source
+        run: bash mikshat/tests/subscriptions/run.sh

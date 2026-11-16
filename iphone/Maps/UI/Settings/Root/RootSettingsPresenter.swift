@@ -19,6 +19,13 @@ final class RootSettingsPresenter {
     viewController?.display(screen)
   }
 
+  func presentSubscription() {
+    Task { @MainActor [weak self] in
+      guard let controller = self?.viewController else { return }
+      MikshatPremiumAccess.presentManage(from: controller)
+    }
+  }
+
   func presentRoutingProfiles() {
     let alert = UIAlertController(title: L("driving_options_title"), message: nil, preferredStyle: .alert)
     for type in MWMRouterType.allCases where !RoutingOptions(routerType: type).supportedOptions.isEmpty {
@@ -113,6 +120,7 @@ final class RootSettingsPresenter {
 
   private func generalItems(_ state: RootSettingsState) -> [RootSettingsItemViewModel] {
     [
+      SettingsItemViewModel(setting: .mikshatSubscription, kind: .link),
       SettingsItemViewModel(setting: .mikshatTools, kind: .link),
       SettingsItemViewModel(setting: .appearance,
                             detail: state.theme.title,
