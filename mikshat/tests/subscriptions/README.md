@@ -1,12 +1,12 @@
 # Subscription verification
 
-Run `bash mikshat/tests/subscriptions/run.sh` on macOS with Xcode. The script runs the app's entitlement XCTest cases against the actual production decision code, then typechecks the StoreKit service, Objective-C lifecycle bridge and UIKit paywall against the iOS 15 SDK. Only the paywall's shared green color is supplied as a small standalone stub. Linux with Swift can run the entitlement cases but cannot perform iOS SDK checks.
+Run `bash mikshat/tests/subscriptions/run.sh` on macOS with Xcode. The script runs the app's entitlement XCTest cases against the actual production decision code, then typechecks the StoreKit service, Objective-C lifecycle bridge and UIKit paywall against the iOS 15 SDK. The paywall's shared green color and an imported `CoreApi.Product` name-collision fixture are supplied as small standalone stubs. This requires subscription code to distinguish `StoreKit.Product` from the existing app type. Linux with Swift can run the entitlement cases but cannot perform iOS SDK checks.
 
 This focused check does not replace building the complete app or testing Apple purchase sheets. It does not verify any App Store Connect product, Saudi storefront price, banking agreement or signed archive.
 
 ## Local StoreKit testing
 
-`MikshatSubscriptions.storekit` is an optional local-only annual product fixture with a simulated price of SAR 39 and no introductory offer. Add it to Xcode and select it in a **separate local testing scheme** under Run → Options → StoreKit Configuration. Production schemes and archives must keep StoreKit Configuration set to None. The real price and availability come from App Store Connect; this fixture does not create a product there.
+`MikshatSubscriptions.storekit` is an optional local-only annual product fixture with a simulated price of SAR 39.99 and no introductory offer. Add it to Xcode and select it in a **separate local testing scheme** under Run → Options → StoreKit Configuration. Production schemes and archives must keep StoreKit Configuration set to None. The real price and availability come from App Store Connect; this fixture does not create a product there.
 
 Use Xcode's StoreKit transaction manager to exercise purchase, cancel, pending/Ask to Buy, approval, restore, expiration and revocation. Confirm an unrelated or unverified transaction cannot unlock the three paid actions. Repeat with App Store sandbox/TestFlight and the actual configured annual product before submitting for review.
 

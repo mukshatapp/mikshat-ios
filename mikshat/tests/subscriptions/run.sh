@@ -40,6 +40,23 @@ SWIFT
 swift test --package-path "$test_root"
 
 ios_sdk="$(xcrun --sdk iphoneos --show-sdk-path)"
+# The real app also imports CoreApi.Product through its Objective-C bridge. Keep that
+# name collision in this focused SDK check; SDK-only imports would miss the integration error.
+mkdir -p "$test_root/CoreApi"
+cat > "$test_root/CoreApi/module.modulemap" <<'MODULE'
+module CoreApi {
+  header "CoreApi.h"
+  export *
+}
+MODULE
+cat > "$test_root/CoreApi/CoreApi.h" <<'OBJC'
+#import <Foundation/Foundation.h>
+@interface Product : NSObject
+@end
+OBJC
+cat > "$test_root/AppBridge.h" <<'OBJC'
+@import CoreApi;
+OBJC
 cat > "$test_root/PaywallStyleStub.swift" <<'SWIFT'
 import UIKit
 // The sole map-app dependency used by the paywall; the real value is in MikshatInterface.swift.
@@ -48,6 +65,7 @@ enum MikshatStyle {
 }
 SWIFT
 xcrun swiftc -typecheck -swift-version 5 -sdk "$ios_sdk" -target arm64-apple-ios15.0 \
+  -I "$test_root" -import-objc-header "$test_root/AppBridge.h" \
   "$subscription_sources/MikshatSubscriptionEntitlement.swift" \
   "$subscription_sources/MikshatSubscriptionStore.swift" \
   "$subscription_sources/MikshatSubscriptions.swift" \

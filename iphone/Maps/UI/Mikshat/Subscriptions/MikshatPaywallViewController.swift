@@ -66,7 +66,7 @@ final class MikshatPaywallViewController: UIViewController {
     view.accessibilityViewIsModal = true
     view.backgroundColor = UIColor.black.withAlphaComponent(0.4)
 
-    let title = label(text(ar: "مكشات بلس", en: "Mikshat Plus"), style: .title1)
+    let title = label(text(ar: "مكشات بريميوم", en: "Mikshat Premium"), style: .title1)
     title.textColor = MikshatStyle.green
     closeButton.setImage(UIImage(systemName: "xmark.circle.fill"), for: .normal)
     closeButton.tintColor = MikshatStyle.green

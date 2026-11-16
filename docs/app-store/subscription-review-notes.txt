@@ -1,0 +1,22 @@
+App: Mikshat (مكشات)
+Product ID: com.mikshat.maps.premium.annual
+
+Mikshat is a free download with one auto-renewable subscription billed annually. There is no free trial or introductory offer for this plan. The purchase screen displays the localized App Store price before confirmation.
+
+To open the subscription screen, open Settings and select "Mikshat subscription" (Arabic: "اشتراك مكشات"). Non-subscribers can also reach this screen when starting a paid action.
+
+The annual subscription unlocks:
+1. Direct navigation to a selected destination.
+2. Compass guidance to a selected destination.
+3. Saving new places to favorites.
+
+Car navigation, the general compass, Qibla, copying coordinates, sharing locations, and viewing, editing, deleting, and sharing previously saved places remain free. Subscription expiry does not delete locally saved places or tracks.
+
+The subscription screen includes "Restore purchases" ("استعادة المشتريات") and "Manage or cancel subscription" ("إدارة الاشتراك وإلغاؤه"). Restoration uses the Apple Account that owns the purchase. Subscription management opens Apple's subscription controls. Cancelling renewal preserves access until the entitled period ends, unless the transaction is refunded or revoked.
+
+Purchasing and restoring use the user's Apple Account. No Mikshat account, Mikshat login, or separate credentials are required.
+
+Privacy policy: https://mukshatapp.github.io/ios-privacy.html
+Terms of use and subscription: https://mukshatapp.github.io/ios-terms.html
+Support: https://mukshatapp.github.io/support.html
+Support email: alhadafsystem@gmail.com

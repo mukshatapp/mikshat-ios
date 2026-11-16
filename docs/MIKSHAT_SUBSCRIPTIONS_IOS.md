@@ -7,7 +7,11 @@ remain free. Expiry must not delete saved places or tracks or interrupt an activ
 
 ## App Store Connect setup
 
-These are the selected settings, not evidence that an App Store product has been created or approved.
+The user has created the App Store Connect product with the matching Product ID and a one-year
+duration. The user accepted SAR 39.99 because SAR 39 was unavailable, and selected the eight countries
+listed below. These setup steps do not mean the product is approved or ready for sale. The review
+screenshot and review information are not complete. The iOS legal/support pages were published and
+verified with HTTP 200; account agreement, banking, and tax status are still unverified.
 
 | Field | Value |
 | --- | --- |
@@ -19,32 +23,34 @@ These are the selected settings, not evidence that an App Store product has been
 | Product ID | `com.mikshat.maps.premium.annual` |
 | Reference name | `Mikshat Premium Annual` |
 | Duration | 1 year, automatically renewing |
-| Initial intended Saudi price | SAR 39 per year; confirm the actual available App Store price point |
+| Selected Saudi price | SAR 39.99 per year, accepted by the user |
+| Selected initial countries | Bahrain, Iraq, Kuwait, Oman, Qatar, Saudi Arabia, United Arab Emirates, Yemen |
 | Introductory offer / trial | None at launch |
 | Arabic display name | مكشات بريميوم السنوي |
 | English display name | Mikshat Premium Annual |
-| Arabic description | التوجيه المباشر والملاحة بالبوصلة وحفظ مواقع جديدة |
-| English description | Direct and compass navigation; save new places |
+| Arabic description | التوجيه المباشر وبوصلة الوجهة وحفظ مواقع جديدة |
+| English description | Direct navigation, destination compass and new saves |
 
 Keep this Product ID identical in the app, local StoreKit test configuration, and App Store Connect.
-The app must display StoreKit's localized price and billing period. Do not hardcode SAR 39 in the purchase
-screen or advertise that price in every storefront. If SAR 39 is unavailable, settle the exact price point
-before release rather than silently choosing another amount. Select subscription availability explicitly.
+The app must display StoreKit's localized price and billing period. SAR 39.99 is the selected Saudi
+price; do not hardcode it in the purchase screen or advertise it as the price in every storefront.
+Verify Apple's local price and currency for each selected country. Display names and descriptions above
+remain the intended metadata until their saved values and review status are checked in App Store Connect.
 
 The Account Holder must have an active Paid Apps Agreement and complete the applicable tax and banking
 information. Verify the In-App Purchase capability for the app's registered identifier and signed build.
 Do not place App Store keys, shared secrets, payment credentials, or commercial weather keys in the app
 or repository. StoreKit verification on the device does not require a secret embedded in the client.
 
-Create the subscription group and product under App Store Connect → Mikshat → Monetization → Subscriptions.
-Add localized group/product information, price, availability, tax category, and a review screenshot showing
-the actual paywall. The first subscription and first group must be submitted with a new app version.
+Continue the created product under App Store Connect → Mikshat → Monetization → Subscriptions.
+Complete and verify localized group/product information, price, availability, tax category, and a review
+screenshot showing the actual paywall. The first subscription and first group must be submitted with a new app version.
 Creating a `.storekit` file only enables local testing; it does not create a purchasable App Store product.
 
 ## Metadata, legal pages, and privacy
 
 Reviewed Arabic and English metadata lives in `iphone/metadata/ar-SA` and `iphone/metadata/en-US`.
-Before submission, publish and verify these pages on a phone and in a browser:
+These pages are published; recheck them on a phone and in a browser before submission:
 
 - Privacy: https://mukshatapp.github.io/ios-privacy.html
 - Terms and subscription: https://mukshatapp.github.io/ios-terms.html
@@ -73,6 +79,10 @@ rather than claiming no location leaves the device. This service decision does n
 the subscription source, metadata, or purchase tests.
 
 ## Build and purchase validation
+
+The subscription source is in [draft PR #7](https://github.com/mukshatapp/mikshat-ios/pull/7), which is
+not merged. A native build failure is being diagnosed. No successful signed subscription build or
+TestFlight purchase validation is established by the App Store Connect setup described above.
 
 Use the Mikshat signed Codemagic workflow in `codemagic.yaml`, `mikshat-ios-testflight`. It signs
 `com.mikshat.maps`, uploads to TestFlight, and does not submit a public App Store release automatically.
@@ -111,8 +121,15 @@ navigation, general compass, Qibla, copying/sharing, and access to existing save
 Check every reviewer instruction against the actual submitted UI. No Mikshat account is required for
 the StoreKit purchase flow; do not invent credentials or bypass Apple's payment review.
 
-App Store Connect product creation, legal-page publication, commercial weather readiness, account
-agreements, signed-build purchase testing, and App Review approval are separate release requirements.
+The source provides a direct entry at Settings → **Mikshat subscription** (Arabic: **اشتراك مكشات**).
+That screen contains **Restore purchases** (استعادة المشتريات) and **Manage or cancel subscription**
+(إدارة الاشتراك وإلغاؤه). Use [the prepared English review notes](app-store/subscription-review-notes.txt)
+after validating these paths in the actual submitted build. The text describes the intended review
+flow, not evidence that a production or TestFlight build has already passed testing.
+
+The product has been created and its initial price/countries selected by the user. Completion of its
+review information, legal-page publication, commercial weather readiness, account agreements,
+signed-build purchase testing, and App Review approval remain separate release requirements.
 Source code and metadata changes alone do not complete them. Small Business Program application
 submission is not proof of acceptance or an active reduced commission.
 

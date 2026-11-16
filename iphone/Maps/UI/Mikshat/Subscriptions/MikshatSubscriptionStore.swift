@@ -17,7 +17,7 @@ final class MikshatSubscriptionStore: ObservableObject {
   static let shared = MikshatSubscriptionStore()
   static let productID = "com.mikshat.maps.premium.annual"
 
-  @Published private(set) var product: Product?
+  @Published private(set) var product: StoreKit.Product?
   @Published private(set) var isBusy = false
   @Published private(set) var message: String?
   @Published private(set) var isCheckingEntitlements = true
@@ -120,7 +120,7 @@ final class MikshatSubscriptionStore: ObservableObject {
       guard let self else { return }
       let messageBeforeLookup = self.message
       do {
-        let products = try await Product.products(for: [Self.productID])
+        let products = try await StoreKit.Product.products(for: [Self.productID])
         guard let annual = products.first(where: { product in
           guard product.id == Self.productID, product.type == .autoRenewable,
                 let period = product.subscription?.subscriptionPeriod else { return false }
