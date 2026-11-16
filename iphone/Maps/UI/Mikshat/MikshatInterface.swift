@@ -1175,14 +1175,42 @@ enum MikshatLocationActions {
 
   static func save(_ coordinate: CLLocationCoordinate2D, from controller: UIViewController) {
     guard !LocationManager.isLocationProhibited(), CLLocationCoordinate2DIsValid(coordinate) else { return }
+    Task { @MainActor [weak controller] in
+      guard let controller else { return }
+      MikshatPremiumAccess.require(from: controller) { [weak controller] in
+        guard let controller, controller.viewIfLoaded?.window != nil else { return }
+        presentSaveAlert(coordinate, from: controller)
+      }
+    }
+  }
+
+  private static func presentSaveAlert(_ coordinate: CLLocationCoordinate2D, from controller: UIViewController) {
+    guard !LocationManager.isLocationProhibited(), CLLocationCoordinate2DIsValid(coordinate) else { return }
     let alert = UIAlertController(title: L("mikshat_save_location"), message: nil, preferredStyle: .alert)
     alert.addTextField { $0.text = L("mikshat_current_location"); $0.clearButtonMode = .whileEditing }
     alert.addAction(UIAlertAction(title: L("cancel"), style: .cancel))
-    alert.addAction(UIAlertAction(title: L("save"), style: .default) { [weak alert] _ in
-      guard !LocationManager.isLocationProhibited() else { return }
+    alert.addAction(UIAlertAction(title: L("save"), style: .default) { [weak alert, weak controller] _ in
       let text = alert?.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-      _ = BookmarksManager.shared().saveLocation(coordinate, name: text.isEmpty ? L("mikshat_current_location") : text)
-      Toast.show(withText: L("mikshat_location_saved"))
+      let name = text.isEmpty ? L("mikshat_current_location") : text
+      Task { @MainActor [weak controller, weak alert] in
+        guard let controller, !LocationManager.isLocationProhibited(),
+              controller.viewIfLoaded?.window != nil else { return }
+        let save = {
+          guard !LocationManager.isLocationProhibited(), controller.viewIfLoaded?.window != nil else { return }
+          _ = BookmarksManager.shared().saveLocation(coordinate, name: name)
+          Toast.show(withText: L("mikshat_location_saved"))
+        }
+        // Entitlement may expire while the name-entry dialog is open.
+        if MikshatSubscriptionStore.shared.hasActiveSubscription { save() }
+        else {
+          let resume = { MikshatPremiumAccess.require(from: controller, onUnlock: save) }
+          if let alert, alert.presentingViewController != nil {
+            if alert.isBeingDismissed, let transition = alert.transitionCoordinator {
+              transition.animate(alongsideTransition: nil) { _ in resume() }
+            } else { alert.dismiss(animated: true, completion: resume) }
+          } else { resume() }
+        }
+      }
     })
     controller.present(alert, animated: true)
   }

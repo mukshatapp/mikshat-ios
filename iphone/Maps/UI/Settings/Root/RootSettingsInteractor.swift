@@ -169,6 +169,7 @@ final class RootSettingsInteractor {
         MikshatSearchLocations.clear()
       }
     case .downloadMaps,
+         .mikshatSubscription,
          .mikshatTools,
          .profile,
          .units,
@@ -227,6 +228,10 @@ extension RootSettingsInteractor: SettingsViewControllerInteractor {
   }
 
   private func select(_ setting: RootSettings) {
+    if setting == .mikshatSubscription {
+      presenter?.presentSubscription()
+      return
+    }
     if setting == .downloadMaps {
       MapViewController.shared()?.openMapsDownloader(.downloaded)
       return

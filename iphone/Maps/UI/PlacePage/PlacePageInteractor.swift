@@ -237,13 +237,23 @@ extension PlacePageInteractor: PlacePageEditBookmarkOrTrackViewControllerDelegat
 // MARK: - ActionBarViewControllerDelegate
 
 extension PlacePageInteractor: ActionBarViewControllerDelegate {
-  func actionBar(_: ActionBarViewController, didPressButton type: ActionBarButtonType) {
+  func actionBar(_ actionBar: ActionBarViewController, didPressButton type: ActionBarButtonType) {
     switch type {
     case .bookmark:
       if placePageData.bookmarkData != nil {
         MWMPlacePageManagerHelper.removeBookmark(placePageData)
       } else {
-        MWMPlacePageManagerHelper.addBookmark(placePageData)
+        let selectedData = placePageData
+        Task { @MainActor [weak self, weak actionBar] in
+          guard let self, let actionBar, actionBar.viewIfLoaded?.window != nil,
+                let map = MapViewController.shared() else { return }
+          MikshatPremiumAccess.require(from: map) { [weak self, weak actionBar] in
+            guard let self, let actionBar, actionBar.viewIfLoaded?.window != nil,
+                  self.presenter != nil, self.placePageData === selectedData,
+                  self.placePageData.bookmarkData == nil, PlacePageData.hasData else { return }
+            MWMPlacePageManagerHelper.addBookmark(self.placePageData)
+          }
+        }
       }
     case .call:
       // since `.call` is a case in an obj-c enum, it can't have associated data, so there is no easy way to

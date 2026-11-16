@@ -11,11 +11,32 @@ enum MikshatNavigationCoordinator {
 
   static func startCustomNavigation() -> Bool {
     guard !isDirectActive else { return false }
-    LocationManager.start()
     guard let point = MWMRouter.finishPoint(), let map = MapViewController.shared() else {
       Toast.show(withText: L("mikshat_location_unavailable"))
       return false
     }
+    let latitude = point.latitude
+    let longitude = point.longitude
+    let requestedCompass = compassSelected
+    Task { @MainActor [weak map] in
+      guard let map else { return }
+      MikshatPremiumAccess.require(from: map) { [weak map] in
+        // Purchasing can take time: never navigate to a subsequently selected destination.
+        guard let map, map.viewIfLoaded?.window != nil,
+              MWMRouter.type() == .ruler, compassSelected == requestedCompass,
+              let current = MWMRouter.finishPoint(),
+              current.latitude == latitude, current.longitude == longitude else { return }
+        _ = startUnlockedCustomNavigation()
+      }
+    }
+    // The direct-visibility notification hides the preview when access is granted.
+    return false
+  }
+
+  private static func startUnlockedCustomNavigation() -> Bool {
+    guard !isDirectActive,
+          let point = MWMRouter.finishPoint(), let map = MapViewController.shared() else { return false }
+    LocationManager.start()
     let destination = CLLocationCoordinate2D(latitude: point.latitude, longitude: point.longitude)
     if compassSelected {
       let title = point.title
