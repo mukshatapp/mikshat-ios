@@ -7,7 +7,7 @@
 "search" = "البحث";
 
 /* "Bookmarks and Tracks" dialog title. Also used in iPhone home screen quick actions. */
-"bookmarks_and_tracks" = "الإشارات المرجعية والمسارات";
+"bookmarks_and_tracks" = "المفضلة والمسارات";
 
 
 /********** Other translations **********/
@@ -29,3 +29,6 @@
 
 /* Needed to explain why we require access to GPS coordinates when the app is active. */
 "NSLocationWhenInUseUsageDescription" = "تستخدم خاصية تحديد الموقع الحالي في خيارات اتباع الطريق وحفظ أحدث مسار مشيت عليه.";
+
+/* Localized iOS app and Live Activity extension display name. */
+"CFBundleDisplayName" = "مكشات";

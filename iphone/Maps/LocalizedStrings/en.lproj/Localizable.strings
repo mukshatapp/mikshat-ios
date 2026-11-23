@@ -52,13 +52,13 @@
 "add_new_set" = "Add a New List";
 
 /* Add Bookmark list dialog - hint when the list name is empty */
-"bookmark_set_name" = "Bookmark List Name";
+"bookmark_set_name" = "Favorites List Name";
 
 /* Should be used in the bookmarks-only context, see bookmarks_and_tracks if tracks are also implied. */
-"bookmarks" = "Bookmarks";
+"bookmarks" = "Favorites";
 
 /* "Bookmarks and Tracks" dialog title. Also used in iPhone home screen quick actions. */
-"bookmarks_and_tracks" = "Bookmarks and Tracks";
+"bookmarks_and_tracks" = "Favorites and Tracks";
 
 /* Editor title above street and house number, duplicates [type.building.address] in types_strings.txt */
 "address" = "Address";
@@ -82,7 +82,7 @@
 "country_status_download_without_size" = "Download Map";
 
 /* "Bookmark Lists" dialog title */
-"bookmark_sets" = "Bookmark Lists";
+"bookmark_sets" = "Favorites Lists";
 
 
 /********** Search categories **********/
@@ -157,16 +157,16 @@
 
 /********** Other translations **********/
 
-"share_bookmarks_email_body" = "Hello!\n\nAttached are my bookmarks; please open them in Organic Maps. If you don't have it installed you can download it here: https://omaps.app/get?kmz\n\nEnjoy travelling with Organic Maps!";
+"share_bookmarks_email_body" = "Hello!\n\nAttached are my favorites from Mikshat. Open the attached file in Mikshat or another compatible maps app.\n\nMikshat: https://apps.apple.com/app/id6828427541";
 
 /* message title of loading file */
-"load_kmz_title" = "Loading Bookmarks";
+"load_kmz_title" = "Loading Favorites";
 
 /* Kmz file successful loading */
-"load_kmz_successful" = "Bookmarks loaded successfully! You can find them on the map or on the Bookmarks Manager screen.";
+"load_kmz_successful" = "Favorites loaded successfully! You can find them on the map or on the Favorites Manager screen.";
 
 /* Kml file loading failed */
-"load_kmz_failed" = "Failed to load bookmarks. The file may be corrupted or defective.";
+"load_kmz_failed" = "Failed to load favorites. The file may be corrupted or defective.";
 
 /* resource for context menu */
 "edit" = "Edit";
@@ -433,7 +433,7 @@
 "downloader_status_failed" = "Failed";
 
 /* bookmark button text */
-"bookmark" = "bookmark";
+"bookmark" = "favorite place";
 
 
 /********** Routing dialogs strings **********/
@@ -634,10 +634,10 @@
 "mobile_data_option_always" = "Use Always";
 "mobile_data_option_today" = "Only Today";
 "mobile_data_option_not_today" = "Do Not Use Today";
-"mobile_data" = "Mobile Internet";
+"mobile_data" = "Mobile data";
 
 /* NOTE to translators: please synchronize your translation with the English one. */
-"mobile_data_description" = "Mobile internet is required for map update notifications and uploading edits.";
+"mobile_data_description" = "Choose when to download maps using mobile data.";
 "mobile_data_option_never" = "Never Use";
 "mobile_data_option_ask" = "Always Ask";
 "traffic_update_maps_text" = "To display traffic data, maps must be updated.";
@@ -663,7 +663,7 @@
 "bookmarks_create_new_group" = "Create a new list";
 
 /* Bookmark categories screen, button that opens folder selection dialog to import KML/KMZ/GPX/KMB files */
-"bookmarks_import" = "Import Bookmarks and Tracks";
+"bookmarks_import" = "Import Favorites and Tracks";
 "bookmarks_error_message_share_general" = "Unable to share due to an application error";
 "bookmarks_error_title_share_empty" = "Sharing error";
 "bookmarks_error_message_share_empty" = "Cannot share an empty list";
@@ -691,7 +691,7 @@
 "layers_title" = "Map Styles and Layers";
 
 /* Button to change the color of all bookmarks in the current list */
-"change_all_bookmarks_color" = "Change color of all bookmarks";
+"change_all_bookmarks_color" = "Change color of all favorites";
 
 /* Button to change the color of all tracks in the current list */
 "change_all_tracks_color" = "Change color of all tracks";
@@ -717,14 +717,14 @@
 /* Speed camera settings menu option - Never warn (about speedcams) */
 "pref_tts_speedcams_never" = "Never warn";
 "power_managment_title" = "Power saving mode";
-"power_managment_description" = "Try to reduce power usage at the expense of some functionality.";
+"power_managment_description" = "In automatic mode, the app reduces power-consuming features according to the current battery level.";
 "power_managment_setting_never" = "Never";
-"power_managment_setting_auto" = "When battery is low";
-"power_managment_setting_manual_max" = "Always";
+"power_managment_setting_auto" = "Automatic";
+"power_managment_setting_manual_max" = "Maximum power saving";
 
 /* Settings/Bookmark Text Placement */
-"bookmarks_text_placement_title" = "Bookmark names on the map";
-"bookmarks_text_placement_description" = "If there are too many bookmarks, displaying their names on the map may slow down the app.";
+"bookmarks_text_placement_title" = "Favorite names on the map";
+"bookmarks_text_placement_description" = "If there are too many favorites, displaying their names on the map may slow down the app.";
 "show_to_the_right" = "Show to the right";
 "show_at_the_bottom" = "Show at the bottom";
 "enable_logging_warning_message" = "Enable this option temporarily to record and manually send detailed diagnostic logs about your issue to us using \"Report a bug\" in the Help dialog. Logs may include location info.";
@@ -899,8 +899,8 @@
 "dialog_routing_system_error_carplay" = "An error occurred. Please restart the application";
 "dialog_routing_rebuild_from_current_location_carplay" = "The route will be rebuilt from your current location";
 "dialog_routing_rebuild_for_vehicle_carplay" = "The route will be converted into an automobile route";
-"not_all_shown_bookmarks_carplay" = "Not all bookmarks are shown";
-"switch_to_phone_bookmarks_carplay" = "Switch to the phone to see all bookmarks";
+"not_all_shown_bookmarks_carplay" = "Not all favorites are shown";
+"switch_to_phone_bookmarks_carplay" = "Switch to the phone to see all favorites";
 "speedcams_alert_title_carplay_1" = "Speedcams";
 "speedcams_alert_title_carplay_2" = "Speed warnings";
 "download_map_carplay" = "Please download maps in the app on your mobile device";
@@ -1015,7 +1015,7 @@
 "button_layer_outdoor" = "Outdoors";
 
 /* Bookmark categories screen, button that opens share dialog to export all bookmarks and tracks */
-"bookmarks_export" = "Export all Bookmarks and Tracks";
+"bookmarks_export" = "Export all Favorites and Tracks";
 "drive_through" = "Drive-through";
 
 /* Accessibility text for the zoom-in button on the map and visible title for the CarPlay dashboard button. Keep it short. */
@@ -1089,7 +1089,7 @@
 "enable_icloud_synchronization_title" = "Enable iCloud Synchronization";
 
 /* Message for the "Enable iCloud Syncronization" alert. */
-"enable_icloud_synchronization_message" = "iCloud synchronization is an experimental feature under development. Make sure that you have made a backup of all your bookmarks and tracks.";
+"enable_icloud_synchronization_message" = "iCloud synchronization is an experimental feature under development. Make sure that you have made a backup of all your favorites and tracks.";
 
 /* Title for the "iCloud Is Disabled" alert. */
 "icloud_disabled_title" = "iCloud Is Disabled";
@@ -1101,7 +1101,7 @@
 "enable" = "Enable";
 
 /* Title for the "Enable iCloud Syncronization" alert's "Backup" action button. */
-"backup" = "Backup";
+"backup" = "Back up";
 
 /* Title for the "iCloud synchronization failure" alert. */
 "icloud_synchronization_error_alert_title" = "iCloud synchronization failure";
@@ -1190,7 +1190,7 @@
 "editor_add_select_category_recent_subtitle" = "Recently Used";
 
 /* Toast message shown when bookmark colors are changed in category settings */
-"toast_bookmarks_color_changed" = "Bookmarks color changed";
+"toast_bookmarks_color_changed" = "Favorites color changed";
 
 /* Toast message shown when track colors are changed in category settings */
 "toast_tracks_color_changed" = "Tracks color changed";
@@ -1268,13 +1268,13 @@
 "mikshat_heading_hint" = "Choose the heading used by destination arrows. Automatic mode uses GPS course at 10 km/h or faster, and the phone compass below that speed. This does not change Qibla.";
 
 /* Mikshat navigation tools */
-"mikshat_heading_sensor" = "Phone compass";
+"mikshat_heading_sensor" = "Phone compass sensor";
 
 /* Mikshat navigation tools */
 "mikshat_heading_gps" = "GPS direction of travel";
 
 /* Mikshat navigation tools */
-"mikshat_heading_auto" = "Automatic GPS / compass";
+"mikshat_heading_auto" = "GPS/compass auto-switch";
 
 /* Mikshat navigation tools */
 "mikshat_location_unavailable" = "A recent location is required. Enable location access and wait for a GPS fix.";
@@ -1325,7 +1325,7 @@
 "mikshat_location_settings" = "Location settings";
 
 /* Mikshat Android-equivalent navigation interface */
-"mikshat_arrow_to_point" = "Arrow points to the destination";
+"mikshat_arrow_to_point" = "Arrow toward the point";
 
 /* Mikshat Android-equivalent navigation interface */
 "mikshat_heading_source" = "Compass direction source";
@@ -1346,13 +1346,13 @@
 "mikshat_navigation_modes" = "Direct guidance, car, compass";
 
 /* Mikshat Android-equivalent navigation interface */
-"mikshat_direct" = "Direct";
+"mikshat_direct" = "Direct guidance";
 
 /* Mikshat Android-equivalent navigation interface */
 "mikshat_car" = "Car";
 
 /* Mikshat Android-equivalent navigation interface */
-"mikshat_stop" = "Stop";
+"mikshat_stop" = "Finish";
 
 /* Mikshat Android-equivalent navigation interface */
 "mikshat_direct_notice" = "Direct guidance • straight-line distance • arrival time is an estimate";
@@ -1403,7 +1403,7 @@
 "mikshat_compass_transparency_enable" = "Enable background transparency";
 
 /* Mikshat map controls and compass settings */
-"mikshat_compass_transparency_amount" = "Background transparency";
+"mikshat_compass_transparency_amount" = "Background transparency level";
 
 /* Mikshat map controls and compass settings */
 "mikshat_compass_transparency_hint" = "Show the map behind the general and navigation compasses. 0% opaque, 100% transparent.";
@@ -1422,69 +1422,196 @@
 
 /* Mikshat selected-location weather */
 "mikshat_weather_available_hours" = "%d of the next 12 hours available";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_clear" = "Clear";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_drizzle_dense" = "Dense drizzle";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_drizzle_light" = "Light drizzle";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_drizzle_moderate" = "Moderate drizzle";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_fog" = "Fog";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_freezing_drizzle_dense" = "Dense freezing drizzle";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_freezing_drizzle_light" = "Light freezing drizzle";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_freezing_rain_heavy" = "Heavy freezing rain";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_freezing_rain_light" = "Light freezing rain";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_mainly_clear" = "Mainly clear";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_overcast" = "Overcast";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_partly_cloudy" = "Partly cloudy";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_rain_heavy" = "Heavy rain";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_rain_light" = "Slight rain";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_rain_moderate" = "Moderate rain";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_rain_showers_light" = "Slight rain showers";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_rain_showers_moderate" = "Moderate rain showers";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_rain_showers_violent" = "Violent rain showers";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_rime_fog" = "Depositing rime fog";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_snow_grains" = "Snow grains";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_snow_heavy" = "Heavy snowfall";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_snow_light" = "Slight snowfall";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_snow_moderate" = "Moderate snowfall";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_snow_showers_heavy" = "Heavy snow showers";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_snow_showers_light" = "Slight snow showers";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_thunderstorm" = "Thunderstorm";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_thunderstorm_hail_heavy" = "Thunderstorm with heavy hail";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_thunderstorm_hail_slight" = "Thunderstorm with slight hail";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_unknown" = "Weather unavailable";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_coordinates" = "Coordinates: %@";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_current" = "Current conditions";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_gusts" = "Gusts";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_hour_gusts" = "Gusts: %@";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_hour_wind" = "Wind: %@";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_invalid_location" = "The selected coordinates are invalid.";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_last_updated" = "Last updated: %@";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_loading" = "Loading forecast…";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_model_notice" = "Values are model estimates and may differ from direct weather station observations.";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_next_12_hours" = "Next 12 hours";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_no_saved_forecast" = "No saved forecast for this location";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_no_saved_retry" = "No saved forecast for this location. Unable to connect; try again.";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_offline_saved" = "Offline — showing saved data.";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_refresh" = "Refresh forecast";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_refresh_failed_saved" = "Unable to update; showing saved data with its last update time.";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_saved_data" = "Saved data";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_selected_location" = "Selected map location";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_temperature_accessibility" = "Temperature: %@ degrees Celsius";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_title" = "Weather";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_unavailable" = "Unavailable";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_updating" = "Updating forecast…";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_wind_calm" = "Calm wind";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_wind_e" = "east";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_wind_from" = "From %@";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_wind_n" = "north";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_wind_ne" = "northeast";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_wind_nw" = "northwest";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_wind_s" = "south";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_wind_se" = "southeast";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_wind_speed" = "Wind speed";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_wind_sw" = "southwest";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_wind_unavailable" = "Wind direction unavailable";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_wind_w" = "west";
-"mikshat_collapsed" = "Collapsed";
 "mikshat_coordinate_formats" = "Coordinate formats";
-"mikshat_copy_coordinates_format" = "Copy coordinates in %@ format";
 "mikshat_expanded" = "Expanded";
+"mikshat_collapsed" = "Collapsed";
+"mikshat_copy_coordinates_format" = "Copy coordinates in %@ format";
+
+/* iOS Settings row for the optional iCloud synchronization feature. */
+"mikshat_icloud_sync_title" = "iCloud Synchronization (Beta)";

@@ -157,7 +157,7 @@
 
 /********** Other translations **********/
 
-"share_bookmarks_email_body" = "مرحباً! ْ\n\n تم إرفاق إشاراتي المرجعية من تطبيق Organic Maps. الرجاء فتحهم إذا لديك تطبيق Organic Maps مثبتاً. أو، إذا لم يكن مثبتاً، قم بتنزيل التطبيق لنظام iOS أو أندرويد من خلال الضغط على هذا الرابط: https://omaps.app/get?kmz \n\nاستمتع بالسفر مع Organic Maps!";
+"share_bookmarks_email_body" = "مرحبًا!\n\nأرفقت مواقعي المفضلة من مكشات. افتح الملف المرفق في مكشات أو تطبيق خرائط آخر متوافق.\n\nمكشات: https://apps.apple.com/app/id6828427541";
 
 /* message title of loading file */
 "load_kmz_title" = "يتم تحميل المفضلة";
@@ -265,13 +265,13 @@
 "pref_tts_download_voices_description" = "لتنزيل صوت بجودة أعلى، افتح تطبيق الإعدادات وانتقل إلى تسهيلات الاستخدام → VoiceOver → الكلام → الصوت.";
 
 /* Header above Apple's group of novelty text-to-speech voices (Bells, Bubbles, Zarvox...), shown after the regional voice sections and Eloquence group. Use Apple's term for this group from Settings > Accessibility > VoiceOver > Speech. */
-"pref_tts_voice_group_novelty" = "Novelty";
+"pref_tts_voice_group_novelty" = "أصوات مميزة";
 
 /* Accessibility label of the button that plays a sample of a text-to-speech voice. */
-"pref_tts_voice_preview_play" = "Play sample";
+"pref_tts_voice_preview_play" = "تشغيل عينة";
 
 /* Accessibility label of the button that stops the sample of a text-to-speech voice being played. */
-"pref_tts_voice_preview_stop" = "Stop sample";
+"pref_tts_voice_preview_stop" = "إيقاف العينة";
 "pref_map_auto_zoom" = "تكبير تلقائي";
 "placepage_distance" = "المسافة";
 "search_show_on_map" = "مشاهدة على الخريطة";
@@ -637,7 +637,7 @@
 "mobile_data" = "بيانات الجوال";
 
 /* NOTE to translators: please synchronize your translation with the English one. */
-"mobile_data_description" = "إننا نحتاج بيانات الجوال لعرض معلومات تفصيلية عن الأماكن والمفضلة.";
+"mobile_data_description" = "اختر متى تُنزَّل الخرائط باستخدام بيانات الجوال.";
 "mobile_data_option_never" = "عدم الاستخدام مطلقًا";
 "mobile_data_option_ask" = "السؤال دوماً";
 "traffic_update_maps_text" = "لعرض البيانات المرورية، يجب تحديث الخرائط.";
@@ -1101,7 +1101,7 @@
 "enable" = "تفعيل";
 
 /* Title for the "Enable iCloud Syncronization" alert's "Backup" action button. */
-"backup" = "دعم";
+"backup" = "نسخ احتياطي";
 
 /* Title for the "iCloud synchronization failure" alert. */
 "icloud_synchronization_error_alert_title" = "فشل مزامنة iCloud";
@@ -1422,69 +1422,196 @@
 
 /* Mikshat selected-location weather */
 "mikshat_weather_available_hours" = "المتاح %d من أصل 12 ساعة مستقبلية";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_clear" = "صافٍ";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_drizzle_dense" = "رذاذ كثيف";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_drizzle_light" = "رذاذ خفيف";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_drizzle_moderate" = "رذاذ متوسط";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_fog" = "ضباب";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_freezing_drizzle_dense" = "رذاذ متجمّد كثيف";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_freezing_drizzle_light" = "رذاذ متجمّد خفيف";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_freezing_rain_heavy" = "أمطار متجمّدة غزيرة";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_freezing_rain_light" = "أمطار متجمّدة خفيفة";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_mainly_clear" = "صافٍ غالبًا";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_overcast" = "غائم";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_partly_cloudy" = "غائم جزئيًا";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_rain_heavy" = "أمطار غزيرة";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_rain_light" = "أمطار خفيفة";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_rain_moderate" = "أمطار متوسطة";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_rain_showers_light" = "زخات مطر خفيفة";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_rain_showers_moderate" = "زخات مطر متوسطة";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_rain_showers_violent" = "زخات مطر شديدة";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_rime_fog" = "ضباب مع صقيع";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_snow_grains" = "حبيبات ثلج";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_snow_heavy" = "ثلوج كثيفة";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_snow_light" = "ثلوج خفيفة";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_snow_moderate" = "ثلوج متوسطة";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_snow_showers_heavy" = "زخات ثلج كثيفة";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_snow_showers_light" = "زخات ثلج خفيفة";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_thunderstorm" = "عاصفة رعدية";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_thunderstorm_hail_heavy" = "عاصفة رعدية مع بَرَد شديد";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_thunderstorm_hail_slight" = "عاصفة رعدية مع بَرَد خفيف";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_condition_unknown" = "حالة الجو غير متوفرة";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_coordinates" = "الإحداثيات: %@";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_current" = "الحالة الحالية";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_gusts" = "الهبات";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_hour_gusts" = "الهبات: %@";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_hour_wind" = "الرياح: %@";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_invalid_location" = "إحداثيات الموقع غير صالحة.";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_last_updated" = "آخر تحديث: %@";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_loading" = "جارٍ تحميل التوقعات…";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_model_notice" = "القيم تقديرات نموذجية وليست بالضرورة قراءات مباشرة من محطة رصد.";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_next_12_hours" = "الساعات الـ12 القادمة";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_no_saved_forecast" = "لا توجد توقعات محفوظة لهذا الموقع";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_no_saved_retry" = "لا توجد توقعات محفوظة لهذا الموقع. تعذر الاتصال؛ أعد المحاولة.";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_offline_saved" = "دون اتصال — تُعرض بيانات محفوظة.";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_refresh" = "تحديث التوقعات";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_refresh_failed_saved" = "تعذر تحديث التوقعات؛ تُعرض بيانات محفوظة مع وقت آخر تحديث.";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_saved_data" = "بيانات محفوظة";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_selected_location" = "الموقع المحدد على الخريطة";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_temperature_accessibility" = "الحرارة: %@ درجة مئوية";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_title" = "أحوال الطقس";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_unavailable" = "غير متوفرة";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_updating" = "جارٍ تحديث التوقعات…";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_wind_calm" = "رياح ساكنة";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_wind_e" = "الشرق";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_wind_from" = "قادمة من %@";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_wind_n" = "الشمال";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_wind_ne" = "الشمال الشرقي";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_wind_nw" = "الشمال الغربي";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_wind_s" = "الجنوب";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_wind_se" = "الجنوب الشرقي";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_wind_speed" = "سرعة الرياح";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_wind_sw" = "الجنوب الغربي";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_wind_unavailable" = "اتجاه الرياح غير متوفر";
+
+/* Mikshat selected-location weather */
 "mikshat_weather_wind_w" = "الغرب";
-"mikshat_collapsed" = "مطوي";
 "mikshat_coordinate_formats" = "تنسيقات الإحداثيات";
-"mikshat_copy_coordinates_format" = "نسخ الإحداثيات بتنسيق %@";
 "mikshat_expanded" = "موسّع";
+"mikshat_collapsed" = "مطوي";
+"mikshat_copy_coordinates_format" = "نسخ الإحداثيات بتنسيق %@";
+
+/* iOS Settings row for the optional iCloud synchronization feature. */
+"mikshat_icloud_sync_title" = "مزامنة iCloud (تجريبية)";
