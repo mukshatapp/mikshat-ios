@@ -10,10 +10,21 @@ JNIEXPORT jboolean Java_app_organicmaps_sdk_util_Config_nativeHasConfigValue(JNI
   return settings::Get(jni::ToNativeString(env, name), value);
 }
 
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+JNIEXPORT jboolean Java_app_organicmaps_sdk_util_Config_nativeDeleteConfigValue(JNIEnv * env, jclass, jstring name)
+{
+  auto const key = jni::ToNativeString(env, name);
+  std::string old;
+  bool const existed = settings::Get(key, old);
+  settings::Delete(key);
+  return existed;
+}
+#else
 JNIEXPORT void Java_app_organicmaps_sdk_util_Config_nativeDeleteConfigValue(JNIEnv * env, jclass thiz, jstring name)
 {
   settings::Delete(jni::ToNativeString(env, name));
 }
+#endif
 
 JNIEXPORT jboolean Java_app_organicmaps_sdk_util_Config_nativeGetBoolean(JNIEnv * env, jclass thiz, jstring name,
                                                                          jboolean defaultVal)

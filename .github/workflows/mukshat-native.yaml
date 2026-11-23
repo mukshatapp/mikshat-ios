@@ -1,0 +1,49 @@
+name: Mukshat native compatibility build
+on:
+  push:
+    branches: [codex/mukshat-organic-26112401]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native:
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    strategy:
+      fail-fast: false
+      matrix:
+        abi: [armeabi-v7a, arm64-v8a, x86, x86_64]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 1
+      - uses: android-actions/setup-android@v3
+      - name: Install NDK and CMake
+        run: |
+          sdkmanager 'ndk;29.0.14206865' 'cmake;3.31.6'
+      - name: Verify all preserved JNI declarations
+        run: python3 tools/mukshat/verify_jni_contract.py
+      - name: Build native engine for the preserved Mukshat SDK
+        env:
+          ABI: ${{ matrix.abi }}
+        run: |
+          cmake -S . -B build-mukshat -G Ninja \
+            -DCMAKE_MAKE_PROGRAM="$ANDROID_HOME/cmake/3.31.6/bin/ninja" \
+            -DCMAKE_TOOLCHAIN_FILE="$ANDROID_HOME/ndk/29.0.14206865/build/cmake/android.toolchain.cmake" \
+            -DANDROID_ABI="$ABI" -DANDROID_PLATFORM=android-28 -DANDROID_STL=c++_static \
+            -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF -DSKIP_TOOLS=ON -DSKIP_QT_GUI=ON \
+            -DUSE_PCH=OFF -DMUKSHAT_LEGACY_SDK_ABI=ON
+          cmake --build build-mukshat --target organicmaps --parallel 3
+          mkdir -p "artifact/$ABI"
+          find build-mukshat -name liborganicmaps.so -exec cp '{}' "artifact/$ABI/" \;
+          test -s "artifact/$ABI/liborganicmaps.so"
+          "$ANDROID_HOME/ndk/29.0.14206865/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" --strip-unneeded "artifact/$ABI/liborganicmaps.so"
+          "$ANDROID_HOME/ndk/29.0.14206865/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -h "artifact/$ABI/liborganicmaps.so" > "artifact/$ABI/ELF-HEADER.txt"
+          sha256sum "artifact/$ABI/liborganicmaps.so" > "artifact/$ABI/SHA256.txt"
+          git rev-parse HEAD > "artifact/$ABI/SOURCE-COMMIT.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mukshat-native-${{ matrix.abi }}
+          path: artifact/
+          retention-days: 14

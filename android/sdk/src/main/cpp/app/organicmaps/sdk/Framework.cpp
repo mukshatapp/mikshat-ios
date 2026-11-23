@@ -1,4 +1,7 @@
 #include "app/organicmaps/sdk/Framework.hpp"
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+#include "app/organicmaps/sdk/MukshatLegacySdk.hpp"
+#endif
 
 #include "app/organicmaps/sdk/FrameworkJni.hpp"
 #include "app/organicmaps/sdk/bookmarks/data/MapObject.hpp"
@@ -1186,10 +1189,17 @@ JNIEXPORT void Java_app_organicmaps_sdk_Framework_nativeSelectTrackCandidate(JNI
   frm()->SelectTrackCandidate(c.m_trackId, c.m_relationId);
 }
 
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+JNIEXPORT void Java_app_organicmaps_sdk_Framework_nativeSaveRoute(JNIEnv *, jclass)
+{
+  (void)frm()->SaveRoute();
+}
+#else
 JNIEXPORT jboolean Java_app_organicmaps_sdk_Framework_nativeSaveRoute(JNIEnv *, jclass)
 {
   return frm()->SaveRoute();
 }
+#endif
 
 JNIEXPORT jstring Java_app_organicmaps_sdk_Framework_nativeGetBookmarkDir(JNIEnv * env, jclass)
 {
@@ -1755,10 +1765,17 @@ JNIEXPORT jboolean Java_app_organicmaps_sdk_Framework_nativeHasSavedRoutePoints(
   return frm()->GetRoutingManager().HasSavedRoutePoints();
 }
 
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+JNIEXPORT void Java_app_organicmaps_sdk_Framework_nativeLoadRoutePoints(JNIEnv * env, jclass)
+{
+  MukshatOnRoutePointsLoaded(env, frm()->GetRoutingManager().LoadRoutePoints());
+}
+#else
 JNIEXPORT jboolean Java_app_organicmaps_sdk_Framework_nativeLoadRoutePoints(JNIEnv *, jclass)
 {
   return frm()->GetRoutingManager().LoadRoutePoints();
 }
+#endif
 
 JNIEXPORT void Java_app_organicmaps_sdk_Framework_nativeSaveRoutePoints(JNIEnv *, jclass)
 {

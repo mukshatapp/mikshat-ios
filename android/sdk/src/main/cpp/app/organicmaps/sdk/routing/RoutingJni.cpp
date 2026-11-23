@@ -393,6 +393,18 @@ JNIEXPORT jint Java_app_organicmaps_sdk_routing_RoutingOptions_nativeGetSupporte
   return vehicle ? routing::RoutingOptions::GetSupportedOptions(*vehicle) : 0;
 }
 
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+JNIEXPORT void Java_app_organicmaps_sdk_routing_RoutingOptions_nativeAddOption(JNIEnv *, jclass, jint option)
+{
+  using routing::RoutingOptions;
+  auto const vehicle = RoutingOptions::GetVehicleType(frm()->GetRoutingManager().GetRouter());
+  if (!vehicle)
+    return;
+  auto value = RoutingOptions::LoadFromSettings(*vehicle);
+  value.Add(routing_jni::ToRoutingOptionsRoad(option));
+  RoutingOptions::SaveToSettings(*vehicle, value);
+}
+#else
 JNIEXPORT void Java_app_organicmaps_sdk_routing_RoutingOptions_nativeAddOption(JNIEnv *, jclass, jint routerType,
                                                                                jint option)
 {
@@ -405,7 +417,20 @@ JNIEXPORT void Java_app_organicmaps_sdk_routing_RoutingOptions_nativeAddOption(J
   options.Add(road);
   RoutingOptions::SaveToSettings(*vehicle, options);
 }
+#endif
 
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+JNIEXPORT void Java_app_organicmaps_sdk_routing_RoutingOptions_nativeRemoveOption(JNIEnv *, jclass, jint option)
+{
+  using routing::RoutingOptions;
+  auto const vehicle = RoutingOptions::GetVehicleType(frm()->GetRoutingManager().GetRouter());
+  if (!vehicle)
+    return;
+  auto value = RoutingOptions::LoadFromSettings(*vehicle);
+  value.Remove(routing_jni::ToRoutingOptionsRoad(option));
+  RoutingOptions::SaveToSettings(*vehicle, value);
+}
+#else
 JNIEXPORT void Java_app_organicmaps_sdk_routing_RoutingOptions_nativeRemoveOption(JNIEnv *, jclass, jint routerType,
                                                                                   jint option)
 {
@@ -418,6 +443,7 @@ JNIEXPORT void Java_app_organicmaps_sdk_routing_RoutingOptions_nativeRemoveOptio
   options.Remove(road);
   RoutingOptions::SaveToSettings(*vehicle, options);
 }
+#endif
 
 JNIEXPORT jboolean Java_app_organicmaps_sdk_routing_RoutingOptions_nativeIsRouteOptimizationEnabled(JNIEnv *, jclass)
 {

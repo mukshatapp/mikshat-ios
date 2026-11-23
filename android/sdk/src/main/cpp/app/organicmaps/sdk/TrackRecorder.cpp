@@ -52,12 +52,19 @@ JNIEXPORT void Java_app_organicmaps_sdk_location_TrackRecorder_nativeDiscardTrac
   frm()->DiscardTrackRecording();
 }
 
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+JNIEXPORT void Java_app_organicmaps_sdk_location_TrackRecorder_nativeSaveTrackRecordingWithName(JNIEnv * env, jclass, jstring name)
+{
+  (void)frm()->SaveTrackRecordingWithName(jni::ToNativeString(env, name));
+}
+#else
 JNIEXPORT jboolean Java_app_organicmaps_sdk_location_TrackRecorder_nativeSaveTrackRecordingWithName(JNIEnv * env,
                                                                                                     jclass clazz,
                                                                                                     jstring name)
 {
   return frm()->SaveTrackRecordingWithName(jni::ToNativeString(env, name));
 }
+#endif
 
 JNIEXPORT jboolean Java_app_organicmaps_sdk_location_TrackRecorder_nativeIsTrackRecordingEnabled(JNIEnv * env,
                                                                                                  jclass clazz)

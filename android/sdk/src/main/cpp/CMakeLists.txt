@@ -92,6 +92,13 @@ set(SRC
 
 omim_add_library(${PROJECT_NAME} SHARED ${SRC})
 
+option(MUKSHAT_LEGACY_SDK_ABI "Build against the preserved Mukshat 26112301 JNI contract" OFF)
+if (MUKSHAT_LEGACY_SDK_ABI)
+  target_sources(${PROJECT_NAME} PRIVATE app/organicmaps/sdk/MukshatLegacySdk.cpp)
+  target_compile_definitions(${PROJECT_NAME} PRIVATE MUKSHAT_LEGACY_SDK_ABI)
+endif()
+
+
 target_include_directories(${PROJECT_NAME} PRIVATE .)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE

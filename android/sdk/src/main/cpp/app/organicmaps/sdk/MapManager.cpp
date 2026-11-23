@@ -398,6 +398,14 @@ static void EndBatchingCallbacks(JNIEnv * env)
 }
 
 // static void nativeDownload(String root, boolean withTerrain);
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+JNIEXPORT void Java_app_organicmaps_sdk_downloader_MapManager_nativeDownload(JNIEnv * env, jclass, jstring root)
+{
+  StartBatchingCallbacks();
+  GetStorage().DownloadNode(jni::ToNativeString(env, root), false /* isUpdate */, false /* withTerrain */);
+  EndBatchingCallbacks(env);
+}
+#else
 JNIEXPORT void Java_app_organicmaps_sdk_downloader_MapManager_nativeDownload(JNIEnv * env, jclass clazz, jstring root,
                                                                              jboolean withTerrain)
 {
@@ -405,6 +413,7 @@ JNIEXPORT void Java_app_organicmaps_sdk_downloader_MapManager_nativeDownload(JNI
   GetStorage().DownloadNode(jni::ToNativeString(env, root), false /* isUpdate */, withTerrain);
   EndBatchingCallbacks(env);
 }
+#endif
 
 // static boolean nativeRetry(String root);
 JNIEXPORT void Java_app_organicmaps_sdk_downloader_MapManager_nativeRetry(JNIEnv * env, jclass clazz, jstring root)
@@ -423,6 +432,14 @@ JNIEXPORT void Java_app_organicmaps_sdk_downloader_MapManager_nativeUpdate(JNIEn
 }
 
 // static void nativeCancel(String root, boolean withTerrain);
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+JNIEXPORT void Java_app_organicmaps_sdk_downloader_MapManager_nativeCancel(JNIEnv * env, jclass, jstring root)
+{
+  StartBatchingCallbacks();
+  GetStorage().CancelDownloadNode(GetRootId(env, root), false /* withTerrain */);
+  EndBatchingCallbacks(env);
+}
+#else
 JNIEXPORT void Java_app_organicmaps_sdk_downloader_MapManager_nativeCancel(JNIEnv * env, jclass clazz, jstring root,
                                                                            jboolean withTerrain)
 {
@@ -430,6 +447,7 @@ JNIEXPORT void Java_app_organicmaps_sdk_downloader_MapManager_nativeCancel(JNIEn
   GetStorage().CancelDownloadNode(GetRootId(env, root), withTerrain);
   EndBatchingCallbacks(env);
 }
+#endif
 
 // static void nativeDelete(String root);
 JNIEXPORT void Java_app_organicmaps_sdk_downloader_MapManager_nativeDelete(JNIEnv * env, jclass clazz, jstring root)
