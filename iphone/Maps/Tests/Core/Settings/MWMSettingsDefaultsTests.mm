@@ -1,5 +1,6 @@
 #import <XCTest/XCTest.h>
 
+#import <CoreApi/MWMNetworkPolicy.h>
 #import <CoreApi/MWMTypes.h>
 #import "MWMSettings.h"
 

@@ -8,12 +8,14 @@
 #include "indexer/feature_visibility.hpp"
 #include "indexer/map_object.hpp"
 #include "indexer/map_style_reader.hpp"
+#include "indexer/mwm_set.hpp"
 
 #include "drape/hatching_decl.hpp"
 
 #include <algorithm>
 #include <array>
 #include <initializer_list>
+#include <memory>
 
 namespace
 {
@@ -70,12 +72,27 @@ private:
 
 class NamedLocality : public osm::MapObject
 {
+  class LocalityMapInfo : public MwmInfo
+  {
+  public:
+    LocalityMapInfo()
+    {
+      m_minScale = 9;
+      m_maxScale = 17;
+      m_data.SetLanguages({"ar"});
+    }
+  };
+
 public:
   explicit NamedLocality(std::string_view name)
   {
+    // CaptionDescription resolves readable names through the feature's map.
+    // A detached synthetic feature would correctly have its caption cleared.
+    m_featureID = FeatureID(MwmSet::MwmId(std::make_shared<LocalityMapInfo>()), 0);
     m_geomType = feature::GeomType::Point;
     m_points = {{0.0, 0.0}};
     m_types.Add(classif().GetTypeByPath({"place", "locality"}));
+    m_name.Add("default", name);
     m_name.Add("ar", name);
   }
 };

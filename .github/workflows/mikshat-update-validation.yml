@@ -62,7 +62,9 @@ jobs:
         run: |
           set -euo pipefail
           if [[ "$CONFIGURATION" == "Debug" ]]; then
-            destination='generic/platform=iOS Simulator'
+            # Match ios-check.yaml: retain the simulator SDK while selecting
+            # the project's supported ARM architecture, not Intel simulator.
+            destination='generic/platform=iOS'
             sdk=iphonesimulator
           else
             destination='generic/platform=iOS'
