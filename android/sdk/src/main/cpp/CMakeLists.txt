@@ -96,6 +96,7 @@ option(MUKSHAT_LEGACY_SDK_ABI "Build against the preserved Mukshat 26112301 JNI 
 if (MUKSHAT_LEGACY_SDK_ABI)
   target_sources(${PROJECT_NAME} PRIVATE app/organicmaps/sdk/MukshatLegacySdk.cpp)
   target_compile_definitions(${PROJECT_NAME} PRIVATE MUKSHAT_LEGACY_SDK_ABI)
+  target_compile_definitions(platform PRIVATE MUKSHAT_BUNDLED_DESERT_MAPS)
 endif()
 
 

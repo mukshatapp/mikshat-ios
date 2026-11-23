@@ -2061,7 +2061,7 @@ void Storage::RegisterLocalFile(platform::LocalCountryFile const & localFile)
 
   /// Funny, but ptr->GetCountryFile() has valid name only. Size and hash are not initialized.
   /// @todo Store only name (CountryId) in LocalCountryFile instead of CountryFile?
-  if (m_currentVersion == ptr->GetVersion() && size != GetCountryFile(countryId).GetRemoteSize())
+  if (IsLeaf(countryId) && m_currentVersion == ptr->GetVersion() && size != GetCountryFile(countryId).GetRemoteSize())
     LOG(LERROR, ("Inconsistent MWM and version for", *ptr));
 }
 

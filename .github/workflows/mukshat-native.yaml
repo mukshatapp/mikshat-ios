@@ -3,6 +3,9 @@ on:
   push:
     branches: [codex/mukshat-organic-26112401]
   workflow_dispatch:
+concurrency:
+  group: mukshat-native-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -18,7 +21,6 @@ jobs:
         with:
           submodules: recursive
           fetch-depth: 1
-      - uses: android-actions/setup-android@v3
       - name: Install NDK and CMake
         run: |
           sdkmanager 'ndk;29.0.14206865' 'cmake;3.31.6'

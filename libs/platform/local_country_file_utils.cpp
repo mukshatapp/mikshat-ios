@@ -265,7 +265,13 @@ void FindAllLocalMapsAndCleanup(int64_t latestVersion, string const & dataDir,
   Platform & platform = GetPlatform();
   string const world(WORLD_FILE_NAME);
   string const worldCoasts(WORLD_COASTS_FILE_NAME);
-  for (string const & file : {world, worldCoasts})
+  std::vector<string> bundledMaps = {world, worldCoasts};
+#if defined(MUKSHAT_BUNDLED_DESERT_MAPS)
+  // These immutable supplemental maps have distinct identities from downloadable countries.
+  for (auto const * name : {"desert-ksa-north", "desert-ksa-south", "desert-kuwait", "desert-qatar"})
+    bundledMaps.emplace_back(name);
+#endif
+  for (string const & file : bundledMaps)
   {
     auto i = localFiles.begin();
     for (; i != localFiles.end(); ++i)
