@@ -225,7 +225,17 @@ def main():
             command(["xcrun", "simctl", "shutdown", udid])
         summary["classification"] = classify(results)
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
-        summary.update(classification="infrastructureFailed", infrastructureError=str(error))
+        if getattr(error, "cmd", [])[:2] == ["xcodebuild", "build-for-testing"]:
+            summary.update(classification="buildFailed", buildError=str(error))
+            build_log = destination / "xcodebuild-build.log"
+            if build_log.exists():
+                lines = build_log.read_text(errors="replace").splitlines()
+                errors = [line for line in lines if ": error:" in line or "fatal error:" in line]
+                print("Build-for-testing failed. Compiler diagnostics:", flush=True)
+                for line in (errors[:40] or lines[-40:]):
+                    print(line, flush=True)
+        else:
+            summary.update(classification="infrastructureFailed", infrastructureError=str(error))
     finally:
         for udid in simulators:
             for operation in ("shutdown", "delete"):

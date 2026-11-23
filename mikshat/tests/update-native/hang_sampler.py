@@ -21,7 +21,7 @@ def valid_identity(record):
         return (record.get("version") == 1 and record.get("bundle") == BUNDLE
                 and type(record.get("pid")) is int and record["pid"] > 1
                 and type(record.get("sequence")) is int and record["sequence"] > 0
-                and str(uuid.UUID(record["run"])) == record["run"])
+                and str(uuid.UUID(record["run"])) == record["run"].lower())
     except (KeyError, ValueError, TypeError, AttributeError):
         return False
 

@@ -261,7 +261,7 @@ final class MikshatMapSceneLayoutTests: XCTestCase {
     RotationPhaseDiagnostics.record("selection.attach.end")
     let page = try XCTUnwrap(map.children.compactMap { $0 as? PlacePageViewController }.first)
     let titleTextView = try XCTUnwrap(try sceneElement("placePage.title", in: page.view) as? UITextView)
-    RotationPhaseDiagnostics.record("probe.title.found", extra: ["bounds": NSStringFromCGRect(titleTextView.bounds),
+    RotationPhaseDiagnostics.record("probe.title.found", extra: ["bounds": String(describing: titleTextView.bounds),
                                                                "behavior": titleTextView.contentInsetAdjustmentBehavior.rawValue])
     if ProcessInfo.processInfo.arguments.contains("-MikshatTitleInsetsNever") {
       RotationPhaseDiagnostics.record("probe.titleInsetsNever.begin")
@@ -726,20 +726,20 @@ private enum RotationPhaseDiagnostics {
       record("title.snapshot.missing")
       return
     }
-    var values: [String: Any] = ["titleBounds": NSStringFromCGRect(title.bounds),
-                                "titleContentSize": NSStringFromCGSize(title.contentSize),
-                                "titleContentInset": NSStringFromUIEdgeInsets(title.contentInset),
-                                "titleAdjustedContentInset": NSStringFromUIEdgeInsets(title.adjustedContentInset),
-                                "titleSafeAreaInsets": NSStringFromUIEdgeInsets(title.safeAreaInsets),
-                                "titleOffset": NSStringFromCGPoint(title.contentOffset),
+    var values: [String: Any] = ["titleBounds": String(describing: title.bounds),
+                                "titleContentSize": String(describing: title.contentSize),
+                                "titleContentInset": String(describing: title.contentInset),
+                                "titleAdjustedContentInset": String(describing: title.adjustedContentInset),
+                                "titleSafeAreaInsets": String(describing: title.safeAreaInsets),
+                                "titleOffset": String(describing: title.contentOffset),
                                 "titleInsetBehavior": title.contentInsetAdjustmentBehavior.rawValue]
     if let outer = descendants.first(where: { $0.accessibilityIdentifier == "placePage.scroll" }) as? UIScrollView {
-      values["outerOffset"] = NSStringFromCGPoint(outer.contentOffset)
-      values["outerBounds"] = NSStringFromCGRect(outer.bounds)
-      values["outerContentSize"] = NSStringFromCGSize(outer.contentSize)
-      values["outerContentInset"] = NSStringFromUIEdgeInsets(outer.contentInset)
-      values["outerAdjustedContentInset"] = NSStringFromUIEdgeInsets(outer.adjustedContentInset)
-      values["outerSafeAreaInsets"] = NSStringFromUIEdgeInsets(outer.safeAreaInsets)
+      values["outerOffset"] = String(describing: outer.contentOffset)
+      values["outerBounds"] = String(describing: outer.bounds)
+      values["outerContentSize"] = String(describing: outer.contentSize)
+      values["outerContentInset"] = String(describing: outer.contentInset)
+      values["outerAdjustedContentInset"] = String(describing: outer.adjustedContentInset)
+      values["outerSafeAreaInsets"] = String(describing: outer.safeAreaInsets)
     }
     record("title.snapshot.end", extra: values)
   }

@@ -33,6 +33,11 @@ class SamplingScopeTests(unittest.TestCase):
     def test_event_loop_hang_after_a_synchronous_end_marker_still_gets_a_stack(self):
         self.assertTrue(hang_sampler.phase_candidate(self.phase(phase="layout.window.end"), 111, 10))
 
+    def test_swift_uppercase_uuid_phase_is_accepted(self):
+        record = self.phase(run="9B3B4353-851A-4E88-B88E-3561D9260D80")
+        self.assertTrue(hang_sampler.valid_identity(record))
+        self.assertTrue(hang_sampler.phase_candidate(record, 111, 10))
+
     def test_shell_or_other_simulator_cannot_match_the_exact_app_process(self):
         executable = Path("/sim/one/Organic Maps.app/Organic Maps")
         self.assertTrue(hang_sampler.exact_app_process(str(executable) + " -IsTests", executable))
