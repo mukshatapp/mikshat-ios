@@ -6,7 +6,7 @@ def legacy(text):
  output=[];active=True;stack=[]
  for line in text.splitlines():
   if line.startswith('#if'):
-   known='MUKSHAT_LEGACY_SDK_ABI' in line;stack.append((active,known));active=active if not known else active;continue
+   known='MUKSHAT_LEGACY_SDK_ABI' in line;stack.append((active,known));active=active if not known else active and '!defined' not in line;continue
   if line.startswith('#else'):
    if stack and stack[-1][1]:active=stack[-1][0] and not active
    continue

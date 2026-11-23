@@ -2,6 +2,7 @@
 #include "app/organicmaps/sdk/Framework.hpp"
 #include "app/organicmaps/sdk/core/jni_helper.hpp"
 #include "map/gps_tracker.hpp"
+#include "platform/platform.hpp"
 #include "routing/routing_options.hpp"
 
 namespace
@@ -9,15 +10,20 @@ namespace
 std::shared_ptr<jobject> g_loadListener;
 }
 
-void MukshatOnRoutePointsLoaded(JNIEnv * env, bool loaded)
+void MukshatOnRoutePointsLoaded(JNIEnv *, bool loaded)
 {
-  // Keep a local owner in case the callback removes its subscription synchronously.
+  // The legacy consumer expects completion after nativeLoadRoutePoints returns.
+  // Own the requested listener until its asynchronous UI-thread completion.
   auto const listener = g_loadListener;
   if (!listener)
     return;
-  auto const method = jni::GetMethodID(env, *listener, "onRoutePointsLoaded", "(Z)V");
-  env->CallVoidMethod(*listener, method, static_cast<jboolean>(loaded));
-  jni::HandleJavaException(env);
+  GetPlatform().RunTask(Platform::Thread::Gui, [listener, loaded]
+  {
+    auto * env = jni::GetEnv();
+    auto const method = jni::GetMethodID(env, *listener, "onRoutePointsLoaded", "(Z)V");
+    env->CallVoidMethod(*listener, method, static_cast<jboolean>(loaded));
+    jni::HandleJavaException(env);
+  });
 }
 
 extern "C"
