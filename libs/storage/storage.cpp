@@ -3189,6 +3189,11 @@ CountryId Storage::GetParentIdFor(CountryId const & countryId) const
 
   CountryTree::NodesBufferT nodes;
   m_countries.Find(countryId, nodes);
+#if defined(MUKSHAT_BUNDLED_DESERT_MAPS)
+  // Registered resource overlays have no node in the downloadable-country hierarchy.
+  if (nodes.empty() && m_localFilesForFakeCountries.contains(platform::CountryFile(countryId)))
+    return {};
+#endif
   CHECK(!nodes.empty(), (countryId));
 
   if (nodes.size() > 1)

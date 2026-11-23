@@ -97,6 +97,7 @@ if (MUKSHAT_LEGACY_SDK_ABI)
   target_sources(${PROJECT_NAME} PRIVATE app/organicmaps/sdk/MukshatLegacySdk.cpp)
   target_compile_definitions(${PROJECT_NAME} PRIVATE MUKSHAT_LEGACY_SDK_ABI)
   target_compile_definitions(platform PRIVATE MUKSHAT_BUNDLED_DESERT_MAPS)
+  target_compile_definitions(storage PRIVATE MUKSHAT_BUNDLED_DESERT_MAPS)
 endif()
 
 

@@ -23,7 +23,17 @@ std::unique_ptr<m4::Tree<NumMwmId>> MakeNumMwmTree(NumMwmIds const & numMwmIds,
 std::shared_ptr<NumMwmIds> CreateNumMwmIds(storage::Storage const & storage)
 {
   auto numMwmIds = std::make_shared<NumMwmIds>();
-  storage.ForEachCountry([&](platform::CountryFile const & country) { numMwmIds->RegisterFile(country); });
+  storage.ForEachCountry([&](platform::CountryFile const & country)
+  {
+#if defined(MUKSHAT_BUNDLED_DESERT_MAPS)
+    // Terrain/POI overlays complement countries; they do not provide road routing graphs.
+    auto const & name = country.GetName();
+    if (name == "desert-ksa-north" || name == "desert-ksa-south" || name == "desert-kuwait" ||
+        name == "desert-qatar")
+      return;
+#endif
+    numMwmIds->RegisterFile(country);
+  });
   return numMwmIds;
 }
 
