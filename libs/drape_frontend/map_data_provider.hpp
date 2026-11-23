@@ -21,7 +21,9 @@ public:
   template <typename T>
   using TReadCallback = std::function<void(T &)>;
   using TReadFeaturesFn = std::function<void(TReadCallback<FeatureType> const &, std::vector<FeatureID> const &)>;
-  using TReadIDsFn = std::function<void(TReadCallback<FeatureID const> const &, m2::RectD const &, int)>;
+  using TStopReadFn = std::function<bool()>;
+  using TReadIDsFn =
+      std::function<void(TReadCallback<FeatureID const> const &, m2::RectD const &, int, TStopReadFn const &)>;
   using TIsCountryLoadedFn = std::function<bool(m2::PointD const &)>;
   using TIsCountryLoadedByNameFn = std::function<bool(std::string_view)>;
   using TUpdateCurrentCountryFn = std::function<void(m2::PointD const &, int)>;
@@ -33,7 +35,8 @@ public:
                   TUpdateCurrentCountryFn && updateCurrentCountryFn, TTileBackgroundReadFn && tileBackgroundReadFn,
                   TCancelTileBackgroundReadingFn && cancelTileBackgroundReadingFn);
 
-  void ReadFeaturesID(TReadCallback<FeatureID const> const & fn, m2::RectD const & r, int scale) const;
+  void ReadFeaturesID(TReadCallback<FeatureID const> const & fn, m2::RectD const & r, int scale,
+                      TStopReadFn const & stop = {}) const;
   void ReadFeatures(TReadCallback<FeatureType> const & fn, std::vector<FeatureID> const & ids) const;
 
   TTileBackgroundReadFn ReadTileBackgroundFn() const;

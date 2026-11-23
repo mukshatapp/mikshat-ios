@@ -1,7 +1,6 @@
 #include "testing/testing.hpp"
 
 #include "storage/map_files_downloader_with_ping.hpp"
-#include "storage/saudi_map_download_source.hpp"
 #include "storage/storage_tests/test_map_files_downloader.hpp"
 
 #include "platform/local_country_file_utils.hpp"
@@ -11,12 +10,15 @@
 
 #include "base/file_name_utils.hpp"
 #include "base/logging.hpp"
+#include "base/string_utils.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "defines.hpp"
 #include "private.h"
@@ -63,35 +65,44 @@ UNIT_TEST(MapFilesDownloader_DebugServerList)
   TEST(downloader.MakeUrlList("maps/1/Germany.mwm").empty(), ());
 }
 
-UNIT_TEST(MapFilesDownloader_SaudiDriveSources)
+UNIT_TEST(MapFilesDownloader_OfficialSources)
 {
   DownloaderStub downloader;
-  downloader.SetServersList({"https://example.com/base/"});
-  auto const diffs = std::make_shared<storage::diffs::DiffsDataSource>();
-  for (auto const & source : storage::kSaudiMapDownloadSources)
-  {
-    auto const id = std::string(source.m_countryId);
-    platform::CountryFile const file(id, source.m_size, std::string(source.m_hash));
-    storage::QueuedCountry country(file, id, MapFileType::Map, storage::kSaudiMapDataVersion, {}, diffs);
-    auto const urls = downloader.MakeUrlList(country);
-    TEST_EQUAL(urls.size(), 1, (id));
-    TEST_EQUAL(urls.front(), source.GetUrl(), (id));
-    TEST_EQUAL(country.GetDownloadSize(), source.m_size, (id));
+  std::vector<std::string> const servers = {"https://cdn.organicmaps.app/", "https://cdn-nl1.organicmaps.app/"};
+  downloader.SetServersList(servers);
 
-    storage::QueuedCountry newer(file, id, MapFileType::Map, storage::kSaudiMapDataVersion + 1, {}, diffs);
-    TEST(downloader.MakeUrlList(newer).empty(), ("Unsupported data version must not use a CDN fallback", id));
-    country.SetFileType(MapFileType::Diff);
-    TEST(downloader.MakeUrlList(country).empty(), ("Drive has no diff sidecars", id));
+  for (auto const & id : {"Saudi Arabia_North", "Saudi Arabia_South", "World", "WorldCoasts", "Germany_Berlin"})
+  {
+    auto const diffs = std::make_shared<storage::diffs::DiffsDataSource>();
+    platform::CountryFile const file(id, 1234, "catalog-hash");
+    for (int64_t const version : {260714, 260715})
+    {
+      storage::QueuedCountry country(file, id, MapFileType::Map, version, {}, diffs);
+      auto const urls = downloader.MakeUrlList(country);
+      TEST_EQUAL(urls.size(), servers.size(), (id, version));
+      TEST_EQUAL(country.GetDownloadSize(), 1234, (id, version));
+      auto encodedId = std::string(id);
+      auto const space = encodedId.find(' ');
+      if (space != std::string::npos)
+        encodedId.replace(space, 1, "%20");
+      for (size_t i = 0; i < servers.size(); ++i)
+        TEST_EQUAL(urls[i], servers[i] + "maps/" + strings::to_string(version) + "/" + encodedId + ".mwm",
+                   (id, version));
+    }
+
+    diffs->SetDiffInfo({{id, storage::diffs::DiffInfo(64, 260714)}});
+    storage::QueuedCountry diff(file, id, MapFileType::Diff, 260715, {}, diffs);
+    auto const urls = downloader.MakeUrlList(diff);
+    TEST_EQUAL(urls.size(), servers.size(), (id));
+    TEST_EQUAL(diff.GetDownloadSize(), 64, (id));
+    TEST(urls.front().starts_with(servers.front() + "diffs/260715/260714/"), (id, urls.front()));
+    TEST(urls.front().ends_with(".mwmdiff"), (id, urls.front()));
   }
 
-  for (auto const & id : {"World", "WorldCoasts", "Germany_Berlin"})
-  {
-    storage::QueuedCountry country(platform::CountryFile(id), id, MapFileType::Map, storage::kSaudiMapDataVersion,
-                                   {}, diffs);
-    auto const urls = downloader.MakeUrlList(country);
-    TEST_EQUAL(urls.size(), 1, (id));
-    TEST_EQUAL(urls.front(), "https://example.com/base/maps/260714/" + std::string(id) + ".mwm", (id));
-  }
+  downloader.ResetServersList();
+  storage::QueuedCountry country(platform::CountryFile("Saudi Arabia_North"), "Saudi Arabia_North", MapFileType::Map,
+                                 260714, {}, std::make_shared<storage::diffs::DiffsDataSource>());
+  TEST(downloader.MakeUrlList(country).empty(), ("Saudi maps must wait for the same server selection as other maps"));
 }
 
 UNIT_TEST(GetMetaConfig)

@@ -42,7 +42,9 @@ public:
   // query. |covering| must have been built at the MWM's coding scale (see covering::AggCovering).
   void ForEachInCoveringForMWM(FeatureCallback const & f, covering::AggCovering & covering, int scale,
                                MwmId const & id) const;
-  void ForEachInRectForMWM(FeatureCallback const & f, m2::RectD const & rect, int scale, MwmId const & id) const;
+  void ForEachInRectForMWM(FeatureCallback const & f, m2::RectD const & rect, int scale, MwmId const & id,
+                           StopSearchCallback const & stop = {},
+                           covering::CoveringMode mode = covering::ViewportWithLowLevels) const;
 
   // "features" must be sorted using FeatureID::operator< as predicate.
   void ReadFeatures(FeatureCallback const & fn, std::vector<FeatureID> const & features) const;

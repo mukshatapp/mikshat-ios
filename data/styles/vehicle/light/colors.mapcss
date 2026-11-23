@@ -154,3 +154,9 @@
 @water_label: #4499Bb;
 @park_label: #3A7921;
 @halo_park_label: #FFFFFF;
+
+/* Mikshat outdoor labels and unsealed tracks. */
+@mikshat_wadi_label: #126CB3;
+@mikshat_settlement_label: #B32624;
+@mikshat_dirt_road: #956138;
+@mikshat_fayda_label: #207440;

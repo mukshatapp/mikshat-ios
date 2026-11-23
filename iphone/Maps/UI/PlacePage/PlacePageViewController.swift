@@ -49,6 +49,10 @@ final class PlacePageScrollView: UIScrollView {
   private var isVisible: Bool = false
   private var closingAnimator: UIViewPropertyAnimator?
   private var previousLayoutSize: CGSize?
+  private var scrollingAnimator: UIViewPropertyAnimator?
+  private var isChangingSize = false
+  private var sizeTransitionRevision: UInt = 0
+  private var isContentSizeRefreshScheduled = false
 
   var layout: IPlacePageLayout!
   var interactor: PlacePageInteractorProtocol?
@@ -75,9 +79,27 @@ final class PlacePageScrollView: UIScrollView {
     updateBackgroundViewFrame()
     let size = view.bounds.size
     if let previousLayoutSize, previousLayoutSize != size, isVisible {
-      DispatchQueue.main.async { [weak self] in self?.refreshContentSize() }
+      scheduleContentSizeRefresh()
     }
     previousLayoutSize = size
+  }
+
+  override func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
+    // UIKit owns this geometry animation. Starting another sheet animator for
+    // each intermediate height feeds scroll insets/offsets back into its layout.
+    sizeTransitionRevision &+= 1
+    let revision = sizeTransitionRevision
+    isChangingSize = true
+    stopScrollingAnimation()
+    super.viewWillTransition(to: size, with: coordinator)
+    let completion: (UIViewControllerTransitionCoordinatorContext) -> Void = { [weak self] _ in
+      self?.finishSizeTransition(revision: revision)
+    }
+    if !coordinator.animate(alongsideTransition: nil, completion: completion) {
+      DispatchQueue.main.async { [weak self] in
+        self?.finishSizeTransition(revision: revision)
+      }
+    }
   }
 
   override func viewDidAppear(_ animated: Bool) {
@@ -90,25 +112,16 @@ final class PlacePageScrollView: UIScrollView {
     super.viewWillDisappear(animated)
     currentScrollContentOffset = scrollView.contentOffset
     isVisible = false
+    stopScrollingAnimation()
   }
 
   override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
     super.traitCollectionDidChange(previousTraitCollection)
     guard isViewLoaded, layout != nil else { return }
     if let previousTraitCollection,
-       previousTraitCollection.preferredContentSizeCategory != traitCollection.preferredContentSizeCategory {
-      DispatchQueue.main.async { [weak self] in self?.refreshContentSize() }
-    }
-    // Update layout when the device was rotated but skip when the appearance was changed.
-    if self.previousTraitCollection != nil, previousTraitCollection?.userInterfaceStyle == traitCollection.userInterfaceStyle, previousTraitCollection?.verticalSizeClass != traitCollection.verticalSizeClass {
-      DispatchQueue.main.async {
-        if self.layout.headerViewController.isEditingTitle {
-          self.updateContentOffsetForTitleEditing()
-        } else {
-          self.scrollView.contentInset.top = self.scrollView.height
-          self.refreshContentSize()
-        }
-      }
+       previousTraitCollection.preferredContentSizeCategory != traitCollection.preferredContentSizeCategory ||
+        previousTraitCollection.verticalSizeClass != traitCollection.verticalSizeClass {
+      scheduleContentSizeRefresh()
     }
   }
 
@@ -136,6 +149,39 @@ final class PlacePageScrollView: UIScrollView {
   }
 
   // MARK: - Private methods
+
+  private func finishSizeTransition(revision: UInt) {
+    // A reversal can start a new transition before the previous coordinator's
+    // completion or unregistered-animation fallback reaches the main queue.
+    guard revision == sizeTransitionRevision else { return }
+    isChangingSize = false
+    scheduleContentSizeRefresh()
+  }
+
+  private func scheduleContentSizeRefresh() {
+    guard !isChangingSize, !isContentSizeRefreshScheduled else { return }
+    isContentSizeRefreshScheduled = true
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      self.isContentSizeRefreshScheduled = false
+      guard self.isVisible, self.viewIfLoaded?.window != nil, !self.isChangingSize,
+            self.closingAnimator == nil, self.layout != nil else { return }
+      if self.layout.headerViewController.isEditingTitle {
+        self.updateContentOffsetForTitleEditing()
+      } else {
+        // Reflow the settled viewport once; only explicit sheet interactions
+        // animate their offset, independently of system geometry transitions.
+        self.refreshContentSize(animated: false)
+      }
+    }
+  }
+
+  private func stopScrollingAnimation() {
+    if let scrollingAnimator, scrollingAnimator.state == .active {
+      scrollingAnimator.stopAnimation(true)
+    }
+    scrollingAnimator = nil
+  }
 
   private func updateSteps() {
     layoutIfNeeded()
@@ -315,24 +361,28 @@ final class PlacePageScrollView: UIScrollView {
     if beginDragging, !forced {
       return
     }
+    stopScrollingAnimation()
     let contentOffset = CGPoint(x: point.x, y: min(scrollView.contentSize.height - scrollView.height, point.y))
-    let bound = view.frame.height + contentOffset.y
+    let bound = view.bounds.height + contentOffset.y
     if animated {
       if isFirstOpening {
         updateTopBound(bound)
         isFirstOpening = false
       }
-      ModalPresentationAnimator.animate(animations: { [weak scrollView] in
-        scrollView?.contentOffset = contentOffset
+      scrollingAnimator = ModalPresentationAnimator.animate(animations: { [weak self] in
+        guard let self else { return }
+        self.scrollView.contentOffset = contentOffset
         self.updateBackgroundViewFrame()
         self.layoutIfNeeded()
-      }, completion: { complete in
+      }, completion: { [weak self] complete in
+        self?.scrollingAnimator = nil
         if complete {
           completion?()
         }
       })
     } else {
       scrollView?.contentOffset = contentOffset
+      updateTopBound(bound)
       updateBackgroundViewFrame()
       completion?()
     }
@@ -368,7 +418,11 @@ extension PlacePageViewController: PlacePageViewProtocol {
   }
 
   func refreshContentSize() {
-    guard layout != nil, isViewLoaded else { return }
+    refreshContentSize(animated: !UIAccessibility.isReduceMotionEnabled)
+  }
+
+  private func refreshContentSize(animated: Bool) {
+    guard layout != nil, isViewLoaded, !isChangingSize, closingAnimator == nil else { return }
     let oldOffset = scrollView.contentOffset.y
     let oldPreviewOffset = scrollSteps.first { if case .preview = $0 { return true }; return false }?.offset
     let wasAtFullStop = scrollSteps.last.map { abs(oldOffset - boundedOffset(for: $0)) < 1 } ?? false
@@ -396,7 +450,7 @@ extension PlacePageViewController: PlacePageViewProtocol {
         targetOffset += previewOffset - oldPreviewOffset
       }
     }
-    scrollTo(CGPoint(x: 0, y: targetOffset), animated: !UIAccessibility.isReduceMotionEnabled)
+    scrollTo(CGPoint(x: 0, y: targetOffset), animated: animated)
   }
 
   func updateWithLayout(_ layout: IPlacePageLayout) {
@@ -455,6 +509,7 @@ extension PlacePageViewController: PlacePageViewProtocol {
   func close(completion: @escaping (() -> Void)) {
     // The completion removes the current Place Page, so it must run only once.
     guard closingAnimator?.state != .active else { return }
+    stopScrollingAnimation()
     view.isUserInteractionEnabled = false
     updateTopBound(.zero)
     closingAnimator = ModalPresentationAnimator.animate(
@@ -491,6 +546,10 @@ extension PlacePageViewController: PlacePageViewProtocol {
 extension PlacePageViewController: UIScrollViewDelegate {
   func scrollViewDidScroll(_ scrollView: UIScrollView) {
     currentScrollContentOffset = scrollView.contentOffset
+    guard !isChangingSize else {
+      updateBackgroundViewFrame()
+      return
+    }
 
     if scrollView.contentOffset.y < -scrollView.height + 1, beginDragging, !layout.headerViewController.isEditingTitle {
       interactor?.close()

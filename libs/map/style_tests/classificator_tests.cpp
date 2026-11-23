@@ -432,6 +432,116 @@ UNIT_TEST(Classificator_IntermittentWaterwayRules)
 
 namespace
 {
+drule::BaseRule const * GetMikshatRule(base::StringIL const & path, int level, GeomType geometry, drule::TypeT kind)
+{
+  drule::KeysT keys;
+  GetDrawRule({classif().GetTypeByPath(path)}, level, geometry, keys);
+  for (auto const & key : keys)
+    if (key.m_type == kind)
+      return drule::GetCurrentRules().Find(key);
+  return nullptr;
+}
+}  // namespace
+
+// Read the shipped binary drawing rules, including both palettes and all
+// browsing/navigation families. MapCSS text alone is not the app's style.
+UNIT_TEST(Classificator_MikshatOutdoorLabels)
+{
+  styles::RunForEveryMapStyle([](MapStyle style)
+  {
+    uint32_t const settlementColor = MapStyleIsDark(style) ? 0xFF8D86 : 0xB32624;
+    uint32_t const wadiColor = MapStyleIsDark(style) ? 0x68BFFF : 0x126CB3;
+    for (auto const & path : vector<base::StringIL>{{"place", "village"}, {"place", "hamlet"}})
+    {
+      for (int const zoom : {10, 13, 17})
+      {
+        auto const * rule = GetMikshatRule(path, zoom, GeomType::Point, drule::caption);
+        TEST(rule && rule->GetCaption() && rule->GetCaption()->primary, (style, path, zoom));
+        auto const & caption = *rule->GetCaption()->primary;
+        TEST_EQUAL(caption.color & 0xFFFFFF, settlementColor, (style, path, zoom));
+        TEST_GREATER_OR_EQUAL(caption.height, zoom >= 13 ? 14 : 12, (style, path, zoom));
+      }
+    }
+    auto const * city = GetMikshatRule({"place", "city"}, 11, GeomType::Point, drule::caption);
+    TEST(city && city->GetCaption() && city->GetCaption()->primary, (style));
+    TEST_GREATER_OR_EQUAL(city->GetCaption()->primary->height, 16, (style));
+
+    uint32_t const faydaColor = MapStyleIsDark(style) ? 0x7AD49A : 0x207440;
+    for (auto const & path : vector<base::StringIL>{{"landuse", "meadow"}, {"natural", "grassland"}})
+    {
+      auto const * rule = GetMikshatRule(path, 10, GeomType::Area, drule::caption);
+      TEST(rule && rule->GetCaption() && rule->GetCaption()->primary, (style, path));
+      TEST_EQUAL(rule->GetCaption()->primary->color & 0xFFFFFF, faydaColor, (style, path));
+    }
+
+    for (auto const & path : vector<base::StringIL>{{"waterway", "river"},
+                                                    {"waterway", "river", "intermittent"},
+                                                    {"waterway", "stream"},
+                                                    {"waterway", "stream", "intermittent"}})
+    {
+      for (int const zoom : {10, 13, 17})
+      {
+        auto const * rule = GetMikshatRule(path, zoom, GeomType::Line, drule::pathtext);
+        TEST(rule && rule->GetPathtext() && rule->GetPathtext()->primary, (style, path, zoom));
+        TEST_EQUAL(rule->GetPathtext()->primary->color & 0xFFFFFF, wadiColor, (style, path, zoom));
+      }
+    }
+  });
+}
+
+UNIT_TEST(Classificator_MikshatResourcesAndTracks)
+{
+  styles::RunForEveryMapStyle([](MapStyle style)
+  {
+    for (auto const & path : vector<base::StringIL>{{"amenity", "fuel"},
+                                                    {"natural", "spring"},
+                                                    {"natural", "hot_spring"},
+                                                    {"man_made", "water_well"},
+                                                    {"man_made", "water_tap"},
+                                                    {"amenity", "water_point"},
+                                                    {"amenity", "drinking_water"}})
+    {
+      auto const * rule = GetMikshatRule(path, 10, GeomType::Point, drule::symbol);
+      TEST(rule && rule->GetSymbol(), (style, path));
+      TEST_EQUAL(rule->GetSymbol()->name, path.begin()[1] == "fuel" ? "fuel-s" : "drinking-water-s", (style, path));
+      TEST_GREATER_OR_EQUAL(rule->GetSymbol()->min_distance, 48, (style, path));
+    }
+
+    for (auto const & path : vector<base::StringIL>{{"natural", "spring", "drinking_water_no"},
+                                                    {"man_made", "water_well", "drinking_water_no"},
+                                                    {"amenity", "water_point", "drinking_water_no"}})
+    {
+      for (int const zoom : {10, 17})
+      {
+        auto const * rule = GetMikshatRule(path, zoom, GeomType::Point, drule::symbol);
+        TEST(rule && rule->GetSymbol(), (style, path, zoom));
+        TEST_EQUAL(rule->GetSymbol()->name, zoom == 10 ? "drinking-water-no-s" : "drinking-water-no-m",
+                   (style, path, zoom));
+      }
+    }
+
+    uint32_t const trackColor = MapStyleIsDark(style) ? 0xC79A66 : 0x956138;
+    for (int const zoom : {10, 14, 17})
+    {
+      drule::KeysT keys;
+      GetDrawRule({classif().GetTypeByPath({"highway", "track"})}, zoom, GeomType::Line, keys);
+      bool hasDirtTrack = false;
+      for (auto const & key : keys)
+      {
+        auto const * line = drule::GetCurrentRules().Find(key)->GetLine();
+        if (line && (line->color & 0xFFFFFF) == trackColor)
+        {
+          TEST(line->dashdot, (style, zoom));
+          hasDirtTrack = true;
+        }
+      }
+      TEST(hasDirtTrack, (style, zoom));
+    }
+  });
+}
+
+namespace
+{
 struct RangeEntry
 {
   uint32_t m_type;

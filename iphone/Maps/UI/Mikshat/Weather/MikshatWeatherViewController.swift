@@ -75,6 +75,7 @@ final class MikshatWeatherViewController: UIViewController {
   override func viewDidLoad() {
     super.viewDidLoad()
     title = L("mikshat_weather_title")
+    view.semanticContentAttribute = weatherInterfaceIsRTL ? .forceRightToLeft : .forceLeftToRight
     view.backgroundColor = WeatherPalette.background
     view.tintColor = WeatherPalette.accent
     buildLayout()
@@ -282,12 +283,12 @@ final class MikshatWeatherViewController: UIViewController {
     hourlySection.addArrangedSubview(hourlyTitle)
     hourlyScroll.showsHorizontalScrollIndicator = true
     hourlyScroll.alwaysBounceHorizontal = true
-    hourlyScroll.semanticContentAttribute = .forceRightToLeft
+    hourlyScroll.semanticContentAttribute = view.semanticContentAttribute
     hourlyScroll.accessibilityIdentifier = "weather.hours"
     hourlyStack.axis = .horizontal
     hourlyStack.alignment = .fill
     hourlyStack.spacing = 10
-    hourlyStack.semanticContentAttribute = .forceRightToLeft
+    hourlyStack.semanticContentAttribute = view.semanticContentAttribute
     hourlyStack.translatesAutoresizingMaskIntoConstraints = false
     hourlyScroll.cards = hourlyStack
     hourlyScroll.addSubview(hourlyStack)
@@ -518,7 +519,7 @@ final class MikshatWeatherViewController: UIViewController {
     cacheLabel.text = cached ? L("mikshat_weather_saved_data") : nil
     cacheLabel.isHidden = !cached
     let updated = DateFormatter()
-    updated.locale = .current
+    updated.locale = weatherInterfaceLocale
     updated.timeZone = snapshot.timeZone
     updated.dateStyle = .medium
     updated.timeStyle = .short
@@ -573,12 +574,12 @@ final class MikshatWeatherViewController: UIViewController {
     hourlyAvailability.isHidden = hours.count == 12
     hourlyScroll.isHidden = hours.isEmpty
     let time = DateFormatter()
-    time.locale = .current
+    time.locale = weatherInterfaceLocale
     time.timeZone = snapshot.timeZone
     time.dateStyle = .none
     time.timeStyle = .short
     let day = DateFormatter()
-    day.locale = .current
+    day.locale = weatherInterfaceLocale
     day.timeZone = snapshot.timeZone
     day.setLocalizedDateFormatFromTemplate("EEEdMMM")
     var calendar = Calendar(identifier: .gregorian)
@@ -776,7 +777,7 @@ private final class WeatherHoursScrollView: UIScrollView, UIScrollViewDelegate {
   weak var cards: UIStackView?
   private enum Position {
     case first
-    case hour(identifier: String, rightFraction: CGFloat)
+    case hour(identifier: String, leadingFraction: CGFloat)
   }
   private var position = Position.first
   private var awaitingContentLayout = true
@@ -815,18 +816,23 @@ private final class WeatherHoursScrollView: UIScrollView, UIScrollViewDelegate {
     guard !isTracking, !isDragging, !isDecelerating else { return }
     let minimum = -adjustedContentInset.left
     let maximum = max(minimum, contentSize.width - bounds.width + adjustedContentInset.right)
+    let rtl = effectiveUserInterfaceLayoutDirection == .rightToLeft
+    let firstOffset = rtl ? maximum : minimum
     let target: CGFloat
     switch position {
     case .first:
-      target = maximum
+      target = firstOffset
     case let .hour(identifier, fraction):
       if let card = cards.arrangedSubviews.first(where: { $0.accessibilityIdentifier == identifier }) {
         let rect = card.convert(card.bounds, to: self)
-        target = min(maximum, max(minimum, rect.maxX - fraction * rect.width - bounds.width + adjustedContentInset.right))
+        let anchoredOffset = rtl
+          ? rect.maxX - fraction * rect.width - bounds.width + adjustedContentInset.right
+          : rect.minX + fraction * rect.width - adjustedContentInset.left
+        target = min(maximum, max(minimum, anchoredOffset))
       } else {
         // The previously visible hour expired; show the first surviving future hour.
         position = .first
-        target = maximum
+        target = firstOffset
       }
     }
     // The pending flag is already clear: changing bounds may schedule another layout callback.
@@ -852,8 +858,10 @@ private final class WeatherHoursScrollView: UIScrollView, UIScrollViewDelegate {
     guard !isLayingOutContent, !awaitingContentLayout, let cards,
           abs(bounds.width - laidOutWidth) < 0.5,
           abs(contentSize.width - laidOutContentWidth) < 0.5 else { return }
-    let maximum = max(-adjustedContentInset.left, contentSize.width - bounds.width + adjustedContentInset.right)
-    if abs(contentOffset.x - maximum) < 1 {
+    let minimum = -adjustedContentInset.left
+    let maximum = max(minimum, contentSize.width - bounds.width + adjustedContentInset.right)
+    let rtl = effectiveUserInterfaceLayoutDirection == .rightToLeft
+    if abs(contentOffset.x - (rtl ? maximum : minimum)) < 1 {
       position = .first
       return
     }
@@ -865,8 +873,19 @@ private final class WeatherHoursScrollView: UIScrollView, UIScrollViewDelegate {
     }), let identifier = card.accessibilityIdentifier else { return }
     let rect = card.convert(card.bounds, to: self)
     guard rect.width > 0 else { return }
-    position = .hour(identifier: identifier, rightFraction: (rect.maxX - right) / rect.width)
+    let fraction = rtl ? (rect.maxX - right) / rect.width : (left - rect.minX) / rect.width
+    position = .hour(identifier: identifier, leadingFraction: fraction)
   }
+}
+
+private var weatherInterfaceLanguage: String { Bundle.main.preferredLocalizations.first ?? "en" }
+
+private var weatherInterfaceIsRTL: Bool { weatherInterfaceLanguage.hasPrefix("ar") }
+
+private var weatherInterfaceLocale: Locale {
+  let language = weatherInterfaceLanguage
+  guard let region = Locale.current.regionCode else { return Locale(identifier: language) }
+  return Locale(identifier: "\(language)_\(region)")
 }
 
 private enum WeatherPalette {

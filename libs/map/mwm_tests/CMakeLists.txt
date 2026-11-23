@@ -10,3 +10,8 @@ set(SRC
 omim_add_test(${PROJECT_NAME} ${SRC})
 
 target_link_libraries(${PROJECT_NAME} PRIVATE map)
+
+option(MIKSHAT_SAUDI_OVERVIEW_TESTS "Build overview tests requiring verified external Saudi map fixtures" OFF)
+if (MIKSHAT_SAUDI_OVERVIEW_TESTS)
+  target_compile_definitions(${PROJECT_NAME} PRIVATE MIKSHAT_SAUDI_OVERVIEW_TESTS)
+endif()

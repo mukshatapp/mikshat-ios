@@ -68,7 +68,7 @@ _IOS_XML_RE = re.compile(
 )
 # Info.plist localizes both key names (the usage-description family) and some values
 # (a shortcut item's title is itself a key looked up in InfoPlist.strings).
-_IOS_PLIST_KEY_RE = re.compile(r"<key>(\w*UsageDescription)</key>")
+_IOS_PLIST_KEY_RE = re.compile(r"<key>(\w*UsageDescription|CFBundleDisplayName)</key>")
 _IOS_PLIST_TITLE_RE = re.compile(
     r"<key>UIApplicationShortcutItemTitle</key>\s*<string>(\w+)</string>"
 )

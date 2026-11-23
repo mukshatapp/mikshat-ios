@@ -65,6 +65,8 @@ public:
       {
         index.ForEachInIntervalAndScale(i.first, i.second, scale, [&](uint64_t /* key */, uint32_t value)
         {
+          if (m_stop && m_stop())
+            return;
           if (checkUnique(value))
             m_fn(value, *src);
         });
@@ -74,10 +76,17 @@ public:
       }
     }
 
+    if (m_stop && m_stop())
+      return;
+
     // Check created features container.
     // Need to do it on a per-mwm basis, because Drape relies on features in a sorted order.
     // Touched (created, edited) features reading.
-    auto f = [&](uint32_t i) { m_fn(i, *src); };
+    auto f = [&](uint32_t i)
+    {
+      if (!m_stop || !m_stop())
+        m_fn(i, *src);
+    };
     src->ForEachAdditionalFeature(cov.GetRect(), scale, f);
   }
 
@@ -275,14 +284,14 @@ void DataSource::ForEachInCoveringForMWM(FeatureCallback const & f, covering::Ag
     ReadMWMFunctor(*m_factory, f)(handle, covering, scale);
 }
 
-void DataSource::ForEachInRectForMWM(FeatureCallback const & f, m2::RectD const & rect, int scale,
-                                     MwmId const & id) const
+void DataSource::ForEachInRectForMWM(FeatureCallback const & f, m2::RectD const & rect, int scale, MwmId const & id,
+                                     StopSearchCallback const & stop, covering::CoveringMode mode) const
 {
   MwmHandle const handle = GetMwmHandleById(id);
   if (handle.IsAlive())
   {
-    covering::CoveringGetter cov(rect, covering::ViewportWithLowLevels);
-    ReadMWMFunctor(*m_factory, f)(handle, cov, scale);
+    covering::CoveringGetter cov(rect, mode);
+    ReadMWMFunctor(*m_factory, f, stop)(handle, cov, scale);
   }
 }
 

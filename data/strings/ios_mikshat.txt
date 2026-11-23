@@ -1,0 +1,152 @@
+[[Mikshat iOS interface terminology]]
+
+[bookmarks]
+comment = Match the Arabic name used by Mikshat's Favorites control.
+tags = apple-maps
+en = Favorites
+ar = المفضلة
+
+[bookmarks_and_tracks]
+tags = apple-maps,apple-infoplist
+en = Favorites and Tracks
+ar = المفضلة والمسارات
+
+[bookmark_sets]
+tags = apple-maps
+en = Favorites Lists
+ar = قائمة المفضلة
+
+[bookmark_set_name]
+tags = apple-maps
+en = Favorites List Name
+ar = اسم قائمة المفضلة
+
+[bookmarks_text_placement_title]
+tags = apple-maps
+en = Favorite names on the map
+ar = أسماء المفضلة على الخريطة
+
+[bookmarks_text_placement_description]
+tags = apple-maps
+en = If there are too many favorites, displaying their names on the map may slow down the app.
+ar = إذا كان هناك عدد كبير جدًا من المفضلة، فقد يؤدي عرض أسمائها على الخريطة إلى إبطاء التطبيق.
+
+[mobile_data]
+tags = apple-maps
+en = Mobile data
+ar = بيانات الجوال
+
+[mobile_data_description]
+tags = apple-maps
+en = Choose when to download maps using mobile data.
+ar = اختر متى تُنزَّل الخرائط باستخدام بيانات الجوال.
+
+[power_managment_description]
+tags = apple-maps
+en = In automatic mode, the app reduces power-consuming features according to the current battery level.
+ar = عندما يتم اختيار الوضع التلقائي، يبدأ التطبيق بتعطيل الخصائص التي تستهلك البطارية بناءً على مستوى شحن البطارية الحالي.
+
+[power_managment_setting_auto]
+tags = apple-maps
+en = Automatic
+ar = تلقائي
+
+[power_managment_setting_manual_max]
+tags = apple-maps
+en = Maximum power saving
+ar = توفير الطاقة الأقصى
+
+[backup]
+tags = apple-maps
+en = Back up
+ar = نسخ احتياطي
+
+[share_bookmarks_email_body]
+tags = apple-maps
+en = Hello!\n\nAttached are my favorites from Mikshat. Open the attached file in Mikshat or another compatible maps app.\n\nMikshat: https://apps.apple.com/app/id6828427541
+ar = مرحبًا!\n\nأرفقت مواقعي المفضلة من مكشات. افتح الملف المرفق في مكشات أو تطبيق خرائط آخر متوافق.\n\nمكشات: https://apps.apple.com/app/id6828427541
+
+[mikshat_heading_sensor]
+tags = apple-maps
+en = Phone compass sensor
+ar = حساس بوصلة الهاتف
+
+[mikshat_heading_auto]
+tags = apple-maps
+en = GPS/compass auto-switch
+ar = تبديل تلقائي بين GPS والحساس
+
+[mikshat_arrow_to_point]
+tags = apple-maps
+en = Arrow toward the point
+ar = السهم نحو النقطة
+
+[mikshat_direct]
+tags = apple-maps
+en = Direct guidance
+ar = توجيه مباشر
+
+[mikshat_stop]
+tags = apple-maps
+en = Finish
+ar = إنهاء
+
+[mikshat_compass_transparency_amount]
+tags = apple-maps
+en = Background transparency level
+ar = درجة شفافية الخلفية
+
+[load_kmz_title]
+tags = apple-maps
+en = Loading Favorites
+ar = يتم تحميل المفضلة
+
+[load_kmz_successful]
+tags = apple-maps
+en = Favorites loaded successfully! You can find them on the map or on the Favorites Manager screen.
+ar = تم تحميل المفضلة بنجاح! يمكنك العثور عليها على الخريطة أو على شاشة إدارة المفضلة.
+
+[load_kmz_failed]
+tags = apple-maps
+en = Failed to load favorites. The file may be corrupted or defective.
+ar = فشلت عملية تحميل المفضلة. قد يكون الملف تالف أو غير صالح.
+
+[bookmark]
+tags = apple-maps
+en = favorite place
+ar = موقع مفضل
+
+[bookmarks_import]
+tags = apple-maps
+en = Import Favorites and Tracks
+ar = استيراد المفضلة والمسارات
+
+[change_all_bookmarks_color]
+tags = apple-maps
+en = Change color of all favorites
+ar = تغيير لون جميع المفضلة
+
+[not_all_shown_bookmarks_carplay]
+tags = apple-maps
+en = Not all favorites are shown
+ar = لا يتم عرض جميع المفضلة
+
+[switch_to_phone_bookmarks_carplay]
+tags = apple-maps
+en = Switch to the phone to see all favorites
+ar = قم بالتبديل إلى الهاتف لرؤية جميع المفضلة
+
+[bookmarks_export]
+tags = apple-maps
+en = Export all Favorites and Tracks
+ar = تصدير كافة المفضلة والمسارات
+
+[enable_icloud_synchronization_message]
+tags = apple-maps
+en = iCloud synchronization is an experimental feature under development. Make sure that you have made a backup of all your favorites and tracks.
+ar = تعد مزامنة iCloud ميزة تجريبية قيد التطوير. تأكد من عمل نسخة احتياطية لجميع المفضلة والمسارات الخاصة بك.
+
+[toast_bookmarks_color_changed]
+tags = apple-maps
+en = Favorites color changed
+ar = تم تغيير لون المفضلة

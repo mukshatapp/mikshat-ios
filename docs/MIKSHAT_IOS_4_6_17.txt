@@ -1,0 +1,99 @@
+Mikshat iOS 4.6.17 — implementation and verification guide
+=======================================================
+
+Source baseline: feature/annual-subscription, e51a3c96483e5913d2de01cd951f09fbdd1ec975.
+Review branch: fix/ios-map-display-4.6.17.
+This update covers three approved areas. The reported home-control text clipping
+was withdrawn by the user and is outside this change.
+
+Selected-place rotation
+-----------------------
+The supplied شرح.mp4 shows a selected place page freezing midway through a phone
+orientation transition. The sheet previously scheduled animated inset/offset
+reflows from intermediate bounds and trait changes. The change coalesces reflow,
+coordinates it with UIKit's size transition, cancels competing sheet animations,
+and ignores stale transition completions or detached/closing pages.
+
+The native regression keeps one selected page attached across 12 rotations and
+checks selection identity, geometry and responsiveness. A separate normal-renderer
+pass requires active Drape, an initialized graphics context and CAMetalLayer,
+using the official Saudi North map. Its selected point is synthetic at the video
+coordinates; this is not proof of an exact stream-feature selection or physical
+device acceptance. A test-only baseline branch runs the same rotation case
+against the unchanged 4.6.16 source for comparison.
+
+Official map downloads
+----------------------
+Saudi North/South now use the normal Organic Maps meta/CDN download path.
+The Drive registry and Saudi-specific diff exclusions have been removed.
+Catalog 260714 and its matching World/WorldCoasts files remain unchanged.
+Both official Saudi files were downloaded and verified against catalog sizes
+and BLAKE3 hashes on 2026-11-23. This changes the download source; it does not
+claim a newer map-data release. See tools/python/mikshat/README.md.
+
+The configured official CDN fallbacks remain available if meta-server access
+fails. Live meta requests with app-version headers returned HTTP 403 in the
+execution environment; no successful live meta-header response is claimed.
+Full-map verification stays asynchronous; diff results are checked after patch
+application. Failed transfers preserve the previously installed map.
+
+Map presentation
+----------------
+Shared source rules are in data/styles/default/include/Mikshat.mapcss and are
+imported by browsing, outdoors and vehicle styles, in light and dark palettes.
+They provide blue wadi names, red enlarged village/hamlet names, larger city
+names, green meadow/grassland and explicitly named faydat, brown unpaved roads,
+and earlier fuel/water symbols. Paved-surface information, road casings,
+collision spacing and explicit non-potable symbols are retained.
+
+A real ruler test maps the 20 km scale bar to draw zooms 9–10 for the tested
+device densities and Saudi latitudes. Lowering style thresholds alone does not
+make an old map's scale index return additional points. The renderer therefore
+adds a bounded country-map POINT supplement at those zooms: fuel, water,
+villages, hamlets and explicitly named faydat. It preserves the normal World
+and non-point geometry contract and the original path at other zooms.
+Each supplement is limited to four maps, 16,384 candidates and 512 extra points;
+it checks real point containment, sorting/deduplication and tile cancellation.
+Small wadi/track line geometry missing from old low-zoom indexes is not invented
+or fetched through an unsafe global zoom increase.
+
+The user's example, فيضة الخويش, occurs in Saudi South as an existing generic
+place/locality point (feature 609861). Decoded data places its name at
+25.3479422061, 47.2901334412, about 6 km from the supplied reference coordinates
+25.4031, 47.2858166667. The update styles the existing mapped feature and does
+not move or manually add a landmark. Native fixture tests are required to confirm its identity,
+classification, overview retrieval and name predicate.
+
+Defaults and languages
+----------------------
+Fresh/missing preferences use light appearance, perspective off and autozoom
+off. Existing explicit choices remain intact. 3D buildings are disabled,
+including previously enabled state, and their settings row is hidden.
+The shipped iOS interface languages are Arabic and English. Map-name languages,
+shared Android resources and speech catalogs are preserved. The English
+terminology overlay matches the Arabic interface/settings terms. Weather
+direction and hourly scroll anchoring follow Arabic RTL / English LTR.
+
+Regenerate interface resources:
+  tools/unix/generate_localizations.sh --ios-only
+  python3 tools/python/generate_ios_localizations.py --check
+
+Regenerate map drawing rules:
+  tools/unix/generate_drules.sh
+
+Validation and delivery
+-----------------------
+.github/workflows/mikshat-responsive-ui.yml runs real app-hosted iPhone/iPad
+tests in Arabic/English, strict execution checks, repeated rotation, a separate
+renderer-on pass, screenshots and diagnostics.
+.github/workflows/mikshat-update-validation.yml builds complete unsigned Debug
+and Release applications and runs focused native storage, scale-index, World
+geometry, generated-style and ruler tests against verified official fixtures.
+
+Execution results must be read from the matching commit's CI logs/artifacts.
+The presence of this guide or test source is not itself a test success claim.
+Physical device testing and actual StoreKit purchase/restore acceptance remain
+separate checks. The subscription product and entitlement behavior are retained.
+
+No TestFlight or App Store upload is part of this delivery. The prepared
+Codemagic marketing version is 4.6.17 for a later explicitly requested build.

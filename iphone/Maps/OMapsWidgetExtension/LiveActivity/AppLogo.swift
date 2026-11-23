@@ -7,6 +7,6 @@ struct AppLogo: View {
       .resizable()
       .aspectRatio(contentMode: .fit)
       .clipShape(RoundedRectangle(cornerRadius: 3))
-      .accessibilityLabel(Text("مكشات"))
+      .accessibilityLabel(Text(Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "Mikshat"))
   }
 }

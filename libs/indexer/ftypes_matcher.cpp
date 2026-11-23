@@ -13,6 +13,29 @@
 
 namespace ftypes
 {
+bool IsNamedFayda(FeatureType & ft)
+{
+  if (ft.GetGeomType() == feature::GeomType::Line)
+    return false;
+  static BaseCheckerEx const kinds(
+      {{"place", "locality"}, {"landuse", "meadow"}, {"natural", "grassland"}, {"natural", "wetland"}});
+  if (!kinds(feature::TypesHolder(ft)))
+    return false;
+
+  bool matches = false;
+  ft.ForEachName([&](int8_t, std::string_view name)
+  {
+    auto const start = name.find_first_not_of(" \t\r\n");
+    if (start == std::string_view::npos)
+      return true;
+    name.remove_prefix(start);
+    matches = name.starts_with("فيضة") || name.starts_with("فياض") || name.starts_with("Faydat ") ||
+              name.starts_with("Fayda ") || name.starts_with("faydat ") || name.starts_with("fayda ");
+    return !matches;
+  });
+  return matches;
+}
+
 namespace
 {
 class HighwayClasses

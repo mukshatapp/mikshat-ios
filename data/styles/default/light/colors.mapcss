@@ -210,3 +210,9 @@
 @label_isoline100: #496149;
 @label_isoline50: #567556;
 @label_isoline10: #567556;
+
+/* Mikshat outdoor labels and unsealed tracks. */
+@mikshat_wadi_label: #126CB3;
+@mikshat_settlement_label: #B32624;
+@mikshat_dirt_road: #956138;
+@mikshat_fayda_label: #207440;

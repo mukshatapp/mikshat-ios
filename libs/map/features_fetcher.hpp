@@ -59,6 +59,12 @@ public:
     m_dataSource.ForEachFeatureIDInRect(fn, rect, scale, covering::LowLevelsOnly);
   }
 
+  // Renderer-only overview: supplement native-zoom IDs with a bounded set of
+  // point landmarks from loaded country maps. World and non-point geometry
+  // keep their original scale-index contract.
+  void ForEachFeatureIDForRendering(m2::RectD const & rect, std::function<void(FeatureID const &)> const & fn,
+                                    int scale, DataSource::StopSearchCallback const & stop = {}) const;
+
   template <class ToDo>
   void ReadFeatures(ToDo & toDo, std::vector<FeatureID> const & features) const
   {

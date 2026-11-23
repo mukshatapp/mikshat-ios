@@ -385,7 +385,11 @@ class PlistAndXibMatcherTest(unittest.TestCase):
 
     def test_plist_unrelated_key_is_ignored(self):
         match = v._xml_matcher(v._IOS_PLIST_KEY_RE)
-        self.assertEqual(match("<key>CFBundleDisplayName</key>"), {})
+        self.assertEqual(match("<key>CFBundleExecutable</key>"), {})
+
+    def test_plist_display_name_is_localizable(self):
+        match = v._xml_matcher(v._IOS_PLIST_KEY_RE)
+        self.assertEqual(match("<key>CFBundleDisplayName</key>"), {"CFBundleDisplayName": 0})
 
     def test_plist_title_value(self):
         match = v._xml_matcher(v._IOS_PLIST_TITLE_RE)

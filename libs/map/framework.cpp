@@ -1729,9 +1729,12 @@ m2::PointD Framework::P3dtoG(m2::PointD const & p) const
 
 void Framework::CreateDrapeEngine(ref_ptr<dp::GraphicsContextFactory> contextFactory, DrapeCreationParams && params)
 {
-  auto idReadFn = [this](auto const & fn, m2::RectD const & r, int scale)
+  auto idReadFn = [this](auto const & fn, m2::RectD const & r, int scale, auto const & stop)
   {
-    m_featuresFetcher.ForEachFeatureID(r, fn, scale);
+    m_featuresFetcher.ForEachFeatureIDForRendering(r, fn, scale, stop);
+
+    if (stop && stop())
+      return;
 
     if (m_showDownloadedRegions && scale <= 7)
     {

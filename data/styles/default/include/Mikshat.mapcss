@@ -1,0 +1,140 @@
+/* Shared by browsing, outdoors and vehicle styles, after their base rules.
+ * At Saudi latitudes the 20 km ruler is approximately z9-10. These rules
+ * expose available indexed features; they cannot recreate geometry or scale
+ * index entries absent from a downloaded map. Keep data-source zooms intact.
+ */
+
+/* Settlements retain their collision priorities and capital symbols. */
+node|z7-9[place=city]
+{font-size: 14;}
+node|z10-12[place=city]
+{font-size: 16;}
+node|z13-[place=city]
+{font-size: 18;}
+
+node|z9-[place=town]
+{text: name; font-size: 14; text-color: @city_label; text-halo-color: @label_halo_light; text-halo-radius: 1; text-halo-opacity: 0.9;}
+node|z13-[place=town]
+{font-size: 16;}
+
+node|z9-[place=village],
+node|z9-[place=hamlet]
+{text: name; font-size: 12; text-color: @mikshat_settlement_label; text-halo-color: @label_halo_light; text-halo-radius: 1; text-halo-opacity: 0.9;}
+node|z11-[place=village]
+{font-size: 13;}
+node|z13-[place=village],
+node|z13-[place=hamlet]
+{font-size: 14;}
+node|z9-[place=village]::int_name,
+node|z9-[place=hamlet]::int_name
+{text: int_name; font-size: 10; text-color: @mikshat_settlement_label; text-halo-color: @label_halo_light; text-halo-radius: 1; text-halo-opacity: 0.9;}
+node|z13-[place=village]::int_name,
+node|z13-[place=hamlet]::int_name
+{font-size: 11;}
+
+/* Intermittent streams/rivers inherit this blue name styling. Canals and
+ * drains keep their separate base treatment. Tunnel waterways stay hidden.
+ */
+line|z9-[waterway=river],
+line|z9-[waterway=stream]
+{text: name; font-size: 11; text-position: line; text-color: @mikshat_wadi_label; text-halo-color: @label_halo_light; text-halo-radius: 1; text-halo-opacity: 0.8;}
+line|z15-[waterway=river],
+line|z15-[waterway=stream]
+{font-size: 12;}
+line|z9[waterway=river][!tunnel],
+line|z9-12[waterway=stream][!tunnel]
+{color: @river; width: 0.7;}
+line[waterway][tunnel]
+{text: none;}
+
+/* Tracks identify the mapped unsealed-road class. Do not recolor paved
+ * residential/service roads merely because they are minor roads.
+ */
+line|z10-13[highway=track][!tunnel]
+{color: @track; width: 0.8; opacity: 0.9; dashes: 5,3;}
+line|z14-15[highway=track][!tunnel]
+{width: 1.1; dashes: 6,2.5;}
+
+/* Small icons are spaced at overview scales. Existing overlay priorities
+ * still resolve collisions; names become available on closer inspection.
+ */
+node|z9-13[amenity=fuel],
+area|z9-13[amenity=fuel]
+{icon-image: fuel-s.svg; icon-min-distance: 48;}
+node|z12-13[amenity=fuel],
+area|z12-13[amenity=fuel]
+{text: name; font-size: 10; text-color: @poi_label; text-offset: 1;}
+
+node|z9-[natural=spring],
+node|z9-[natural=hot_spring],
+node|z9-[amenity=water_point],
+node|z9-[amenity=drinking_water],
+node|z9-[man_made=water_tap],
+node|z9-[man_made=water_well]
+{icon-image: drinking-water-s.svg; icon-min-distance: 48;}
+node|z12-[natural=spring],
+node|z12-[natural=hot_spring],
+node|z12-[amenity=water_point],
+node|z12-[amenity=drinking_water],
+node|z12-[man_made=water_tap],
+node|z12-[man_made=water_well]
+{text: name; font-size: 10; text-color: @poi_label; text-offset: 1;}
+node|z17-[natural=spring],
+node|z17-[natural=hot_spring],
+node|z17-[amenity=water_point],
+node|z17-[amenity=drinking_water],
+node|z17-[man_made=water_tap],
+node|z17-[man_made=water_well]
+{icon-image: drinking-water-m.svg; icon-min-distance: 0; font-size: 11;}
+
+/* Preserve explicit non-potable water information at every new scale. */
+node|z9-[natural=spring][drinking_water=not],
+node|z9-[man_made=water_tap][drinking_water=not],
+node|z9-[man_made=water_well][drinking_water=not],
+node|z9-[amenity=water_point][drinking_water=not]
+{icon-image: drinking-water-no-s.svg; icon-min-distance: 48;}
+node|z17-[natural=spring][drinking_water=not],
+node|z17-[man_made=water_tap][drinking_water=not],
+node|z17-[man_made=water_well][drinking_water=not],
+node|z17-[amenity=water_point][drinking_water=not]
+{icon-image: drinking-water-no-m.svg; icon-min-distance: 0;}
+
+/* A vegetated fayda can be mapped as meadow/grassland. Only these actual
+ * landcover classes receive green names. Generic place=locality does not
+ * distinguish a fayda from other places and therefore stays unchanged.
+ */
+node|z9-[landuse=meadow],
+area|z9-[landuse=meadow],
+node|z9-[natural=grassland],
+area|z9-[natural=grassland]
+{text: name; text-position: center; font-size: 11; text-color: @mikshat_fayda_label; text-halo-color: @label_halo_light; text-halo-radius: 1; text-halo-opacity: 0.9;}
+node|z14-[landuse=meadow],
+area|z14-[landuse=meadow],
+node|z14-[natural=grassland],
+area|z14-[natural=grassland]
+{font-size: 12;}
+
+/* Explicitly named faydat that use the generic existing locality class.
+ * Test the stored feature name at runtime, leaving other localities intact.
+ */
+node|z9-[place=locality][named_fayda],
+area|z9-[place=locality][named_fayda]
+{text: name; text-position: center; font-size: 12; text-color: @mikshat_fayda_label; text-halo-color: @label_halo_light; text-halo-radius: 1; text-halo-opacity: 0.9;}
+node|z14-[place=locality][named_fayda],
+area|z14-[place=locality][named_fayda]
+{font-size: 13;}
+
+/* Kothic needs the complementary branch to retain the original locality
+ * captions at their normal scales when the runtime predicate is false.
+ */
+node|z9-[place=locality][!named_fayda],
+area|z9-[place=locality][!named_fayda]
+{}
+
+/* Surface metadata distinguishes genuinely unpaved motor roads from paved
+ * service/residential roads. Keep their widths, casings and priorities.
+ */
+line|z9-[highway][unpaved_road]
+{color: @mikshat_dirt_road; opacity: 1;}
+line|z9-[highway][!unpaved_road]
+{}

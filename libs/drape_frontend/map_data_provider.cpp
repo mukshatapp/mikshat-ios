@@ -26,9 +26,10 @@ MapDataProvider::MapDataProvider(TReadIDsFn && idsReader, TReadFeaturesFn && fea
   CHECK(m_cancelTileBackgroundReading != nullptr, ());
 }
 
-void MapDataProvider::ReadFeaturesID(TReadCallback<FeatureID const> const & fn, m2::RectD const & r, int scale) const
+void MapDataProvider::ReadFeaturesID(TReadCallback<FeatureID const> const & fn, m2::RectD const & r, int scale,
+                                     TStopReadFn const & stop) const
 {
-  m_idsReader(fn, r, scale);
+  m_idsReader(fn, r, scale, stop);
 }
 
 void MapDataProvider::ReadFeatures(TReadCallback<FeatureType> const & fn, std::vector<FeatureID> const & ids) const

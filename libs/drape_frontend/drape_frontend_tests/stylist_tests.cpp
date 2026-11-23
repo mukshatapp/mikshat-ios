@@ -68,6 +68,32 @@ private:
   MapStyle const m_originalStyle;
 };
 
+class NamedLocality : public osm::MapObject
+{
+public:
+  explicit NamedLocality(std::string_view name)
+  {
+    m_geomType = feature::GeomType::Point;
+    m_points = {{0.0, 0.0}};
+    m_types.Add(classif().GetTypeByPath({"place", "locality"}));
+    m_name.Add("ar", name);
+  }
+};
+
+class SurfaceRoad : public osm::MapObject
+{
+public:
+  SurfaceRoad(std::string_view highway, std::string_view surface)
+  {
+    m_geomType = feature::GeomType::Line;
+    m_points = {{0.0, 0.0}, {0.01, 0.01}};
+    m_types.Add(classif().GetTypeByPath({"highway", highway}));
+    if (!surface.empty())
+      m_types.Add(classif().GetTypeByPath({"psurface", surface}));
+    m_name.Add("en", "Road");
+  }
+};
+
 void TestSameRules(df::Stylist const & actual, df::Stylist const & expected)
 {
   TEST_EQUAL(actual.m_symbolRule, expected.m_symbolRule, ());
@@ -82,6 +108,72 @@ void TestSameRules(df::Stylist const & actual, df::Stylist const & expected)
        ());
 }
 }  // namespace
+
+UNIT_CLASS_TEST(StyleSnapshotFixture, Stylist_MikshatNamedFayda)
+{
+  for (auto const style : kStyles)
+  {
+    uint32_t const green = MapStyleIsDark(style) ? 0x7AD49A : 0x207440;
+    for (auto const name : {"فيضة الخويش", "فيضةالخويش", "Faydat al Khuwaysh"})
+    {
+      auto ft = FeatureType::CreateFromMapObject(NamedLocality(name));
+      for (uint8_t const zoom : {9, 14})
+      {
+        df::Stylist const stylist(*ft, zoom, StringUtf8Multilang::kEnglishCode, style);
+        TEST(stylist.m_captionRule && stylist.m_captionRule->primary, (style, zoom, name));
+        TEST_EQUAL(stylist.m_captionRule->primary->color & 0xFFFFFF, green, (style, zoom, name));
+      }
+    }
+    for (auto const name : {"مزرعة الخويش", "شعيب الفيضة", "الخويش"})
+    {
+      auto ft = FeatureType::CreateFromMapObject(NamedLocality(name));
+      df::Stylist const overview(*ft, 9, StringUtf8Multilang::kEnglishCode, style);
+      TEST(!overview.m_captionRule, (style, name));
+      df::Stylist const detail(*ft, 14, StringUtf8Multilang::kEnglishCode, style);
+      TEST(detail.m_captionRule && detail.m_captionRule->primary, (style, name));
+      TEST_NOT_EQUAL(detail.m_captionRule->primary->color & 0xFFFFFF, green, (style, name));
+    }
+  }
+}
+
+UNIT_CLASS_TEST(StyleSnapshotFixture, Stylist_MikshatUnpavedRoads)
+{
+  for (auto const style : kStyles)
+  {
+    uint32_t const brown = MapStyleIsDark(style) ? 0xC79A66 : 0x956138;
+    for (auto const highway : {"unclassified", "residential", "service", "secondary", "track"})
+    {
+      auto pavedFeature = FeatureType::CreateFromMapObject(SurfaceRoad(highway, "paved_good"));
+      df::Stylist const paved(*pavedFeature, 17, StringUtf8Multilang::kEnglishCode, style);
+      TEST(!paved.m_lineRules.empty(), (style, highway));
+      for (auto const surface : {"unpaved_good", "unpaved_bad"})
+      {
+        auto unpavedFeature = FeatureType::CreateFromMapObject(SurfaceRoad(highway, surface));
+        df::Stylist const unpaved(*unpavedFeature, 17, StringUtf8Multilang::kEnglishCode, style);
+        TEST_EQUAL(unpaved.m_lineRules.size(), paved.m_lineRules.size(), (style, highway, surface));
+        size_t brownLines = 0;
+        for (size_t i = 0; i < unpaved.m_lineRules.size(); ++i)
+        {
+          auto actual = *unpaved.m_lineRules[i];
+          auto const & original = *paved.m_lineRules[i];
+          if ((actual.color & 0xFFFFFF) == brown)
+          {
+            ++brownLines;
+            TEST_NOT_EQUAL(original.color & 0xFFFFFF, brown, (style, highway, surface));
+            actual.color = original.color;
+          }
+          // Preserve the original width/dashes/priority and every casing.
+          TEST(actual == original, (style, highway, surface, i));
+        }
+        TEST_EQUAL(brownLines, 1, (style, highway, surface));
+      }
+    }
+    auto unknownTrackFeature = FeatureType::CreateFromMapObject(SurfaceRoad("track", ""));
+    df::Stylist const unknownTrack(*unknownTrackFeature, 17, StringUtf8Multilang::kEnglishCode, style);
+    TEST_EQUAL(unknownTrack.m_lineRules.size(), 1, (style));
+    TEST_EQUAL(unknownTrack.m_lineRules.front()->color & 0xFFFFFF, brown, (style));
+  }
+}
 
 UNIT_TEST(Stylist_IsHatching)
 {

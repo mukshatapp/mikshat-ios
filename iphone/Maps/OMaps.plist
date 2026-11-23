@@ -6,6 +6,11 @@
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
 	<string>مكشات</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>ar</string>
+		<string>en</string>
+	</array>
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>

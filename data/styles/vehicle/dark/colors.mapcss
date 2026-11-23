@@ -176,3 +176,9 @@
 @shield_text_halo: #000000;
 @shield: #999999;
 @shield_outline: #303030;
+
+/* Mikshat outdoor labels and unsealed tracks. */
+@mikshat_wadi_label: #68BFFF;
+@mikshat_settlement_label: #FF8D86;
+@mikshat_dirt_road: #C79A66;
+@mikshat_fayda_label: #7AD49A;

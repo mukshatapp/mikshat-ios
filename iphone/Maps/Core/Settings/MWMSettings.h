@@ -17,6 +17,8 @@ typedef NS_ENUM(NSUInteger, MWMSettingsPowerManagement) {
 NS_SWIFT_NAME(Settings)
 @interface MWMSettings : NSObject <PromoManager>
 
++ (void)applyMikshatMapDefaults;
+
 + (NSString *)osmUserName;
 
 + (BOOL)autoDownloadEnabled;

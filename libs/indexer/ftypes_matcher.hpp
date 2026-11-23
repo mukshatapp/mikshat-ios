@@ -832,4 +832,8 @@ std::string DebugPrint(HighwayClass const cls);
 std::string DebugPrint(LocalityType const localityType);
 
 HighwayClass GetHighwayClass(feature::TypesHolder const & types);
+
+/// Existing locality/landcover explicitly named as a fayda in the map data.
+/// A village or a waterway containing the word is not a fayda label.
+bool IsNamedFayda(FeatureType & feature);
 }  // namespace ftypes

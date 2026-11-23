@@ -2,3 +2,5 @@ population
 name
 bbox_area
 rating
+named_fayda
+unpaved_road

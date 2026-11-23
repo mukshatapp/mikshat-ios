@@ -213,11 +213,13 @@ UNIT_TEST(ReadCancellation_IndexCancellationPreservesLifecycle)
     df::TileInfo tile(make_unique_dp<df::EngineContext>(MakeContext(df::TileKey(1, 2, 15), commutator)));
     bool indexRead = false;
     bool featuresRead = false;
-    df::MapDataProvider model([&](auto const & callback, auto const &, int)
+    df::MapDataProvider model([&](auto const & callback, auto const &, int, auto const & stop)
     {
       indexRead = true;
+      TEST(stop && !stop(), ());
       callback(FeatureID{});
       tile.Cancel();
+      TEST(stop(), ());
     }, [&](auto const &, auto const &) { featuresRead = true; }, [](std::string_view) {
       return true;
     }, [](auto const &, int) {}, [](auto const &, auto) { return false; }, [](auto const &, auto) {});
@@ -236,9 +238,9 @@ class ReadCoverageFixture
 public:
   ReadCoverageFixture()
     : m_receiver(m_commutator)
-    , m_model([this](auto const &, auto const &, int) { NotifyRead(); }, [](auto const &, auto const &) {},
-              [](std::string_view) { return true; }, [](auto const &, int) {}, [](auto const &, auto) { return false; },
-              [](auto const &, auto) {})
+    , m_model([this](auto const &, auto const &, int, auto const &) { NotifyRead(); },
+              [](auto const &, auto const &) {}, [](std::string_view) { return true; }, [](auto const &, int) {},
+              [](auto const &, auto) { return false; }, [](auto const &, auto) {})
     , m_metalines(make_ref(&m_commutator), m_model)
     , m_reader(make_ref(&m_commutator), m_model, false, false, false, dp::BackgroundMode::Default, 0.5f)
   {

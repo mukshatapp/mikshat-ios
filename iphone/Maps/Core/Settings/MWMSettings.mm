@@ -8,6 +8,7 @@
 #include <CoreApi/Logger.h>
 
 #include "map/gps_tracker.hpp"
+#include "platform/settings.hpp"
 
 namespace
 {
@@ -26,6 +27,20 @@ NSString * const kUDDidShowICloudSynchronizationEnablingAlert = @"kUDDidShowIClo
 }  // namespace
 
 @implementation MWMSettings
+
++ (void)applyMikshatMapDefaults
+{
+  // Seed only missing preferences. Existing navigation choices survive an update.
+  bool enabled;
+  if (!settings::Get("Allow3d", enabled))
+    settings::Set("Allow3d", false);
+  if (!settings::Get("AutoZoom", enabled))
+    settings::Set("AutoZoom", false);
+
+  // This control is hidden in Mikshat, including for installations that enabled it before.
+  if (!settings::Get("Buildings3d", enabled) || enabled)
+    settings::Set("Buildings3d", false);
+}
 
 + (NSString *)osmUserName
 {
@@ -99,6 +114,8 @@ NSString * const kUDDidShowICloudSynchronizationEnablingAlert = @"kUDDidShowIClo
 + (MWMTheme)theme
 {
   auto ud = NSUserDefaults.standardUserDefaults;
+  if ([ud objectForKey:kUDAutoNightModeOff] == nil && [ud objectForKey:kThemeMode] == nil)
+    return MWMThemeDay;
   if (![ud boolForKey:kUDAutoNightModeOff])
     return MWMThemeAuto;
   return static_cast<MWMTheme>([ud integerForKey:kThemeMode]);
@@ -149,19 +166,17 @@ NSString * const kUDDidShowICloudSynchronizationEnablingAlert = @"kUDDidShowIClo
 
 + (BOOL)map3dBuildingsEnabled
 {
-  bool allow3d = true, allow3dBuildings = true;
-  GetFramework().Load3dMode(allow3d, allow3dBuildings);
-  return allow3dBuildings;
+  return NO;
 }
 
 + (void)setMap3dBuildingsEnabled:(BOOL)enabled
 {
+  UNUSED_VALUE(enabled);
   auto & f = GetFramework();
   bool allow3d = true, allow3dBuildings = true;
   f.Load3dMode(allow3d, allow3dBuildings);
-  allow3dBuildings = static_cast<bool>(enabled);
-  f.Save3dMode(allow3d, allow3dBuildings);
-  f.Allow3dMode(allow3d, allow3dBuildings);
+  f.Save3dMode(allow3d, false);
+  f.Allow3dMode(allow3d, false);
 }
 
 + (BOOL)perspectiveViewEnabled
@@ -177,8 +192,8 @@ NSString * const kUDDidShowICloudSynchronizationEnablingAlert = @"kUDDidShowIClo
   bool allow3d = true, allow3dBuildings = true;
   f.Load3dMode(allow3d, allow3dBuildings);
   allow3d = static_cast<bool>(enabled);
-  f.Save3dMode(allow3d, allow3dBuildings);
-  f.Allow3dMode(allow3d, allow3dBuildings);
+  f.Save3dMode(allow3d, false);
+  f.Allow3dMode(allow3d, false);
 }
 
 + (BOOL)autoZoomEnabled

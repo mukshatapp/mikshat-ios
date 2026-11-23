@@ -1,0 +1,141 @@
+name: Mikshat update build and map validation
+
+'on':
+  push:
+    branches:
+      - fix/ios-map-display-4.6.17
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mikshat-update-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios-build:
+    name: Full iOS app (${{ matrix.configuration }})
+    runs-on: xcode-27
+    timeout-minutes: 65
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Debug, Release]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 128
+      - name: Fetch pinned dependencies
+        run: git submodule update --init --recursive --depth 1 --jobs 8
+      - name: Prepare app resources
+        run: |
+          python3 mikshat/prepare_branding.py
+          python3 mikshat/prepare_satellite.py
+      - name: Verify Xcode and Metal compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/update-validation
+          xcodebuild -version | tee build/update-validation/toolchain.txt
+          if ! xcrun metal -v >/dev/null 2>&1; then
+            xcodebuild -downloadComponent MetalToolchain
+            xcrun -k
+          fi
+          xcrun metal -v
+      - name: Restore existing full-app build cache
+        uses: irgaly/xcode-cache@v1
+        with:
+          key: xcode-cache-mikshat-update-${{ matrix.configuration }}-${{ github.sha }}
+          restore-keys: |
+            xcode-cache-deriveddata-iOS Check-${{ matrix.configuration }}-
+          cache-read-only: true
+          delete-used-deriveddata-cache: false
+      - name: Build complete app without signing
+        shell: bash
+        env:
+          CONFIGURATION: ${{ matrix.configuration }}
+        run: |
+          set -euo pipefail
+          if [[ "$CONFIGURATION" == "Debug" ]]; then
+            destination='generic/platform=iOS Simulator'
+            sdk=iphonesimulator
+          else
+            destination='generic/platform=iOS'
+            sdk=iphoneos
+          fi
+          xcodebuild build \
+            -workspace xcode/omim.xcworkspace -scheme OMaps \
+            -configuration "$CONFIGURATION" -sdk "$sdk" -destination "$destination" \
+            CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
+            2>&1 | tee "build/update-validation/xcodebuild-$CONFIGURATION.log"
+      - name: Preserve complete build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mikshat-update-build-${{ matrix.configuration }}
+          path: build/update-validation/
+          retention-days: 7
+          if-no-files-found: warn
+
+  map-core:
+    name: Native map sources, World geometry and generated styles
+    runs-on: ubuntu-26.04
+    timeout-minutes: 70
+    env:
+      CC: gcc-15
+      CXX: g++-15
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 128
+      - name: Fetch pinned dependencies
+        run: git submodule update --init --recursive --depth 1 --jobs 8
+      - name: Install focused native-test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build ccache gcc-15 g++-15 python3-tornado qt6-base-dev libharfbuzz-dev libfreetype-dev libgl1-mesa-dev libxi-dev libxrandr-dev libxcursor-dev libxinerama-dev
+      - name: Restore existing native compiler cache
+        uses: hendrikmuhs/ccache-action@v1.2.24
+        with:
+          key: CMake-ubuntu-26.04-gcc-15--Debug
+          max-size: 1G
+          save: false
+      - name: Validate map-container inspection tools
+        run: /usr/bin/python3 -m unittest discover -s tools/python/mikshat -p 'test_*.py' -v
+      - name: Verify native execution checks reject incomplete results
+        run: /usr/bin/python3 -m unittest discover -s mikshat/tests/update-core -p 'test_*.py' -v
+      - name: Configure and build only required native suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/update-core-diagnostics
+          cmake -S . -B build/update-core -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug -DSKIP_QT_GUI=ON -DBUILD_TESTING=ON \
+            -DBUILD_DEV_SANDBOX=OFF -DBUILD_OPENGL_TESTS=OFF -DCMAKE_UNITY_BUILD=ON \
+            -DMIKSHAT_SAUDI_OVERVIEW_TESTS=ON \
+            -DCMAKE_C_FLAGS=-g1 -DCMAKE_CXX_FLAGS=-g1 -DUSE_CCACHE=ON \
+            -DPython3_EXECUTABLE=/usr/bin/python3 \
+            2>&1 | tee build/update-core-diagnostics/configure.log
+          cmake --build build/update-core --parallel 3 \
+            --target storage_tests mwm_tests indexer_tests style_tests drape_frontend_tests \
+            2>&1 | tee build/update-core-diagnostics/build.log
+      - name: Run official map-source, storage, geometry and style regressions
+        run: >-
+          /usr/bin/python3 mikshat/tests/update-core/run.py
+          --build-dir build/update-core --output-dir build/update-core-diagnostics
+      - name: Preserve native test inventories and results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mikshat-update-map-core
+          path: |
+            build/update-core-diagnostics/
+            !build/update-core-diagnostics/fixture/*.mwm
+          retention-days: 7
+          if-no-files-found: warn

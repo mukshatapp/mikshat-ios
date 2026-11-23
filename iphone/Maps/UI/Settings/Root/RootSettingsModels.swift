@@ -71,7 +71,7 @@ extension RootSettings {
     case .largeFont: return L("big_font")
     case .transliteration: return L("transliteration_title")
     case .appearance: return L("pref_appearance_title")
-    case .iCloud: return "iCloud Synchronization (Beta)"
+    case .iCloud: return L("mikshat_icloud_sync_title")
     case .mapTiles: return L("pref_bg_tiles_title")
     case .logging: return L("enable_logging")
     case .perspectiveView: return L("pref_map_3d_title")

@@ -9,6 +9,7 @@
 #import "MWMRoutePoint+CPP.h"
 #import "MWMRouter.h"
 #import "MWMSearch+CoreSpotlight.h"
+#import "MWMSettings.h"
 #import "MWMTextToSpeech.h"
 #import "MapViewController.h"
 #import "NSDate+TimeDistance.h"
@@ -145,6 +146,7 @@ using namespace osm_auth_ios;
 {
   NSLog(@"application:didFinishLaunchingWithOptions: %@", launchOptions);
 
+  [MWMSettings applyMikshatMapDefaults];
   [self observeApplicationLifecycle];
   InitLocalizedStrings();
   [MWMThemeManager invalidate];

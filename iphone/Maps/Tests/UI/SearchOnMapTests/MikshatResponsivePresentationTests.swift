@@ -231,6 +231,64 @@ final class MikshatMapSceneLayoutTests: XCTestCase {
   }
 
   @MainActor
+  func testSelectedPointStaysAttachedAndResponsiveWhileTheSamePageRotatesRepeatedly() async throws {
+    let (map, window, scene) = try await attachedMapScene()
+    defer { map.dismissPlacePage() }
+    try await requireRotationRendererIfRequested(map, window: window)
+    try recordRotationRendererIfRequested("ready", map: map, window: window)
+    // The physical-device report selected this point before rotating. Keeping
+    // the page alive exercises a different path from selecting after rotation.
+    let coordinate = CLLocationCoordinate2D(latitude: 26 + 13.904 / 60, longitude: 44 + 56.718 / 60)
+    let title = "تيار مائي متقطع"
+    MikshatNavigationCoordinator.restoreDestinationSelection(coordinate: coordinate, title: title)
+    try await sceneWait("The reported selected-point page must be attached before rotation") {
+      map.children.compactMap { $0 as? PlacePageViewController }.first?.viewIfLoaded?.window === window
+    }
+    let page = try XCTUnwrap(map.children.compactMap { $0 as? PlacePageViewController }.first)
+    await settleMapScene(map)
+    let coordinates = try XCTUnwrap(try sceneElement("placePage.coordinates", in: page.view) as? PlacePageCoordinatesView)
+    let toggle = try XCTUnwrap(try sceneElement("placePage.coordinates.toggle", in: page.view) as? UIButton)
+    let expected = MikshatNavigationMath.coordinatePairs(latitude: coordinate.latitude,
+                                                         longitude: coordinate.longitude)[1]
+      .components(separatedBy: "\n")
+    for cycle in 0..<3 {
+      for orientation in [UIInterfaceOrientation.landscapeRight, .portrait, .landscapeLeft, .portrait] {
+        try await rotateMapScene(scene, window: window, map: map, to: orientation)
+        XCTAssertTrue(map.children.contains { $0 === page }, "Rotation must preserve the existing selected page")
+        XCTAssertTrue(page.view.window === window)
+        XCTAssertTrue(PlacePageData.hasData)
+        XCTAssertEqual(PlacePageData(localizationProvider: OpeinigHoursLocalization()).previewData.title, title)
+        let latitude = try XCTUnwrap(try sceneElement("placePage.coordinates.ddm.latitude", in: page.view) as? UILabel)
+        let longitude = try XCTUnwrap(try sceneElement("placePage.coordinates.ddm.longitude", in: page.view) as? UILabel)
+        XCTAssertEqual(latitude.text, expected[0])
+        XCTAssertEqual(longitude.text, expected[1])
+        let host = try sceneElement("placePage.host", in: map.view)
+        XCTAssertEqual(host.bounds.width, page.view.bounds.width, accuracy: 1)
+        XCTAssertFalse(host.hasAmbiguousLayout)
+        XCTAssertTrue(page.view.isUserInteractionEnabled)
+        page.scrollToReveal(toggle)
+        await settleMapScene(map)
+        let wasExpanded = coordinates.isExpanded
+        toggle.sendActions(for: .touchUpInside)
+        await settleMapScene(map)
+        XCTAssertEqual(coordinates.isExpanded, !wasExpanded,
+                       "A real selected-point action must still respond after each rotation")
+        try await requireRotationRendererIfRequested(map, window: window)
+        try recordRotationRendererIfRequested("rotated", map: map, window: window,
+                                             extra: ["cycle": cycle, "orientation": orientation.rawValue])
+        try sceneScreenshot(window, name: "persistent-selection-cycle-\(cycle)-\(orientation.rawValue)")
+      }
+    }
+    let close = try XCTUnwrap(try sceneElement("placePage.close", in: page.view) as? UIButton)
+    close.sendActions(for: .touchUpInside)
+    try await sceneWait("The close button must remain responsive after repeated selected-point rotations") {
+      !map.children.contains { $0 === page } && !PlacePageData.hasData
+    }
+    try await requireRotationRendererIfRequested(map, window: window)
+    try recordRotationRendererIfRequested("completed", map: map, window: window)
+  }
+
+  @MainActor
   func testRealHomePreviewAndTripContainersStayPlacedAcrossPortraitLandscapePortrait() async throws {
     let (map, window, scene) = try await attachedMapScene()
     let manager = MWMNavigationDashboardManager.shared()
@@ -440,7 +498,10 @@ private func attachedMapScene() async throws -> (MapViewController, UIWindow, UI
     map.view.window === window && window.isKeyWindow && !window.isHidden
       && UIApplication.shared.applicationState == .active
   }
-  map.view.semanticContentAttribute = .forceRightToLeft
+  let isArabic = Bundle.main.preferredLocalizations.first?.hasPrefix("ar") == true
+  map.view.semanticContentAttribute = isArabic ? .forceRightToLeft : .forceLeftToRight
+  XCTAssertEqual(map.view.effectiveUserInterfaceLayoutDirection, isArabic ? .rightToLeft : .leftToRight,
+                 "The native scene must exercise the app language's actual layout direction")
   try await rotateMapScene(scene, window: window, map: map, to: .portrait)
   return (map, window, scene)
 }
@@ -554,6 +615,63 @@ private func settleMapScene(_ map: MapViewController) async {
     map.view.window?.layoutIfNeeded()
     try? await Task.sleep(nanoseconds: 50_000_000)
   }
+}
+
+// The ordinary hosted suite intentionally disables Drape. A second opt-in run
+// reuses this exact selected-page case with the normal renderer enabled, and
+// records that distinction instead of treating UIKit-only tests as map evidence.
+@MainActor
+private func requireRotationRendererIfRequested(_ map: MapViewController, window: UIWindow) async throws {
+  guard ProcessInfo.processInfo.arguments.contains("-MikshatRequireRenderer") else { return }
+  guard !MapsAppDelegate.isTestsEnvironment() else {
+    throw NSError(domain: "MikshatRotationRenderer", code: 1,
+                  userInfo: [NSLocalizedDescriptionKey: "Remove -IsTests before running the Drape rotation pass."])
+  }
+  let ready = {
+    UIApplication.shared.applicationState == .active && window.isKeyWindow && !window.isHidden
+      && map.view.window === window && !map.view.bounds.isEmpty
+      && map.mapView.drapeEngineCreated && map.mapView.graphicContextInitialized
+  }
+  let deadline = Date().addingTimeInterval(30)
+  while !ready(), Date() < deadline { try await Task.sleep(nanoseconds: 50_000_000) }
+  guard ready(), String(describing: type(of: map.mapView.layer)) == "CAMetalLayer" else {
+    try recordRotationRendererIfRequested("setup-failed", map: map, window: window)
+    throw NSError(domain: "MikshatRotationRenderer", code: 2,
+                  userInfo: [NSLocalizedDescriptionKey: "An active Drape/Metal map did not become ready; renderer rotation coverage was not established."])
+  }
+}
+
+@MainActor
+private func recordRotationRendererIfRequested(_ event: String, map: MapViewController, window: UIWindow,
+                                               extra: [String: Any] = [:]) throws {
+  guard ProcessInfo.processInfo.arguments.contains("-MikshatRequireRenderer") else { return }
+  var entry: [String: Any] = [
+    "event": event,
+    "timestamp": Date().timeIntervalSince1970,
+    "rendererReady": map.mapView.drapeEngineCreated,
+    "graphicsReady": map.mapView.graphicContextInitialized,
+    "layer": String(describing: type(of: map.mapView.layer)),
+    "active": UIApplication.shared.applicationState == .active,
+    "windowAttached": map.view.window === window && window.isKeyWindow && !window.isHidden,
+    "language": Bundle.main.preferredLocalizations.first ?? "",
+    "direction": map.view.effectiveUserInterfaceLayoutDirection == .rightToLeft ? "RTL" : "LTR",
+    "width": window.bounds.width,
+    "height": window.bounds.height,
+    "scope": "Active Drape with a synthetic selected point at the reported coordinates; not a physical-device or real-stream feature-selection claim",
+  ]
+  entry.merge(extra) { _, new in new }
+  let data = try JSONSerialization.data(withJSONObject: entry, options: [.sortedKeys])
+  let line = try XCTUnwrap(String(data: data, encoding: .utf8))
+  print("MIKSHAT_RENDERER_ROTATION " + line)
+  let directory = try XCTUnwrap(FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first)
+  let path = directory.appendingPathComponent("mikshat-renderer-rotation.jsonl")
+  if !FileManager.default.fileExists(atPath: path.path) {
+    try Data().write(to: path)
+  }
+  let handle = try FileHandle(forWritingTo: path)
+  defer { try? handle.close() }
+  try handle.seekToEnd()
+  try handle.write(contentsOf: Data((line + "\n").utf8))
 }
 
 @MainActor

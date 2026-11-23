@@ -11,9 +11,9 @@ TWINE_CLI="$OMIM_PATH/tools/python/twine/python_twine/twine_cli.py"
 echo
 echo "Validating translation string files format"
 
-for f in data/strings/strings.txt data/strings/types_strings.txt data/strings/sound.txt; do
+for f in data/strings/strings.txt data/strings/ios_mikshat.txt data/strings/types_strings.txt data/strings/sound.txt; do
   echo ">> Validating '$f' ..."
-  if [[ "$f" == "data/strings/strings.txt" ]]; then
+  if [[ "$f" == "data/strings/strings.txt" || "$f" == "data/strings/ios_mikshat.txt" ]]; then
     # Generation selects definitions by tag but keeps untagged ones for every target, so a
     # missing 'tags' line silently copies the string into all apps. --pedantic rejects it.
     python3 "$TWINE_CLI" validate-twine-file --pedantic "$OMIM_PATH/$f"

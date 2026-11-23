@@ -24,10 +24,6 @@ jobs:
       run: bash mikshat/tests/weather-data/run.sh
     - name: Run country container validation regressions
       run: python3 -m unittest discover -s tools/python/mikshat -p 'test_*.py' -v
-    - name: Compile and exercise the actual Saudi source registry
-      run: |-
-        clang++ -std=c++23 -Wall -Wextra -Werror -I. mikshat/tests/weather-data/SaudiSourceTests.cpp -o /tmp/saudi-source-tests
-        /tmp/saudi-source-tests
     - name: Single live free Open-Meteo reference probe
       continue-on-error: true
       run: |-

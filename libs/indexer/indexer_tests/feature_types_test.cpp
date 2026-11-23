@@ -1,13 +1,59 @@
 #include "testing/testing.hpp"
 
 #include "indexer/classificator.hpp"
+#include "indexer/drules_selector.hpp"
+#include "indexer/feature.hpp"
 #include "indexer/feature_data.hpp"
+#include "indexer/ftypes_matcher.hpp"
+#include "indexer/map_object.hpp"
 
 #include "generator/generator_tests_support/test_with_classificator.hpp"
 
 namespace feature_types_test
 {
 using namespace generator::tests_support;
+
+namespace
+{
+class FaydaSample : public osm::MapObject
+{
+public:
+  FaydaSample(base::StringIL const & path, std::string_view name, feature::GeomType geometry)
+  {
+    m_geomType = geometry;
+    m_points = {{0.0, 0.0}, {0.01, 0.01}};
+    m_types.Add(classif().GetTypeByPath(path));
+    m_name.Add("ar", name);
+  }
+};
+}  // namespace
+
+UNIT_CLASS_TEST(TestWithClassificator, Feature_NamedFaydaSelector)
+{
+  auto selector = drule::ParseSelector("named_fayda");
+  auto negativeSelector = drule::ParseSelector("!named_fayda");
+  TEST(selector && negativeSelector, ());
+  for (auto const name : {"فيضة الخويش", "فيضةالخويش", "فياض الخويش", " Faydat al Khuwaysh", "fayda al Khuwaysh"})
+  {
+    auto ft = FeatureType::CreateFromMapObject(FaydaSample({"place", "locality"}, name, feature::GeomType::Point));
+    TEST(ftypes::IsNamedFayda(*ft), (name));
+    TEST(selector->Test(*ft, 9), (name));
+    TEST(!negativeSelector->Test(*ft, 9), (name));
+  }
+  for (auto const name : {"الخويش", "شعيب الخويش", "وادي الفيضة", "حي الفيضة", "مزرعة الخويش", ""})
+  {
+    auto ft = FeatureType::CreateFromMapObject(FaydaSample({"place", "locality"}, name, feature::GeomType::Point));
+    TEST(!ftypes::IsNamedFayda(*ft), (name));
+    TEST(!selector->Test(*ft, 9), (name));
+    TEST(negativeSelector->Test(*ft, 9), (name));
+  }
+  for (auto const & path : std::vector<base::StringIL>{{"place", "village"}, {"waterway", "stream"}})
+  {
+    auto const geometry = path.begin()[0] == "waterway" ? feature::GeomType::Line : feature::GeomType::Point;
+    auto ft = FeatureType::CreateFromMapObject(FaydaSample(path, "فيضة الخويش", geometry));
+    TEST(!ftypes::IsNamedFayda(*ft), (path));
+  }
+}
 
 feature::TypesHolder MakeTypesHolder(std::initializer_list<base::StringIL> const & arr, bool sortBySpec = true,
                                      feature::GeomType geomType = feature::GeomType::Point)

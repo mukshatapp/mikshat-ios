@@ -8,6 +8,11 @@ OMIM_PATH="${OMIM_PATH:-$(dirname "$0")/../..}"
 OMIM_PATH=$(realpath $OMIM_PATH)
 DATA_PATH="${DATA_PATH:-$OMIM_PATH/data}"
 
+if [[ ${1:-} == --ios-only ]]; then
+  python3 "$OMIM_PATH/tools/python/generate_ios_localizations.py"
+  exit
+fi
+
 
 function GenerateStringResource() {
   strings_file=$1
@@ -102,19 +107,14 @@ GenerateStringResource "strings.txt" android/libs/downloader/src/main/res androi
 GenerateStringResource "strings.txt" android/libs/routing/src/main/res android android-libs-routing ""
 GenerateStringResource "strings.txt" android/wear/src/main/res android android-wear "wear_strings.xml"
 
-# Generate iPhone strings
-GenerateStringResource "strings.txt" iphone/Maps/LocalizedStrings apple apple-maps ""
-GenerateStringResource "strings.txt" iphone/Maps/LocalizedStrings apple-plural apple-maps ""
-GenerateStringResource "strings.txt" iphone/Maps/LocalizedStrings apple apple-infoplist "InfoPlist.strings"
+# Generate only the interface languages packaged by the Mikshat iOS app.
+python3 "$OMIM_PATH/tools/python/generate_ios_localizations.py"
 
 # Generate Qt UI strings
 GenerateStringResource "strings.txt" qt/translations qt qt "" "-r"
 
 # Generate Android types strings
 GenerateStringResource "types_strings.txt" android/sdk/src/main/res android "" types_strings.xml
-
-# Generate iPhone types strings
-GenerateStringResource "types_strings.txt" iphone/Maps/LocalizedStrings apple "" LocalizableTypes.strings
 
 # Generate sound strings
 GenerateStringResource "sound.txt" data/sound-strings jquery ""

@@ -3,6 +3,8 @@ import XCTest
 import UIKit
 
 final class MikshatWeatherViewTests: XCTestCase {
+  private var isRTL: Bool { Bundle.main.preferredLocalizations.first?.hasPrefix("ar") == true }
+
   @MainActor
   func testSelectedMapPointAndFallbackNameAreRenderedBeforeAnyRequest() throws {
     let weather = MikshatWeatherViewController(name: "  ", latitude: 24.65001, longitude: 46.71002)
@@ -12,6 +14,7 @@ final class MikshatWeatherViewTests: XCTestCase {
     XCTAssertEqual(try label("weather.location", in: weather.view).text, L("mikshat_weather_selected_location"))
     XCTAssertEqual(try label("weather.coordinates", in: weather.view).text, "24.65001, 46.71002")
     XCTAssertEqual(try label("weather.title", in: weather.view).text, L("mikshat_weather_title"))
+    XCTAssertEqual(weather.view.effectiveUserInterfaceLayoutDirection, isRTL ? .rightToLeft : .leftToRight)
     XCTAssertFalse(descendants(weather.view).contains { $0.accessibilityIdentifier == "weather.current" })
     XCTAssertGreaterThanOrEqual(try element("weather.close", in: weather.view).bounds.width, 44)
   }
@@ -56,7 +59,7 @@ final class MikshatWeatherViewTests: XCTestCase {
       let hours = try XCTUnwrap(try element("weather.hours", in: weather.view) as? UIScrollView)
       let cards = try XCTUnwrap(hours.subviews.compactMap { $0 as? UIStackView }.first).arrangedSubviews
       try assertHorizontalHours(in: hours, context: name)
-      XCTAssertEqual(hours.contentOffset.x, max(0, hours.contentSize.width - hours.bounds.width), accuracy: 1)
+      XCTAssertEqual(hours.contentOffset.x, isRTL ? max(0, hours.contentSize.width - hours.bounds.width) : 0, accuracy: 1)
       let temperature = try label("weather.current.temperature", in: weather.view)
       XCTAssertEqual((temperature.text ?? "").components(separatedBy: "°C").count - 1, 1)
       let icon = try XCTUnwrap(try element("weather.current.icon", in: weather.view) as? UIImageView)
@@ -71,17 +74,18 @@ final class MikshatWeatherViewTests: XCTestCase {
       page.setContentOffset(CGPoint(x: 0, y: max(0, page.contentSize.height - page.bounds.height)), animated: false)
       layout(container)
       try writeScreenshot(container.view, name: name + "-forecast")
-      hours.setContentOffset(.zero, animated: false)
+      hours.setContentOffset(CGPoint(x: isRTL ? 0 : max(0, hours.contentSize.width - hours.bounds.width), y: 0), animated: false)
       layout(container)
       try assertVisible(try XCTUnwrap(cards.last), in: hours, context: name + "-twelfth-hour")
 
       // Keep the same visible hour and fraction when data rebuilds and the viewport resizes.
-      hours.setContentOffset(CGPoint(x: hours.contentSize.width - hours.bounds.width - 300, y: 0), animated: false)
+      hours.setContentOffset(CGPoint(x: isRTL ? hours.contentSize.width - hours.bounds.width - 300 : 300, y: 0), animated: false)
       layout(container)
       let right = hours.contentOffset.x + hours.bounds.width
       let anchor = try XCTUnwrap(cards.first { $0.frame.minX < right && $0.frame.maxX > hours.contentOffset.x })
       let identifier = try XCTUnwrap(anchor.accessibilityIdentifier)
-      let fraction = (anchor.frame.maxX - right) / anchor.frame.width
+      let fraction = isRTL ? (anchor.frame.maxX - right) / anchor.frame.width
+        : (hours.contentOffset.x - anchor.frame.minX) / anchor.frame.width
       let refresh = try XCTUnwrap(try element("weather.refresh", in: weather.view) as? UIButton)
       refresh.sendActions(for: .touchUpInside)
       try await waitUntil("Refreshed forecast completed") { refresh.isEnabled }
@@ -95,9 +99,9 @@ final class MikshatWeatherViewTests: XCTestCase {
       try writeScreenshot(container.view, name: name + "-rotated")
 
       // Returning to the first hour keeps it pinned after resizing back.
-      hours.setContentOffset(CGPoint(x: hours.contentSize.width - hours.bounds.width, y: 0), animated: false)
+      hours.setContentOffset(CGPoint(x: isRTL ? hours.contentSize.width - hours.bounds.width : 0, y: 0), animated: false)
       resize(window: window, container: container, size: size)
-      XCTAssertEqual(hours.contentOffset.x, max(0, hours.contentSize.width - hours.bounds.width), accuracy: 1)
+      XCTAssertEqual(hours.contentOffset.x, isRTL ? max(0, hours.contentSize.width - hours.bounds.width) : 0, accuracy: 1)
       try assertSheetPolicy(weather, size: size, context: name + "-returned")
       window.isHidden = true
     }
@@ -304,7 +308,8 @@ final class MikshatWeatherViewTests: XCTestCase {
     let cards = stack.arrangedSubviews
     XCTAssertEqual(cards.count, 12, file: file, line: line)
     XCTAssertEqual(stack.axis, .horizontal, file: file, line: line)
-    XCTAssertEqual(hours.semanticContentAttribute, .forceRightToLeft, file: file, line: line)
+    XCTAssertEqual(hours.semanticContentAttribute, isRTL ? .forceRightToLeft : .forceLeftToRight, file: file, line: line)
+    XCTAssertEqual(stack.semanticContentAttribute, hours.semanticContentAttribute, file: file, line: line)
     XCTAssertGreaterThan(hours.contentSize.width, hours.bounds.width, file: file, line: line)
     XCTAssertLessThanOrEqual(hours.contentSize.height, hours.bounds.height + 1,
                              "Hourly forecast must scroll horizontally without a vertical clipping area", file: file, line: line)
@@ -327,8 +332,13 @@ final class MikshatWeatherViewTests: XCTestCase {
       }
       if index > 0 {
         let previous = cards[index - 1].convert(cards[index - 1].bounds, to: stack)
-        XCTAssertLessThanOrEqual(rect.maxX, previous.minX + 1, "Future hours must run right to left without overlap",
-                                 file: file, line: line)
+        if isRTL {
+          XCTAssertLessThanOrEqual(rect.maxX, previous.minX + 1, "Future hours must follow right-to-left reading order",
+                                   file: file, line: line)
+        } else {
+          XCTAssertGreaterThanOrEqual(rect.minX, previous.maxX - 1, "Future hours must follow left-to-right reading order",
+                                      file: file, line: line)
+        }
         XCTAssertEqual(rect.midY, previous.midY, accuracy: 1, file: file, line: line)
       }
     }
@@ -387,7 +397,9 @@ final class MikshatWeatherViewTests: XCTestCase {
                                   file: StaticString = #filePath, line: UInt = #line) throws {
     let card = try element(identifier, in: hours, file: file, line: line)
     let rect = card.convert(card.bounds, to: hours)
-    XCTAssertEqual((rect.maxX - hours.contentOffset.x - hours.bounds.width) / rect.width, fraction,
+    let actual = isRTL ? (rect.maxX - hours.contentOffset.x - hours.bounds.width) / rect.width
+      : (hours.contentOffset.x - rect.minX) / rect.width
+    XCTAssertEqual(actual, fraction,
                    accuracy: 0.01, file: file, line: line)
   }
 
@@ -426,7 +438,7 @@ final class MikshatWeatherViewTests: XCTestCase {
       container.setOverrideTraitCollection(UITraitCollection(traitsFrom: [
         UITraitCollection(preferredContentSizeCategory: category),
         UITraitCollection(userInterfaceStyle: window.overrideUserInterfaceStyle),
-        UITraitCollection(layoutDirection: .rightToLeft),
+        UITraitCollection(layoutDirection: isRTL ? .rightToLeft : .leftToRight),
         UITraitCollection(userInterfaceIdiom: min(size.width, size.height) >= 600 ? .pad : .phone),
         UITraitCollection(horizontalSizeClass: size.width >= 600 ? .regular : .compact),
         UITraitCollection(verticalSizeClass: size.height < 500 ? .compact : .regular),
@@ -479,15 +491,14 @@ final class MikshatWeatherViewTests: XCTestCase {
                                   size: size)
     canvas.view.addSubview(container.view)
     container.didMove(toParent: canvas)
-    container.view.semanticContentAttribute = .forceRightToLeft
+    container.view.semanticContentAttribute = isRTL ? .forceRightToLeft : .forceLeftToRight
     container.addChild(weather)
     container.setOverrideTraitCollection(UITraitCollection(traitsFrom: [
       UITraitCollection(preferredContentSizeCategory: category), UITraitCollection(userInterfaceStyle: style),
-      UITraitCollection(layoutDirection: .rightToLeft),
+      UITraitCollection(layoutDirection: isRTL ? .rightToLeft : .leftToRight),
     ]), forChild: weather)
     weather.view.frame = container.view.bounds
     weather.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-    weather.view.semanticContentAttribute = .forceRightToLeft
     container.view.addSubview(weather.view)
     weather.didMove(toParent: container)
     window.rootViewController = canvas
