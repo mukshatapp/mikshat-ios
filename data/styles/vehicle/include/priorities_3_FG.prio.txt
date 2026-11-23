@@ -263,10 +263,10 @@ highway-path-horse                                  # line z17-
 highway-pedestrian                                  # line z18-
 highway-pedestrian-area                             # line z18-
 highway-pedestrian-bridge                           # line z18-
-highway-track                                       # line z16-
-highway-track-area                                  # line z16-
-highway-track-bridge                                # line z16-
-highway-track-no-access                             # line z16-
+highway-track                                       # line z10-
+highway-track-area                                  # line z10-
+highway-track-bridge                                # line z10-
+highway-track-no-access                             # line z10-
 === 130
 
 highway-construction                                # line z13-

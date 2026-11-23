@@ -169,7 +169,7 @@ place-town                                          # caption z8-
 === 3250
 
 amenity-charging_station-motorcar                   # icon z14- (also has caption(optional) z14-)
-amenity-fuel                                        # icon z12- (also has caption(optional) z12-)
+amenity-fuel                                        # icon z9- (also has caption(optional) z12-)
 === 3200
 
 amenity-charging_station                            # icon z16- (also has caption(optional) z16-)
@@ -181,7 +181,7 @@ railway-station-subway-spb                          # icon z11-16 (also has capt
 === 3100
 
 aeroway-aerodrome                                   # icon z14- (also has caption(optional) z14-, area z10-)
-place-village                                       # caption z11-
+place-village                                       # caption z9-
 === 3050
 
 railway-station                                     # icon z12- (also has caption(optional) z13-)
@@ -312,6 +312,8 @@ highway-service-parking_aisle                       # pathtext z16- (also has li
 place-island                                        # caption z12-14
 === 2100
 
+landuse-meadow                                      # caption z9- (also has area z12-)
+natural-grassland                                   # caption z9- (also has area z12-)
 natural-water-river                                 # caption z10- (also has area z1-)
 === 2050
 
@@ -438,10 +440,10 @@ historic-monument                                   # icon z13- (also has captio
 man_made-communications_tower                       # icon z15- (also has caption(optional) z16-)
 === 1950
 
-place-hamlet                                        # caption z13-
+place-hamlet                                        # caption z9-
 === 1900
 
-place-locality                                      # caption z13-
+place-locality                                      # caption z9-
 === 1850
 
 tourism-viewpoint                                   # icon z14- (also has caption(optional) z15-)
@@ -456,8 +458,10 @@ tourism-theme_park                                  # icon z14- (also has captio
 shop-supermarket                                    # icon z14- (also has caption(optional) z14-)
 === 1650
 
-waterway-river                                      # pathtext z11- (also has line z10-)
-waterway-river-intermittent                         # pathtext z11- (also has line z10-)
+waterway-river                                      # pathtext z9- (also has line z9-)
+waterway-river-intermittent                         # pathtext z9- (also has line z9-)
+waterway-stream                                     # pathtext z9- (also has line z9-12)
+waterway-stream-intermittent                        # pathtext z9- (also has line z9-12)
 === 1550
 
 natural-water                                       # caption z10- (also has area z1-)
@@ -561,11 +565,19 @@ waterway-lock_gate                                  # icon z16-
 === 600
 
 amenity-conference_centre                           # icon z16-
+amenity-drinking_water                              # icon z9- (also has caption(optional) z12-)
 amenity-events_venue                                # icon z16-
 amenity-exhibition_centre                           # icon z16-
-amenity-water_point                                 # icon z16-
-amenity-water_point-drinking_water_no               # icon z18-
+amenity-water_point                                 # icon z9- (also has caption(optional) z12-)
+amenity-water_point-drinking_water_no               # icon z9- (also has caption(optional) z12-)
 building-train_station                              # caption z18- (also has area z15-)
+man_made-water_tap                                  # icon z9- (also has caption(optional) z12-)
+man_made-water_tap-drinking_water_no                # icon z9- (also has caption(optional) z12-)
+man_made-water_well                                 # icon z9- (also has caption(optional) z12-)
+man_made-water_well-drinking_water_no               # icon z9- (also has caption(optional) z12-)
+natural-hot_spring                                  # icon z9- (also has caption(optional) z12-)
+natural-spring                                      # icon z9- (also has caption(optional) z12-)
+natural-spring-drinking_water_no                    # icon z9- (also has caption(optional) z12-)
 railway-subway_entrance                             # icon z16- (also has caption(optional) z17-)
 railway-subway_entrance-adana                       # icon z16- (also has caption(optional) z17-)
 railway-subway_entrance-algiers                     # icon z16- (also has caption(optional) z17-)
@@ -771,7 +783,7 @@ entrance-main                                       # icon z18- (also has captio
 # === -6700
 
 # amenity-charging_station-motorcar                 # caption(optional) z14- (also has icon z14-)
-# amenity-fuel                                      # caption(optional) z12- (also has icon z12-)
+# amenity-fuel                                      # caption(optional) z12- (also has icon z9-)
 # === -6800
 
 # amenity-charging_station                          # caption(optional) z16- (also has icon z16-)
@@ -1070,6 +1082,16 @@ entrance-main                                       # icon z18- (also has captio
 # amenity-place_of_worship-taoist                   # caption(optional) z17- (also has icon z16-)
 # === -9350
 
+# amenity-drinking_water                            # caption(optional) z12- (also has icon z9-)
+# amenity-water_point                               # caption(optional) z12- (also has icon z9-)
+# amenity-water_point-drinking_water_no             # caption(optional) z12- (also has icon z9-)
+# man_made-water_tap                                # caption(optional) z12- (also has icon z9-)
+# man_made-water_tap-drinking_water_no              # caption(optional) z12- (also has icon z9-)
+# man_made-water_well                               # caption(optional) z12- (also has icon z9-)
+# man_made-water_well-drinking_water_no             # caption(optional) z12- (also has icon z9-)
+# natural-hot_spring                                # caption(optional) z12- (also has icon z9-)
+# natural-spring                                    # caption(optional) z12- (also has icon z9-)
+# natural-spring-drinking_water_no                  # caption(optional) z12- (also has icon z9-)
 # railway-subway_entrance                           # caption(optional) z17- (also has icon z16-)
 # railway-subway_entrance-adana                     # caption(optional) z17- (also has icon z16-)
 # railway-subway_entrance-algiers                   # caption(optional) z17- (also has icon z16-)
