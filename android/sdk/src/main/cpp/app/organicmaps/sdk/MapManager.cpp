@@ -62,6 +62,9 @@ struct CountryItemBuilder
 {
   jclass m_class;
   jmethodID m_ctor, m_updateProgress;
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  jfieldID m_EnqueuedSize, m_TotalSize, m_Progress, m_DownloadedBytes, m_BytesToDownload;
+#endif
   jfieldID m_Id, m_Name, m_DirectParentId, m_TopmostParentId, m_DirectParentName, m_TopmostParentName, m_Description,
       m_Size, m_DownloadSize, m_ChildCount, m_TotalChildCount, m_Present, m_Category, m_Status, m_ErrorCode;
 
@@ -69,7 +72,15 @@ struct CountryItemBuilder
   {
     m_class = jni::GetGlobalClassRef(env, "app/organicmaps/sdk/downloader/CountryItem");
     m_ctor = jni::GetConstructorID(env, m_class, "(Ljava/lang/String;)V");
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+    m_EnqueuedSize = env->GetFieldID(m_class, "enqueuedSize", "J");
+    m_TotalSize = env->GetFieldID(m_class, "totalSize", "J");
+    m_Progress = env->GetFieldID(m_class, "progress", "F");
+    m_DownloadedBytes = env->GetFieldID(m_class, "downloadedBytes", "J");
+    m_BytesToDownload = env->GetFieldID(m_class, "bytesToDownload", "J");
+#else
     m_updateProgress = env->GetMethodID(m_class, "updateProgress", "(JJ)V");
+#endif
 
     m_Id = env->GetFieldID(m_class, "id", "Ljava/lang/String;");
     m_Name = env->GetFieldID(m_class, "name", "Ljava/lang/String;");
@@ -79,7 +90,9 @@ struct CountryItemBuilder
     m_TopmostParentName = env->GetFieldID(m_class, "topmostParentName", "Ljava/lang/String;");
     m_Description = env->GetFieldID(m_class, "description", "Ljava/lang/String;");
     m_Size = env->GetFieldID(m_class, "size", "J");
+#if !defined(MUKSHAT_LEGACY_SDK_ABI)
     m_DownloadSize = env->GetFieldID(m_class, "downloadSize", "J");
+#endif
     m_ChildCount = env->GetFieldID(m_class, "childCount", "I");
     m_TotalChildCount = env->GetFieldID(m_class, "totalChildCount", "I");
     m_Present = env->GetFieldID(m_class, "present", "Z");
@@ -223,7 +236,12 @@ static void UpdateItem(JNIEnv * env, jobject item, storage::NodeAttrs const & at
 
   // Sizes
   env->SetLongField(item, ciBuilder.m_Size, attrs.m_localMwmSize);
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  env->SetLongField(item, ciBuilder.m_EnqueuedSize, attrs.m_downloadSize);
+  env->SetLongField(item, ciBuilder.m_TotalSize, attrs.m_mwmSize);
+#else
   env->SetLongField(item, ciBuilder.m_DownloadSize, attrs.m_downloadSize);
+#endif
 
   // Child counts
   env->SetIntField(item, ciBuilder.m_ChildCount, attrs.m_downloadingMwmCounter);
@@ -237,8 +255,15 @@ static void UpdateItem(JNIEnv * env, jobject item, storage::NodeAttrs const & at
 
   // Progress
   auto const & progress = attrs.m_downloadingProgress;
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  env->SetLongField(item, ciBuilder.m_DownloadedBytes, progress.m_bytesDownloaded);
+  env->SetLongField(item, ciBuilder.m_BytesToDownload, progress.m_bytesTotal);
+  env->SetFloatField(item, ciBuilder.m_Progress, progress.m_bytesTotal == 0 ? 0.0f :
+      static_cast<float>(100.0 * progress.m_bytesDownloaded / progress.m_bytesTotal));
+#else
   env->CallVoidMethod(item, ciBuilder.m_updateProgress, static_cast<jlong>(progress.m_bytesDownloaded),
                       static_cast<jlong>(progress.m_bytesTotal));
+#endif
 }
 
 static void PutItemsToList(
@@ -458,6 +483,7 @@ JNIEXPORT void Java_app_organicmaps_sdk_downloader_MapManager_nativeDelete(JNIEn
   EndBatchingCallbacks(env);
 }
 
+#if !defined(MUKSHAT_LEGACY_SDK_ABI)
 static jobject ToJavaProgress(JNIEnv * env, storage::Progress const & progress)
 {
   static jclass const progressClass = jni::GetGlobalClassRef(env, "app/organicmaps/sdk/downloader/MapManager$Progress");
@@ -466,6 +492,8 @@ static jobject ToJavaProgress(JNIEnv * env, storage::Progress const & progress)
                         static_cast<jlong>(progress.m_mwmTotal), static_cast<jlong>(progress.m_twmDownloaded),
                         static_cast<jlong>(progress.m_twmTotal));
 }
+
+#endif
 
 JNIEXPORT jboolean Java_app_organicmaps_sdk_downloader_MapManager_nativeIsLeaf(JNIEnv * env, jclass, jstring countryId)
 {
@@ -487,11 +515,18 @@ static void ProgressChangedCallback(std::shared_ptr<jobject> const & listenerRef
                                     storage::Progress const & progress)
 {
   JNIEnv * env = jni::GetEnv();
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  jmethodID const methodID = jni::GetMethodID(env, *listenerRef, "onProgress", "(Ljava/lang/String;JJ)V");
+  env->CallVoidMethod(*listenerRef, methodID,
+      jni::TScopedLocalRef(env, jni::ToJavaString(env, countryId)).get(),
+      static_cast<jlong>(progress.m_mwmDownloaded), static_cast<jlong>(progress.m_mwmTotal));
+#else
   jmethodID const methodID = jni::GetMethodID(
       env, *listenerRef, "onProgress", "(Ljava/lang/String;Lapp/organicmaps/sdk/downloader/MapManager$Progress;)V");
   jni::TScopedLocalRef const javaProgress(env, ToJavaProgress(env, progress));
   env->CallVoidMethod(*listenerRef, methodID, jni::TScopedLocalRef(env, jni::ToJavaString(env, countryId)).get(),
                       javaProgress.get());
+#endif
 }
 
 // static int nativeSubscribe(StorageCallback listener);

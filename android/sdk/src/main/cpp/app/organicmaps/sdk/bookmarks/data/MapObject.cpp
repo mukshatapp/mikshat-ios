@@ -112,9 +112,11 @@ static jobject CreateMapObjectImpl(JNIEnv * env, place_page::Info const & info)
 jobject CreateMapObject(JNIEnv * env, place_page::Info const & info)
 {
   jobject const mapObject = CreateMapObjectImpl(env, info);
+#if !defined(MUKSHAT_LEGACY_SDK_ABI)
   static jfieldID const previewSubtitleId = env->GetFieldID(g_mapObjectClazz, "mPreviewSubtitle", "Ljava/lang/String;");
   jni::TScopedLocalRef const previewSubtitle(env,
                                              jni::ToJavaStringWithSupplementalCharsFix(env, info.GetPreviewSubtitle()));
   env->SetObjectField(mapObject, previewSubtitleId, previewSubtitle.get());
+#endif
   return mapObject;
 }
