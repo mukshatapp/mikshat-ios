@@ -9,6 +9,7 @@
 #include "indexer/map_object.hpp"
 #include "indexer/map_style_reader.hpp"
 #include "indexer/mwm_set.hpp"
+#include "indexer/transliteration_loader.hpp"
 
 #include "drape/hatching_decl.hpp"
 
@@ -59,6 +60,7 @@ class StyleSnapshotFixture
 public:
   StyleSnapshotFixture() : m_originalStyle(GetStyleReader().GetCurrentStyle())
   {
+    InitTransliterationInstanceWithDefaultDirs();
     classificator::Load();
     for (auto const style : kStyles)
       classificator::EnsureStyleLoaded(style);
