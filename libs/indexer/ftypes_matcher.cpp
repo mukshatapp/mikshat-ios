@@ -27,11 +27,11 @@ bool IsNamedFayda(FeatureType & ft)
   {
     auto const start = name.find_first_not_of(" \t\r\n");
     if (start == std::string_view::npos)
-      return true;
+      return base::ControlFlow::Continue;
     name.remove_prefix(start);
     matches = name.starts_with("فيضة") || name.starts_with("فياض") || name.starts_with("Faydat ") ||
               name.starts_with("Fayda ") || name.starts_with("faydat ") || name.starts_with("fayda ");
-    return !matches;
+    return matches ? base::ControlFlow::Break : base::ControlFlow::Continue;
   });
   return matches;
 }

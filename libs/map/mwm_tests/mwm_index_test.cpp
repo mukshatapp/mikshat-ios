@@ -250,10 +250,7 @@ UNIT_TEST(MikshatOverview_SaudiIndexedPoints)
   TEST(feature::TypesHolder(*fayda).Has(classif().GetTypeByPath({"place", "locality"})), ());
   bool hasExpectedName = false;
   fayda->ForEachName([&](int8_t, std::string_view name)
-  {
-    hasExpectedName = hasExpectedName || name == "فيضة الخويش";
-    return true;
-  });
+  { hasExpectedName = hasExpectedName || name == "فيضة الخويش"; });
   TEST(hasExpectedName, ("The actual feature, not a synthetic name, must be inspected"));
   TEST(ftypes::IsNamedFayda(*fayda), ());
   auto const stored = mercator::ToLatLon(fayda->GetCenter());
