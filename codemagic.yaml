@@ -115,16 +115,26 @@ workflows:
       - name: Set app and widget versions
         script: |
           set -euo pipefail
-          LATEST_BUILD_NUMBER=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID")
-          # A successful query returns no number before the first upload.
-          if [[ -z "$LATEST_BUILD_NUMBER" ]]; then
-            LATEST_BUILD_NUMBER=0
-          fi
-          if [[ ! "$LATEST_BUILD_NUMBER" =~ ^[0-9]+$ ]]; then
-            echo "Expected a numeric TestFlight build number."
-            exit 1
-          fi
-          NEXT_BUILD_NUMBER=$((LATEST_BUILD_NUMBER + 1))
+          # Query this release train; the highest marketing version may have a
+          # lower build number than a previously uploaded release.
+          LATEST_TESTFLIGHT_BUILD_NUMBER=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID" --pre-release-version "$APP_VERSION" --platform IOS)
+          LATEST_APP_STORE_BUILD_NUMBER=$(app-store-connect get-latest-app-store-build-number "$APP_STORE_APPLE_ID" --app-store-version "$APP_VERSION" --platform IOS)
+          NEXT_BUILD_NUMBER=$(python3 - "${LATEST_TESTFLIGHT_BUILD_NUMBER:-0}" "${LATEST_APP_STORE_BUILD_NUMBER:-0}" "${PROJECT_BUILD_NUMBER:?Codemagic project build counter is required}" <<'PY'
+          import re
+          import sys
+          values = [value.strip() for value in sys.argv[1:]]
+          if any(not re.fullmatch(r"[0-9]+", value) for value in values):
+              raise SystemExit("Expected integer Apple build numbers and a Codemagic project counter")
+          testflight, app_store, project = map(int, values)
+          if project < 1:
+              raise SystemExit("Codemagic project build counter must be positive")
+          # Continue above the known uploaded build 2 and use the app-wide CI
+          # counter as a floor when Apple has not exposed a recent upload yet.
+          print(max(3, testflight + 1, app_store + 1, project))
+          PY
+          )
+          printf 'MIKSHAT_BUILD_NUMBER=%s\n' "$NEXT_BUILD_NUMBER" >> "$CM_ENV"
+          printf 'Preparing Mikshat %s (%s), commit %s\n' "$APP_VERSION" "$NEXT_BUILD_NUMBER" "${CM_COMMIT:-unknown}"
           cd iphone/Maps
           agvtool new-version -all "$NEXT_BUILD_NUMBER"
           agvtool new-marketing-version "$APP_VERSION"
@@ -147,6 +157,7 @@ workflows:
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
+          import os
           import plistlib
           import re
           import zipfile
@@ -154,6 +165,10 @@ workflows:
           if len(ipas) != 1:
               raise SystemExit(f"Expected one IPA, found {len(ipas)}")
           errors = []
+          expected_versions = {"CFBundleShortVersionString": os.environ["APP_VERSION"],
+                               "CFBundleVersion": os.environ["MIKSHAT_BUILD_NUMBER"]}
+          required_bundles = {"com.mikshat.maps", "com.mikshat.maps.widgetextension"}
+          found_bundles = set()
           with zipfile.ZipFile(ipas[0]) as archive:
               for name in archive.namelist():
                   if not re.search(r"\.(app|appex|framework)/Info\.plist$", name):
@@ -163,7 +178,23 @@ workflows:
                       value = info.get(key, "")
                       if not isinstance(value, str) or not re.fullmatch(r"[0-9]+(?:\.[0-9]+){0,2}", value):
                           errors.append(f"{name}: invalid {key}={value!r}")
+                  if re.fullmatch(r"Payload/[^/]+\.app/Info\.plist", name):
+                      expected_bundle = "com.mikshat.maps"
+                  elif re.fullmatch(r"Payload/[^/]+\.app/PlugIns/[^/]+\.appex/Info\.plist", name):
+                      expected_bundle = "com.mikshat.maps.widgetextension"
+                  else:
+                      continue
+                  bundle = info.get("CFBundleIdentifier")
+                  if bundle != expected_bundle:
+                      errors.append(f"{name}: expected bundle {expected_bundle}, found {bundle!r}")
+                  else:
+                      found_bundles.add(bundle)
+                  for key, expected in expected_versions.items():
+                      if info.get(key) != expected:
+                          errors.append(f"{name}: expected {key}={expected!r}, found {info.get(key)!r}")
                   print(f"{name}: version={info.get('CFBundleShortVersionString')}, build={info.get('CFBundleVersion')}")
+          for bundle in sorted(required_bundles - found_bundles):
+              errors.append(f"Missing required bundle: {bundle}")
           if errors:
               raise SystemExit("\n".join(errors))
           PY
