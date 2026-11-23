@@ -266,6 +266,20 @@ jobs:
         print('MIKSHAT_PHYSICAL_ROTATION_DRIVER_READY '+ready.read_text())
         PYDRIVER
         fi
+        python3 -u mikshat/tests/update-native/hang_sampler.py \
+          --udid "$MIKSHAT_SIMULATOR_UDID" \
+          --output-dir build/search-diagnostics/rotation-native-stacks --max-seconds 3300 \
+          > build/search-diagnostics/rotation-stack-monitor.log 2>&1 &
+        stack_sampler_pid=$!
+        cleanup_native_observers() {
+          kill "$stack_sampler_pid" 2>/dev/null || true
+          wait "$stack_sampler_pid" 2>/dev/null || true
+          if [[ -n "${rotation_driver_pid:-}" ]]; then
+            kill "$rotation_driver_pid" 2>/dev/null || true
+            wait "$rotation_driver_pid" 2>/dev/null || true
+          fi
+        }
+        trap cleanup_native_observers EXIT
         xcodebuild test-without-building "${test_args[@]}" -resultBundlePath build/SearchRegressions.xcresult \
           2>&1 | tee build/search-diagnostics/xcodebuild-search-tests.log
         if [[ "$MIKSHAT_TEST_DEVICE" == "iPhone 16" && "$MIKSHAT_ROTATION_BASELINE" != "true" ]]; then
@@ -365,9 +379,16 @@ jobs:
           --output-dir build/search-diagnostics/renderer-rotation/screenshots \
           > build/search-diagnostics/renderer-rotation/capture.log 2>&1 &
         capture_pid=$!
+        python3 -u mikshat/tests/update-native/hang_sampler.py \
+          --udid "$MIKSHAT_SIMULATOR_UDID" \
+          --output-dir build/search-diagnostics/renderer-rotation/native-stacks --max-seconds 480 \
+          > build/search-diagnostics/renderer-rotation/stack-monitor.log 2>&1 &
+        stack_sampler_pid=$!
         cleanup_capture() {
           kill "$capture_pid" 2>/dev/null || true
           wait "$capture_pid" 2>/dev/null || true
+          kill "$stack_sampler_pid" 2>/dev/null || true
+          wait "$stack_sampler_pid" 2>/dev/null || true
         }
         trap cleanup_capture EXIT
         xcodebuild test-without-building \

@@ -208,3 +208,47 @@ workflows:
         auth: integration
         submit_to_testflight: true
         submit_to_app_store: false
+
+  mikshat-ios-rotation-diagnostics:
+    name: Mikshat iOS - selected point rotation diagnostics
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: fix/selected-point-rotation-diagnostics
+          include: true
+          source: true
+      cancel_previous_builds: true
+    environment:
+      xcode: "27.0"
+      vars:
+        XCODE_WORKSPACE: xcode/omim.xcworkspace
+        XCODE_SCHEME: OMaps
+    scripts:
+      - name: Prepare Mikshat app resources
+        script: |
+          set -euo pipefail
+          python3 mikshat/prepare_branding.py
+          python3 mikshat/prepare_satellite.py
+      - name: Download pinned dependencies
+        script: |
+          set -euo pipefail
+          git submodule update --init --recursive --depth 1 --jobs 8
+      - name: Check Xcode and Metal
+        script: |
+          set -euo pipefail
+          xcodebuild -version
+          if ! xcrun metal -v >/dev/null 2>&1; then
+            xcodebuild -downloadComponent MetalToolchain
+            xcrun -k
+          fi
+          xcrun metal -v
+      - name: Compare selected point layouts and capture blocked thread stacks
+        script: |
+          set -euo pipefail
+          bash mikshat/tests/update-native/run_rotation_diagnostic.sh build/rotation-diagnostic
+    artifacts:
+      - build/rotation-diagnostic/rotation-diagnostics.zip
+      - build/rotation-diagnostic/summary.json

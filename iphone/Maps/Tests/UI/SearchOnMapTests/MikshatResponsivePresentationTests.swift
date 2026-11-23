@@ -232,19 +232,47 @@ final class MikshatMapSceneLayoutTests: XCTestCase {
 
   @MainActor
   func testSelectedPointStaysAttachedAndResponsiveWhileTheSamePageRotatesRepeatedly() async throws {
+    RotationPhaseDiagnostics.begin()
+    defer { RotationPhaseDiagnostics.end() }
+    RotationPhaseDiagnostics.record("scene.attach.begin")
     let (map, window, scene) = try await attachedMapScene()
-    defer { map.dismissPlacePage() }
+    RotationPhaseDiagnostics.record("scene.attach.end",
+                                    extra: ["language": Bundle.main.preferredLocalizations.first ?? "",
+                                            "direction": map.view.effectiveUserInterfaceLayoutDirection == .rightToLeft ? "RTL" : "LTR"])
+    defer {
+      RotationPhaseDiagnostics.record("selection.dismiss.begin")
+      map.dismissPlacePage()
+      RotationPhaseDiagnostics.record("selection.dismiss.end")
+    }
+    RotationPhaseDiagnostics.record("renderer.ready.wait")
     try await requireRotationRendererIfRequested(map, window: window)
+    RotationPhaseDiagnostics.record("renderer.ready.end")
     try recordRotationRendererIfRequested("ready", map: map, window: window)
     // The physical-device report selected this point before rotating. Keeping
     // the page alive exercises a different path from selecting after rotation.
     let coordinate = CLLocationCoordinate2D(latitude: 26 + 13.904 / 60, longitude: 44 + 56.718 / 60)
     let title = "تيار مائي متقطع"
+    RotationPhaseDiagnostics.record("selection.restore.begin")
     MikshatNavigationCoordinator.restoreDestinationSelection(coordinate: coordinate, title: title)
+    RotationPhaseDiagnostics.record("selection.attach.wait")
     try await sceneWait("The reported selected-point page must be attached before rotation") {
       map.children.compactMap { $0 as? PlacePageViewController }.first?.viewIfLoaded?.window === window
     }
+    RotationPhaseDiagnostics.record("selection.attach.end")
     let page = try XCTUnwrap(map.children.compactMap { $0 as? PlacePageViewController }.first)
+    let titleTextView = try XCTUnwrap(try sceneElement("placePage.title", in: page.view) as? UITextView)
+    RotationPhaseDiagnostics.record("probe.title.found", extra: ["bounds": NSStringFromCGRect(titleTextView.bounds),
+                                                               "behavior": titleTextView.contentInsetAdjustmentBehavior.rawValue])
+    if ProcessInfo.processInfo.arguments.contains("-MikshatTitleInsetsNever") {
+      RotationPhaseDiagnostics.record("probe.titleInsetsNever.begin")
+      titleTextView.contentInsetAdjustmentBehavior = .never
+      RotationPhaseDiagnostics.record("probe.titleInsetsNever.applied",
+                                      extra: ["behavior": titleTextView.contentInsetAdjustmentBehavior.rawValue])
+    } else {
+      RotationPhaseDiagnostics.record("probe.titleInsetsAutomatic.observed",
+                                      extra: ["behavior": titleTextView.contentInsetAdjustmentBehavior.rawValue])
+    }
+    RotationPhaseDiagnostics.snapshot(in: page.view)
     await settleMapScene(map)
     let coordinates = try XCTUnwrap(try sceneElement("placePage.coordinates", in: page.view) as? PlacePageCoordinatesView)
     let toggle = try XCTUnwrap(try sceneElement("placePage.coordinates.toggle", in: page.view) as? UIButton)
@@ -253,7 +281,9 @@ final class MikshatMapSceneLayoutTests: XCTestCase {
       .components(separatedBy: "\n")
     for cycle in 0..<3 {
       for orientation in [UIInterfaceOrientation.landscapeRight, .portrait, .landscapeLeft, .portrait] {
+        RotationPhaseDiagnostics.record("rotation.begin", extra: ["cycle": cycle, "orientation": orientation.rawValue])
         try await rotateMapScene(scene, window: window, map: map, to: orientation)
+        RotationPhaseDiagnostics.record("rotation.end", extra: ["cycle": cycle, "orientation": orientation.rawValue])
         XCTAssertTrue(map.children.contains { $0 === page }, "Rotation must preserve the existing selected page")
         XCTAssertTrue(page.view.window === window)
         XCTAssertTrue(PlacePageData.hasData)
@@ -269,7 +299,9 @@ final class MikshatMapSceneLayoutTests: XCTestCase {
         page.scrollToReveal(toggle)
         await settleMapScene(map)
         let wasExpanded = coordinates.isExpanded
+        RotationPhaseDiagnostics.record("coordinates.toggle.begin")
         toggle.sendActions(for: .touchUpInside)
+        RotationPhaseDiagnostics.record("coordinates.toggle.end")
         await settleMapScene(map)
         XCTAssertEqual(coordinates.isExpanded, !wasExpanded,
                        "A real selected-point action must still respond after each rotation")
@@ -280,10 +312,13 @@ final class MikshatMapSceneLayoutTests: XCTestCase {
       }
     }
     let close = try XCTUnwrap(try sceneElement("placePage.close", in: page.view) as? UIButton)
+    RotationPhaseDiagnostics.record("selection.close.begin")
     close.sendActions(for: .touchUpInside)
+    RotationPhaseDiagnostics.record("selection.close.wait")
     try await sceneWait("The close button must remain responsive after repeated selected-point rotations") {
       !map.children.contains { $0 === page } && !PlacePageData.hasData
     }
+    RotationPhaseDiagnostics.record("selection.close.end")
     try await requireRotationRendererIfRequested(map, window: window)
     try recordRotationRendererIfRequested("completed", map: map, window: window)
   }
@@ -530,14 +565,18 @@ private func rotateMapScene(_ scene: UIWindowScene, window: UIWindow, map: MapVi
     let mask: UIInterfaceOrientationMask = orientation == .portrait ? .portrait
       : (orientation == .landscapeLeft ? .landscapeLeft : .landscapeRight)
     window.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+    RotationPhaseDiagnostics.record("scene.geometry.request.begin", extra: ["orientation": orientation.rawValue])
     scene.requestGeometryUpdate(.iOS(interfaceOrientations: mask)) {
       geometryError = $0
       print("Mikshat real-scene geometry request failed: \($0)")
     }
+    RotationPhaseDiagnostics.record("scene.geometry.request.end", extra: ["orientation": orientation.rawValue])
   }
+  RotationPhaseDiagnostics.record("scene.geometry.wait", extra: ["orientation": orientation.rawValue])
   try await sceneWait("UIKit must perform the requested real scene rotation") {
     actualGeometryMatches()
   }
+  RotationPhaseDiagnostics.record("scene.geometry.end", extra: ["orientation": orientation.rawValue])
   if let geometryError { throw geometryError }
   await settleMapScene(map)
 }
@@ -609,11 +648,100 @@ private func sceneWait(_ description: String, condition: () -> Bool) async throw
 
 @MainActor
 private func settleMapScene(_ map: MapViewController) async {
-  for _ in 0..<8 {
+  for iteration in 0..<8 {
+    RotationPhaseDiagnostics.snapshot(in: map.view)
+    RotationPhaseDiagnostics.record("layout.map.invalidate.begin", extra: ["iteration": iteration])
     map.view.setNeedsLayout()
+    RotationPhaseDiagnostics.record("layout.map.begin", extra: ["iteration": iteration])
     map.view.layoutIfNeeded()
+    RotationPhaseDiagnostics.record("layout.map.end", extra: ["iteration": iteration])
+    RotationPhaseDiagnostics.record("layout.window.begin", extra: ["iteration": iteration])
     map.view.window?.layoutIfNeeded()
+    RotationPhaseDiagnostics.record("layout.window.end", extra: ["iteration": iteration])
+    RotationPhaseDiagnostics.record("layout.settle.wait", extra: ["iteration": iteration])
     try? await Task.sleep(nanoseconds: 50_000_000)
+    RotationPhaseDiagnostics.record("layout.settle.end", extra: ["iteration": iteration])
+  }
+}
+
+// A MainActor timeout cannot execute while synchronous UIKit layout is stuck.
+// The host-side monitor reads this journal and samples this exact app process
+// before XCTest terminates it, preserving the blocked phase and native stack.
+@MainActor
+private enum RotationPhaseDiagnostics {
+  private static var enabled = false
+  private static var run = ""
+  private static var sequence = 0
+  private static let filename = "mikshat-rotation-phases.jsonl"
+
+  private static var path: URL? {
+    FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent(filename)
+  }
+
+  static func begin() {
+    enabled = true
+    run = UUID().uuidString
+    sequence = 0
+    do {
+      guard let path else { throw CocoaError(.fileNoSuchFile) }
+      try Data().write(to: path, options: .atomic)
+      record("test.begin")
+    } catch {
+      XCTFail("Could not create the external rotation diagnostic journal: \(error)")
+    }
+  }
+
+  static func end() {
+    record("test.completed")
+    enabled = false
+  }
+
+  static func record(_ phase: String, extra: [String: Any] = [:]) {
+    guard enabled, let path else { return }
+    sequence += 1
+    var entry: [String: Any] = ["version": 1, "run": run, "sequence": sequence,
+                              "phase": phase, "timestamp": Date().timeIntervalSince1970,
+                              "pid": ProcessInfo.processInfo.processIdentifier,
+                              "bundle": Bundle.main.bundleIdentifier ?? "",
+                              "mainThread": Thread.isMainThread]
+    entry.merge(extra) { _, new in new }
+    do {
+      var data = try JSONSerialization.data(withJSONObject: entry, options: [.sortedKeys])
+      data.append(0x0A)
+      let handle = try FileHandle(forWritingTo: path)
+      defer { try? handle.close() }
+      try handle.seekToEnd()
+      try handle.write(contentsOf: data)
+      print("MIKSHAT_ROTATION_PHASE " + String(decoding: data, as: UTF8.self))
+    } catch {
+      XCTFail("Could not record the external rotation diagnostic phase: \(error)")
+    }
+  }
+
+  static func snapshot(in view: UIView) {
+    guard enabled else { return }
+    record("title.snapshot.begin")
+    let descendants = presentationDescendants(view)
+    guard let title = descendants.first(where: { $0.accessibilityIdentifier == "placePage.title" }) as? UITextView else {
+      record("title.snapshot.missing")
+      return
+    }
+    var values: [String: Any] = ["titleBounds": NSStringFromCGRect(title.bounds),
+                                "titleContentSize": NSStringFromCGSize(title.contentSize),
+                                "titleContentInset": NSStringFromUIEdgeInsets(title.contentInset),
+                                "titleAdjustedContentInset": NSStringFromUIEdgeInsets(title.adjustedContentInset),
+                                "titleSafeAreaInsets": NSStringFromUIEdgeInsets(title.safeAreaInsets),
+                                "titleOffset": NSStringFromCGPoint(title.contentOffset),
+                                "titleInsetBehavior": title.contentInsetAdjustmentBehavior.rawValue]
+    if let outer = descendants.first(where: { $0.accessibilityIdentifier == "placePage.scroll" }) as? UIScrollView {
+      values["outerOffset"] = NSStringFromCGPoint(outer.contentOffset)
+      values["outerBounds"] = NSStringFromCGRect(outer.bounds)
+      values["outerContentSize"] = NSStringFromCGSize(outer.contentSize)
+      values["outerContentInset"] = NSStringFromUIEdgeInsets(outer.contentInset)
+      values["outerAdjustedContentInset"] = NSStringFromUIEdgeInsets(outer.adjustedContentInset)
+      values["outerSafeAreaInsets"] = NSStringFromUIEdgeInsets(outer.safeAreaInsets)
+    }
+    record("title.snapshot.end", extra: values)
   }
 }
 
