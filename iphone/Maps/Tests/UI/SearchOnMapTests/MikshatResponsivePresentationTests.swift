@@ -231,6 +231,57 @@ final class MikshatMapSceneLayoutTests: XCTestCase {
   }
 
   @MainActor
+  func testSelectedPointStaysAttachedAndResponsiveWhileTheSamePageRotatesRepeatedly() async throws {
+    let (map, window, scene) = try await attachedMapScene()
+    defer { map.dismissPlacePage() }
+    // The physical-device report selected this point before rotating. Keeping
+    // the page alive exercises a different path from selecting after rotation.
+    let coordinate = CLLocationCoordinate2D(latitude: 26 + 13.904 / 60, longitude: 44 + 56.718 / 60)
+    let title = "تيار مائي متقطع"
+    MikshatNavigationCoordinator.restoreDestinationSelection(coordinate: coordinate, title: title)
+    try await sceneWait("The reported selected-point page must be attached before rotation") {
+      map.children.compactMap { $0 as? PlacePageViewController }.first?.viewIfLoaded?.window === window
+    }
+    let page = try XCTUnwrap(map.children.compactMap { $0 as? PlacePageViewController }.first)
+    await settleMapScene(map)
+    let coordinates = try XCTUnwrap(try sceneElement("placePage.coordinates", in: page.view) as? PlacePageCoordinatesView)
+    let toggle = try XCTUnwrap(try sceneElement("placePage.coordinates.toggle", in: page.view) as? UIButton)
+    let expected = MikshatNavigationMath.coordinatePairs(latitude: coordinate.latitude,
+                                                         longitude: coordinate.longitude)[1]
+      .components(separatedBy: "\n")
+    for cycle in 0..<3 {
+      for orientation in [UIInterfaceOrientation.landscapeRight, .portrait, .landscapeLeft, .portrait] {
+        try await rotateMapScene(scene, window: window, map: map, to: orientation)
+        XCTAssertTrue(map.children.contains { $0 === page }, "Rotation must preserve the existing selected page")
+        XCTAssertTrue(page.view.window === window)
+        XCTAssertTrue(PlacePageData.hasData)
+        XCTAssertEqual(PlacePageData(localizationProvider: OpeinigHoursLocalization()).previewData.title, title)
+        let latitude = try XCTUnwrap(try sceneElement("placePage.coordinates.ddm.latitude", in: page.view) as? UILabel)
+        let longitude = try XCTUnwrap(try sceneElement("placePage.coordinates.ddm.longitude", in: page.view) as? UILabel)
+        XCTAssertEqual(latitude.text, expected[0])
+        XCTAssertEqual(longitude.text, expected[1])
+        let host = try sceneElement("placePage.host", in: map.view)
+        XCTAssertEqual(host.bounds.width, page.view.bounds.width, accuracy: 1)
+        XCTAssertFalse(host.hasAmbiguousLayout)
+        XCTAssertTrue(page.view.isUserInteractionEnabled)
+        page.scrollToReveal(toggle)
+        await settleMapScene(map)
+        let wasExpanded = coordinates.isExpanded
+        toggle.sendActions(for: .touchUpInside)
+        await settleMapScene(map)
+        XCTAssertEqual(coordinates.isExpanded, !wasExpanded,
+                       "A real selected-point action must still respond after each rotation")
+        try sceneScreenshot(window, name: "persistent-selection-cycle-\(cycle)-\(orientation.rawValue)")
+      }
+    }
+    let close = try XCTUnwrap(try sceneElement("placePage.close", in: page.view) as? UIButton)
+    close.sendActions(for: .touchUpInside)
+    try await sceneWait("The close button must remain responsive after repeated selected-point rotations") {
+      !map.children.contains { $0 === page } && !PlacePageData.hasData
+    }
+  }
+
+  @MainActor
   func testRealHomePreviewAndTripContainersStayPlacedAcrossPortraitLandscapePortrait() async throws {
     let (map, window, scene) = try await attachedMapScene()
     let manager = MWMNavigationDashboardManager.shared()

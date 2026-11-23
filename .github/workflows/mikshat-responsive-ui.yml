@@ -3,6 +3,8 @@ name: Mikshat responsive iPhone and iPad validation
   push:
     branches:
     - feature/ios-layout-followup
+    - fix/ios-map-display-4.6.17
+    - fix/ios-map-display-4.6.17-baseline
   workflow_dispatch: null
 permissions:
   contents: read
@@ -11,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   native:
-    name: Responsive UIKit, search and GPS regressions (${{ matrix.device }})
+    name: Native app regressions (${{ matrix.device }}, ${{ matrix.language }})
     runs-on: xcode-27
     timeout-minutes: 70
     env:
@@ -19,6 +21,9 @@ jobs:
       LC_ALL: en_US.UTF-8
       DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
       MIKSHAT_TEST_DEVICE: ${{ matrix.device }}
+      MIKSHAT_TEST_LANGUAGE: ${{ matrix.language }}
+      MIKSHAT_TEST_REGION: ${{ matrix.language == 'ar' && 'SA' || 'US' }}
+      MIKSHAT_ROTATION_BASELINE: ${{ endsWith(github.ref_name, '-baseline') }}
     steps:
     - name: Check out responsive app sources
       uses: actions/checkout@v4
@@ -44,6 +49,10 @@ jobs:
         set -euo pipefail
         python3 mikshat/prepare_branding.py
         python3 mikshat/prepare_satellite.py
+    - name: Verify subscription access decisions and actual StoreKit source
+      if: matrix.device == 'iPhone 16' && matrix.language == 'en'
+      shell: bash
+      run: bash mikshat/tests/subscriptions/run.sh
     - name: Ensure Metal compiler is available
       shell: bash
       run: |
@@ -59,7 +68,7 @@ jobs:
       with:
         path: build/SearchDerivedData
         key: mikshat-search-derived-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.MIKSHAT_XCODE_CACHE_ID }}-${{ github.sha
-          }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.device }}
+          }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.device }}-${{ matrix.language }}
         restore-keys: |
           mikshat-search-derived-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.MIKSHAT_XCODE_CACHE_ID }}-
     - name: Restore unchanged build input timestamps
@@ -156,7 +165,7 @@ jobs:
           -workspace xcode/omim.xcworkspace -scheme OMaps -configuration Debug
           -sdk iphonesimulator -destination "id=$MIKSHAT_SIMULATOR_UDID"
           -destination-timeout 120 -derivedDataPath build/SearchDerivedData
-          -testLanguage ar -testRegion SA -parallel-testing-enabled NO
+          -testLanguage "$MIKSHAT_TEST_LANGUAGE" -testRegion "$MIKSHAT_TEST_REGION" -parallel-testing-enabled NO
           -maximum-concurrent-test-simulator-destinations 1 -test-timeouts-enabled YES
           -default-test-execution-time-allowance 120 -maximum-test-execution-time-allowance 180
           -only-testing:OMapsTests/MikshatResponsiveCompassTests
@@ -171,8 +180,19 @@ jobs:
           -only-testing:OMapsTests/MikshatSearchDirectionIndicatorTests
           -only-testing:OMapsTests/MikshatHeadingCacheLifecycleTests
           -only-testing:OMapsTests/MikshatCompassLocationIndependenceTests
+          -only-testing:OMapsTests/MWMSettingsDefaultsTests
           "ARCHS=$(uname -m)" ONLY_ACTIVE_ARCH=YES CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
         )
+        if [[ "$MIKSHAT_ROTATION_BASELINE" == "true" ]]; then
+          # The baseline branch contains only the new regression test and this
+          # workflow on the published source. Run the same method without fixes.
+          baseline_args=()
+          for argument in "${test_args[@]}"; do
+            if [[ "$argument" != -only-testing:* ]]; then baseline_args+=("$argument"); fi
+          done
+          test_args=("${baseline_args[@]}"
+            -only-testing:OMapsTests/MikshatMapSceneLayoutTests/testSelectedPointStaysAttachedAndResponsiveWhileTheSamePageRotatesRepeatedly)
+        fi
         xcodebuild build-for-testing "${test_args[@]}" -resultBundlePath build/SearchBuild.xcresult \
           2>&1 | tee build/search-diagnostics/xcodebuild-search-build.log
         python3 - <<'PYSETUP'
@@ -194,7 +214,7 @@ jobs:
         if [[ "$MIKSHAT_TEST_DEVICE" == "iPad" ]]; then
           # iPadOS 27 windowed mode rejects scene orientation requests. Select
           # the supported Full Screen Apps mode through Settings on this fresh
-          # simulator; keep production windowing settings and all 47 tests intact.
+          # simulator; keep production windowing settings and all native tests intact.
           xcodebuild test \
             -workspace xcode/omim.xcworkspace -scheme MikshatSimulatorSetup -configuration Debug \
             -sdk iphonesimulator -destination "id=$MIKSHAT_SIMULATOR_UDID" \
@@ -244,9 +264,9 @@ jobs:
         fi
         xcodebuild test-without-building "${test_args[@]}" -resultBundlePath build/SearchRegressions.xcresult \
           2>&1 | tee build/search-diagnostics/xcodebuild-search-tests.log
-        if [[ "$MIKSHAT_TEST_DEVICE" == "iPhone 16" ]]; then
+        if [[ "$MIKSHAT_TEST_DEVICE" == "iPhone 16" && "$MIKSHAT_ROTATION_BASELINE" != "true" ]]; then
           # Repetition is an additional stability check, not a retry of failed
-          # cases. Keep the original 47-case log and once-only gate untouched.
+          # cases. Keep the original full-suite log and once-only gate untouched.
           repeat_args=()
           for argument in "${test_args[@]}"; do
             if [[ "$argument" != -only-testing:* ]]; then repeat_args+=("$argument"); fi
@@ -255,7 +275,7 @@ jobs:
           xcodebuild test-without-building "${repeat_args[@]}" \
             -resultBundlePath build/SelectedPointRepetitions.xcresult \
             -test-iterations 3 -test-repetition-relaunch-enabled YES \
-            -only-testing:OMapsTests/MikshatMapSceneLayoutTests/testSelectedPointUsesTheRealBottomSheetAndKeepsAllContentReachableAfterSceneRotation \
+            -only-testing:OMapsTests/MikshatMapSceneLayoutTests/testSelectedPointStaysAttachedAndResponsiveWhileTheSamePageRotatesRepeatedly \
             2>&1 | tee build/search-diagnostics/xcodebuild-selected-point-repetitions.log
           repeat_status=$?
           set -e
@@ -265,7 +285,7 @@ jobs:
         import importlib.util,json,os,re
         spec=importlib.util.spec_from_file_location('native_results','mikshat/tests/weather-data/verify-native-results.py')
         m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
-        expected=('MikshatMapSceneLayoutTests','testSelectedPointUsesTheRealBottomSheetAndKeepsAllContentReachableAfterSceneRotation')
+        expected=('MikshatMapSceneLayoutTests','testSelectedPointStaysAttachedAndResponsiveWhileTheSamePageRotatesRepeatedly')
 
         def analyze_selected_point_repetitions(text,exit_status):
             text=re.sub(r'\x1b\[[0-?]*[ -/]*[@-~]','',text)
@@ -308,15 +328,17 @@ jobs:
       run: |-
         python3 - <<'PYCODE'
         from pathlib import Path
-        import importlib.util,json
+        import importlib.util,json,os
         spec=importlib.util.spec_from_file_location('native_results','mikshat/tests/weather-data/verify-native-results.py')
         m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
-        m.EXPECTED_CLASSES={'MikshatResponsiveCompassTests':5,'MikshatResponsivePlaceCoordinatesTests':3,'MikshatResponsiveNavigationTests':4,'MikshatResponsivePresentationTests':2,'MikshatMapSceneLayoutTests':3,'MikshatMapControlLayoutTests':1,'MikshatWeatherViewTests':6,'SearchThemeWindowLifecycleTests':4,'SearchHistoryOnlyTests':8,'MikshatSearchDirectionIndicatorTests':3,'MikshatHeadingCacheLifecycleTests':2,'MikshatCompassLocationIndependenceTests':6}
+        m.EXPECTED_CLASSES={'MikshatResponsiveCompassTests':5,'MikshatResponsivePlaceCoordinatesTests':3,'MikshatResponsiveNavigationTests':4,'MikshatResponsivePresentationTests':2,'MikshatMapSceneLayoutTests':4,'MikshatMapControlLayoutTests':1,'MikshatWeatherViewTests':6,'SearchThemeWindowLifecycleTests':4,'SearchHistoryOnlyTests':8,'MikshatSearchDirectionIndicatorTests':3,'MikshatHeadingCacheLifecycleTests':2,'MikshatCompassLocationIndependenceTests':6,'MWMSettingsDefaultsTests':9}
+        if os.environ.get('MIKSHAT_ROTATION_BASELINE')=='true':
+            m.EXPECTED_CLASSES={'MikshatMapSceneLayoutTests':1}
         p=Path('build/search-diagnostics/xcodebuild-search-tests.log')
         report=m.analyze(p.read_text(errors='replace') if p.exists() else '')
         p.with_suffix('.summary.json').write_text(json.dumps(report,indent=2)+'\n')
         print(json.dumps(report))
-        if not report['passed']:raise SystemExit('All 47 native tests must execute once and pass without skips or cancellation')
+        if not report['passed']:raise SystemExit('Every required native test must execute once and pass without skips or cancellation')
         PYCODE
     - name: Collect app crash reports and simulator log
       if: always()
@@ -389,7 +411,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: mikshat-responsive-${{ matrix.device }}-ios27
+        name: mikshat-responsive-${{ matrix.device }}-${{ matrix.language }}-ios27
         retention-days: 7
         if-no-files-found: warn
         path: |-
@@ -409,16 +431,13 @@ jobs:
           python3 build/search-diagnostics/cache-input-mtimes.py record
         fi
     - name: Save compiled objects even when a test or test compilation fails
-      if: always() && matrix.device == 'iPad' && hashFiles('build/SearchDerivedData/mikshat-input-mtimes.json') != ''
+      if: always() && matrix.device == 'iPad' && matrix.language == 'ar' && hashFiles('build/SearchDerivedData/mikshat-input-mtimes.json') != ''
       timeout-minutes: 4
       uses: actions/cache/save@v4
       with:
         path: build/SearchDerivedData
         key: mikshat-search-derived-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.MIKSHAT_XCODE_CACHE_ID }}-${{ github.sha
-          }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.device }}
+          }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.device }}-${{ matrix.language }}
     strategy:
       fail-fast: false
-      matrix:
-        device:
-        - iPhone 16
-        - iPad
+      matrix: ${{ fromJSON(endsWith(github.ref_name, '-baseline') && '{"device":["iPhone 16"],"language":["ar"]}' || '{"device":["iPhone 16","iPad"],"language":["ar","en"]}') }}
