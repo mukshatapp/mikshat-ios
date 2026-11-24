@@ -1615,3 +1615,27 @@
 
 /* iOS Settings row for the optional iCloud synchronization feature. */
 "mikshat_icloud_sync_title" = "مزامنة iCloud (تجريبية)";
+
+/* Mikshat offline map layers and exact search history */
+"mikshat_history_resolve_location" = "اختر نتيجة لتثبيت الموقع في السجل";
+
+/* Mikshat offline map layers and exact search history */
+"mikshat_map_layers" = "طبقات الخريطة";
+
+/* Mikshat offline map layers and exact search history */
+"mikshat_supplementary_maps" = "خرائط إضافية";
+
+/* Mikshat offline map layers and exact search history */
+"mikshat_map_ksa_north" = "شمال السعودية";
+
+/* Mikshat offline map layers and exact search history */
+"mikshat_map_ksa_south" = "جنوب السعودية";
+
+/* Mikshat offline map layers and exact search history */
+"mikshat_map_kuwait" = "الكويت";
+
+/* Mikshat offline map layers and exact search history */
+"mikshat_map_qatar" = "قطر";
+
+/* Mikshat offline map layers and exact search history */
+"mikshat_supplementary_map_unavailable" = "تعذّر تفعيل هذه الخريطة.";

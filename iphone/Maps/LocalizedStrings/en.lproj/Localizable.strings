@@ -1615,3 +1615,27 @@
 
 /* iOS Settings row for the optional iCloud synchronization feature. */
 "mikshat_icloud_sync_title" = "iCloud Synchronization (Beta)";
+
+/* Mikshat offline map layers and exact search history */
+"mikshat_history_resolve_location" = "Choose a result to save its location";
+
+/* Mikshat offline map layers and exact search history */
+"mikshat_map_layers" = "Map layers";
+
+/* Mikshat offline map layers and exact search history */
+"mikshat_supplementary_maps" = "Additional maps";
+
+/* Mikshat offline map layers and exact search history */
+"mikshat_map_ksa_north" = "Northern Saudi Arabia";
+
+/* Mikshat offline map layers and exact search history */
+"mikshat_map_ksa_south" = "Southern Saudi Arabia";
+
+/* Mikshat offline map layers and exact search history */
+"mikshat_map_kuwait" = "Kuwait";
+
+/* Mikshat offline map layers and exact search history */
+"mikshat_map_qatar" = "Qatar";
+
+/* Mikshat offline map layers and exact search history */
+"mikshat_supplementary_map_unavailable" = "This map could not be activated.";
