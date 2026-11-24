@@ -261,6 +261,19 @@ final class MikshatMapSceneLayoutTests: XCTestCase {
     }
     RotationPhaseDiagnostics.record("selection.attach.end")
     let page = try XCTUnwrap(map.children.compactMap { $0 as? PlacePageViewController }.first)
+    if ProcessInfo.processInfo.arguments.contains("-MikshatVerifyProductionRotation") {
+      let preview = try XCTUnwrap(page.layout.headerViewControllers.compactMap { $0 as? PlacePagePreviewViewController }.first)
+      let probeFlags = ["-MikshatTitleInsetsNever", "-MikshatRequireRenderer", "-MikshatFixedTitleHeight",
+                        "-MikshatPreviewInsetsNever", "-MikshatRotationDiagnostics"]
+        .filter { ProcessInfo.processInfo.arguments.contains($0) }
+      RotationPhaseDiagnostics.record("verification.previewInsets.observed",
+                                      extra: ["insetsLayoutMarginsFromSafeArea": preview.stackView.insetsLayoutMarginsFromSafeArea,
+                                              "diagnosticHookEnabled": ProcessInfo.processInfo.arguments.contains("-MikshatRotationDiagnostics"),
+                                              "runtimeProbeFlags": probeFlags])
+      XCTAssertFalse(preview.stackView.insetsLayoutMarginsFromSafeArea,
+                     "The production preview must disable automatic safe-area margins before rotation")
+      XCTAssertTrue(probeFlags.isEmpty, "Production layout verification must not change layout through diagnostic probes")
+    }
     let titleTextView = try XCTUnwrap(try sceneElement("placePage.title", in: page.view) as? UITextView)
     RotationPhaseDiagnostics.record("probe.title.found", extra: ["bounds": String(describing: titleTextView.bounds),
                                                                "behavior": titleTextView.contentInsetAdjustmentBehavior.rawValue])

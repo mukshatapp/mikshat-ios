@@ -74,7 +74,7 @@ workflows:
     integrations:
       app_store_connect: Mikshat-Codemagic
     environment:
-      xcode: latest
+      xcode: "27.0"
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.mikshat.maps
@@ -82,7 +82,7 @@ workflows:
         APP_STORE_APPLE_ID: "6828427541"
         XCODE_WORKSPACE: xcode/omim.xcworkspace
         XCODE_SCHEME: OMaps
-        APP_VERSION: "4.6.17"
+        APP_VERSION: "4.6.18"
     scripts:
       - name: Prepare Mikshat branding and check navigation math
         script: |
@@ -108,6 +108,11 @@ workflows:
         script: |
           set -euo pipefail
           git submodule update --init --recursive --depth 1 --jobs 8
+      - name: Verify selected point rotation before TestFlight upload
+        script: |
+          set -euo pipefail
+          python3 -m unittest discover -s mikshat/tests/update-native -p 'test_*.py'
+          python3 mikshat/tests/update-native/rotation_diagnostic.py --production build/rotation-verification
       - name: Apply distribution provisioning profiles
         script: |
           set -euo pipefail
@@ -202,6 +207,8 @@ workflows:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
       - /tmp/mikshat-archive.log
+      - build/rotation-verification/rotation-diagnostics.zip
+      - build/rotation-verification/summary.json
       - build/ios/xcarchive/*.xcarchive/dSYMs/*.dSYM
     publishing:
       app_store_connect:

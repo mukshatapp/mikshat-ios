@@ -32,6 +32,10 @@ MODES = {
     "fixed-title": ("-MikshatFixedTitleHeight", "probe.fixedTitleHeight.applied"),
     "preview-insets": ("-MikshatPreviewInsetsNever", "probe.previewInsetsNever.applied"),
 }
+PRODUCTION_FLAG = "-MikshatVerifyProductionRotation"
+PROBE_FLAGS = {"-MikshatTitleInsetsNever", "-MikshatRequireRenderer", "-MikshatFixedTitleHeight",
+               "-MikshatPreviewInsetsNever", "-MikshatRotationDiagnostics"}
+ROTATIONS = [(cycle, orientation) for cycle in range(3) for orientation in (3, 1, 4, 1)]
 
 
 def command(args, **kwargs):
@@ -43,8 +47,8 @@ def output(args):
     return subprocess.check_output(args, text=True, timeout=30).strip()
 
 
-def patch_plan(original, mode):
-    if mode not in MODES:
+def patch_plan(original, mode, production=False):
+    if mode not in MODES or (production and mode != "automatic"):
         raise ValueError("Unknown layout diagnostic mode")
     plan = deepcopy(original)
     count = 0
@@ -55,13 +59,15 @@ def patch_plan(original, mode):
                 args = value.get("CommandLineArguments", [])
                 if not isinstance(args, list):
                     raise ValueError("Unexpected native target launch arguments")
-                args = [arg for arg in args if arg not in ("-MikshatTitleInsetsNever", "-MikshatRequireRenderer",
-                        "-MikshatFixedTitleHeight", "-MikshatPreviewInsetsNever", "-MikshatRotationDiagnostics")]
+                args = [arg for arg in args if arg not in PROBE_FLAGS | {PRODUCTION_FLAG}]
                 if "-IsTests" not in args:
                     args.append("-IsTests")
-                args.append("-MikshatRotationDiagnostics")
-                if MODES[mode][0]:
-                    args.append(MODES[mode][0])
+                if production:
+                    args.append(PRODUCTION_FLAG)
+                else:
+                    args.append("-MikshatRotationDiagnostics")
+                    if MODES[mode][0]:
+                        args.append(MODES[mode][0])
                 value["CommandLineArguments"] = args
                 count += 1
             for child in value.values():
@@ -75,13 +81,16 @@ def patch_plan(original, mode):
     return plan
 
 
-def classify(passes):
-    if (len(passes) != len(MODES) or {item.get("mode") for item in passes} != set(MODES)
+def classify(passes, production=False):
+    expected = {"automatic"} if production else set(MODES)
+    if (len(passes) != len(expected) or {item.get("mode") for item in passes} != expected
             or any(item.get("infrastructureError") or item.get("nativeExecution", {}).get("casesStarted") == 0
                    for item in passes)):
         return "infrastructureFailed"
     if any(not item.get("modeApplied") for item in passes):
         return "modeNotApplied"
+    if production:
+        return "productionLayoutSimulatorPassed" if passes[0]["passed"] else "productionLayoutSimulatorFailed"
     by_mode = {item["mode"]: item for item in passes}
     if all(item["passed"] for item in passes):
         return "allPass"
@@ -128,14 +137,19 @@ def run_bounded(args, log, sampler, timeout):
     return process.returncode, timed_out
 
 
-def evaluate_mode(mode, directory, status, timed_out):
+def evaluate_mode(mode, directory, status, timed_out, production=False):
     native = native_result(directory / "xcodebuild-test.log")
     phases = []
     journal = directory / "native-samples/phases-seen.jsonl"
     if journal.exists():
         phases = [json.loads(line) for line in journal.read_text().splitlines() if line.strip()]
     candidates = [item for item in phases if item.get("phase") == MODES[mode][1]]
-    if mode == "automatic":
+    if production:
+        candidates = [item for item in phases if item.get("phase") == "verification.previewInsets.observed"]
+        applied = (len(candidates) == 1 and candidates[0].get("insetsLayoutMarginsFromSafeArea") is False
+                   and candidates[0].get("diagnosticHookEnabled") is False
+                   and candidates[0].get("runtimeProbeFlags") == [])
+    elif mode == "automatic":
         applied = any(item.get("behavior") == 0 for item in candidates)
     elif mode == "fixed-title":
         applied = any(item.get("scrollEnabled") is True
@@ -164,9 +178,21 @@ def evaluate_mode(mode, directory, status, timed_out):
               "passed": status == 0 and not timed_out and applied and native["passed"]
                         and any(str(item.get("language", "")).startswith("ar")
                                 and item.get("direction") == "RTL" for item in phases),
-              "scope": "UIKit-only simulator probe; no physical-device, real-feature or Metal assertion"}
+              "scope": "UIKit-only source layout verification without runtime probes; no physical-device, real-feature or Metal assertion"
+                       if production else "UIKit-only simulator probe; no physical-device, real-feature or Metal assertion"}
     if native["casesStarted"] == 0:
         result["infrastructureError"] = "No native XCTest case started"
+    if production:
+        rotations = [(item.get("cycle"), item.get("orientation")) for item in phases if item.get("phase") == "rotation.end"]
+        probes = [item.get("phase", "") for item in phases
+                  if (item.get("phase", "").startswith("probe.") and item.get("phase", "").endswith(".applied"))
+                  or item.get("phase", "").startswith("layout.probe.")]
+        completed = sum(item.get("phase") == "test.completed" for item in phases) == 1
+        result["productionEvidence"] = {"sourceInsetsObserved": applied, "rotationsCompleted": len(rotations),
+                                        "rotationPatternMatched": rotations == ROTATIONS,
+                                        "runtimeProbePhases": probes, "testCompleted": completed}
+        result["passed"] = result["passed"] and rotations == ROTATIONS and completed and not probes
+        result["productionLayoutSimulatorVerified"] = result["passed"]
     (directory / "summary.json").write_text(json.dumps(result, indent=2) + "\n")
     return result
 
@@ -255,6 +281,7 @@ def collect_diagnostics(result_bundle, directory, started):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("output", type=Path)
+    parser.add_argument("--production", action="store_true", help="Verify the production layout without runtime probes or hook")
     args = parser.parse_args()
     destination = args.output.resolve()
     destination.mkdir(parents=True, exist_ok=True)
@@ -262,8 +289,11 @@ def main():
     derived = ROOT / "build/RotationDiagnosticDerivedData"
     results = []
     simulators = []
+    modes = ["automatic"] if args.production else list(MODES)
     summary = {"productionFixVerified": False, "passes": results,
-               "scope": "Three UIKit-only layout probes on isolated iPhone simulators; no upload"}
+               "productionLayoutSimulatorVerified": False,
+               "scope": "UIKit-only production layout verification without runtime probes; no physical-device or Metal assertion"
+                        if args.production else "Three UIKit-only layout probes on isolated iPhone simulators; no upload"}
     try:
         toolchain = output(["xcodebuild", "-version"])
         (destination / "toolchain.txt").write_text(toolchain + "\n")
@@ -276,7 +306,7 @@ def main():
         if len(matching) != 1:
             raise RuntimeError("Exactly one installed, available iOS 27.0 runtime is required")
         runtime = matching[0]["identifier"]
-        for mode in MODES:
+        for mode in modes:
             udid = output(["xcrun", "simctl", "create", "Mikshat rotation " + mode,
                            "com.apple.CoreSimulator.SimDeviceType.iPhone-16", runtime])
             simulators.append(udid)
@@ -295,7 +325,7 @@ def main():
         for path in products.glob("*.xctestrun"):
             try:
                 plan = plistlib.loads(path.read_bytes())
-                patch_plan(plan, "automatic")
+                patch_plan(plan, "automatic", args.production)
                 plans.append((path, plan))
             except ValueError:
                 continue
@@ -305,7 +335,7 @@ def main():
                 if plistlib.loads((app / "Info.plist").read_bytes()).get("CFBundleIdentifier") == BUNDLE]
         if len(apps) != 1:
             raise RuntimeError("Expected exactly one compiled Debug app host")
-        for mode, udid in zip(MODES, simulators):
+        for mode, udid in zip(modes, simulators):
             directory = destination / mode
             directory.mkdir()
             if mode != "automatic":
@@ -315,7 +345,7 @@ def main():
             command(["xcrun", "simctl", "privacy", udid, "grant", "location", BUNDLE])
             command(["xcrun", "simctl", "location", udid, "set", "26.2317333333,44.9453"])
             plan_path = products / ("MikshatTitleInsets-" + mode + ".xctestrun")
-            plan_path.write_bytes(plistlib.dumps(patch_plan(plans[0][1], mode)))
+            plan_path.write_bytes(plistlib.dumps(patch_plan(plans[0][1], mode, args.production)))
             sampler = PhaseSampler(udid, directory / "native-samples")
             result_bundle = ROOT / "build" / ("RotationDiagnostic-" + mode + ".xcresult")
             test = ["xcodebuild", "test-without-building", "-xctestrun", str(plan_path),
@@ -328,9 +358,9 @@ def main():
                     "CODE_SIGNING_REQUIRED=NO", "CODE_SIGNING_ALLOWED=NO"]
             status, timed_out = run_bounded(test, directory / "xcodebuild-test.log", sampler, 180)
             collect_diagnostics(result_bundle, directory, sampler.started)
-            results.append(evaluate_mode(mode, directory, status, timed_out))
+            results.append(evaluate_mode(mode, directory, status, timed_out, args.production))
             command(["xcrun", "simctl", "shutdown", udid])
-        summary["classification"] = classify(results)
+        summary["classification"] = classify(results, args.production)
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
         if getattr(error, "cmd", [])[:2] == ["xcodebuild", "build-for-testing"]:
             summary.update(classification="buildFailed", buildError=str(error))
@@ -351,7 +381,9 @@ def main():
                 except (OSError, subprocess.TimeoutExpired) as error:
                     summary.setdefault("cleanupErrors", []).append(str(error))
         summary["passedProbeModes"] = [item["mode"] for item in results if item["mode"] != "automatic" and item["passed"]]
-        summary["allNativeCasesPassed"] = len(results) == len(MODES) and all(item["passed"] for item in results)
+        summary["allNativeCasesPassed"] = len(results) == len(modes) and all(item["passed"] for item in results)
+        summary["productionLayoutSimulatorVerified"] = (args.production and summary["allNativeCasesPassed"]
+                                                       and summary.get("classification") == "productionLayoutSimulatorPassed")
         (destination / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
         archive = destination / "rotation-diagnostics.zip"
         with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as package:
@@ -359,8 +391,8 @@ def main():
                 if path.is_file() and path != archive:
                     package.write(path, str(path.relative_to(destination)))
         print(json.dumps(summary), flush=True)
-    if not summary["allNativeCasesPassed"]:
-        raise SystemExit("The diagnostic did not establish three passing native cases; inspect the classification and native stacks")
+    if not summary["allNativeCasesPassed"] or (args.production and not summary["productionLayoutSimulatorVerified"]):
+        raise SystemExit("The rotation verification did not establish all required native cases; inspect the classification and native stacks")
 
 
 if __name__ == "__main__":

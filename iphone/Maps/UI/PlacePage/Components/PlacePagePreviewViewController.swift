@@ -197,6 +197,9 @@ final class PlacePagePreviewViewController: UIViewController {
   override func viewDidLoad() {
     super.viewDidLoad()
 
+    // The outer sheet owns safe-area positioning. Offscreen safe-area margins
+    // must not feed the preview's height back into the sheet during rotation.
+    stackView.insetsLayoutMarginsFromSafeArea = false
     updateViews()
     if let coordinate = mikshatCoordinate {
       stackView.addArrangedSubview(PlacePageCoordinatesView(coordinate: coordinate,

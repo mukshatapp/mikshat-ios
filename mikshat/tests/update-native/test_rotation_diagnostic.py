@@ -143,6 +143,70 @@ class ProbePlanTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             rotation_diagnostic.patch_plan([{"BlueprintName": "OMapsTests"}] * 2, "automatic")
 
+    def test_production_plan_removes_all_layout_probes_and_diagnostic_hook(self):
+        original = {"TestTargets": [{"BlueprintName": "OMapsTests", "CommandLineArguments":
+                                     ["-IsTests", *sorted(rotation_diagnostic.PROBE_FLAGS), rotation_diagnostic.PRODUCTION_FLAG]},
+                                    {"BlueprintName": "UnrelatedTests", "CommandLineArguments": ["-MikshatRotationDiagnostics"]}]}
+        plan = rotation_diagnostic.patch_plan(original, "automatic", production=True)
+        self.assertEqual(plan["TestTargets"][0]["CommandLineArguments"], ["-IsTests", rotation_diagnostic.PRODUCTION_FLAG])
+        self.assertEqual(plan["TestTargets"][1], original["TestTargets"][1])
+        diagnostic = rotation_diagnostic.patch_plan(original, "automatic")
+        self.assertNotIn(rotation_diagnostic.PRODUCTION_FLAG, diagnostic["TestTargets"][0]["CommandLineArguments"])
+        with self.assertRaises(ValueError):
+            rotation_diagnostic.patch_plan(original, "preview-insets", production=True)
+
+
+class ProductionGateTests(unittest.TestCase):
+    def phases(self):
+        return [dict(phase="scene.attach.end", language="ar", direction="RTL"),
+                dict(phase="verification.previewInsets.observed", insetsLayoutMarginsFromSafeArea=False,
+                     diagnosticHookEnabled=False, runtimeProbeFlags=[]),
+                *[dict(phase="rotation.end", cycle=cycle, orientation=orientation)
+                  for cycle, orientation in rotation_diagnostic.ROTATIONS],
+                dict(phase="test.completed")]
+
+    def evaluate(self, directory, phases, log=None):
+        samples = directory / "native-samples"
+        samples.mkdir(exist_ok=True)
+        (samples / "phases-seen.jsonl").write_text("".join(json.dumps(item) + "\n" for item in phases))
+        if log is None:
+            case = "-[OMapsTests.MikshatMapSceneLayoutTests " + rotation_diagnostic.CASE + "]"
+            log = (f"Test Case '{case}' started.\nTest Case '{case}' passed (1.0 seconds).\n"
+                   "Executed 1 test, with 0 failures in 1.0 seconds\n** TEST EXECUTE SUCCEEDED **\n")
+        (directory / "xcodebuild-test.log").write_text(log)
+        return rotation_diagnostic.evaluate_mode("automatic", directory, 0, False, production=True)
+
+    def test_source_layout_and_all_twelve_rotations_pass_without_claiming_physical_proof(self):
+        with tempfile.TemporaryDirectory() as temp:
+            report = self.evaluate(Path(temp), self.phases())
+        self.assertTrue(report["productionLayoutSimulatorVerified"])
+        self.assertTrue(report["productionEvidence"]["rotationPatternMatched"])
+        self.assertEqual(rotation_diagnostic.classify([report], production=True), "productionLayoutSimulatorPassed")
+        self.assertEqual(rotation_diagnostic.classify([report]), "infrastructureFailed")
+
+    def test_probe_contamination_missing_rotation_or_terminal_cannot_pass(self):
+        variations = []
+        for key, value in [("insetsLayoutMarginsFromSafeArea", True), ("diagnosticHookEnabled", True),
+                           ("runtimeProbeFlags", ["-MikshatPreviewInsetsNever"])]:
+            phases = self.phases()
+            phases[1][key] = value
+            variations.append(phases)
+        variations += [self.phases()[:-1], self.phases()[:2] + self.phases()[3:],
+                       self.phases() + [dict(phase="probe.previewInsetsNever.applied")],
+                       self.phases() + [dict(phase="layout.probe.armed")]]
+        with tempfile.TemporaryDirectory() as temp:
+            for phases in variations:
+                with self.subTest(phases=phases):
+                    report = self.evaluate(Path(temp), phases)
+                    self.assertFalse(report["passed"])
+                    self.assertFalse(report["productionLayoutSimulatorVerified"])
+
+    def test_source_marker_cannot_turn_zero_native_tests_into_a_pass(self):
+        with tempfile.TemporaryDirectory() as temp:
+            report = self.evaluate(Path(temp), self.phases(), log="Executed 0 tests, with 0 failures\n** TEST EXECUTE SUCCEEDED **")
+        self.assertFalse(report["productionLayoutSimulatorVerified"])
+        self.assertEqual(rotation_diagnostic.classify([report], production=True), "infrastructureFailed")
+
 
 class EvidenceClassificationTests(unittest.TestCase):
     def rows(self, passed=False):
