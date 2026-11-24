@@ -1,4 +1,4 @@
-name: Mikshat offline maps source compilation
+name: Mikshat offline maps native validation
 
 'on':
   push:
@@ -15,10 +15,11 @@ concurrency:
 
 jobs:
   ios-source:
-    name: Compile iOS app and XCTest sources
-    runs-on: macos-26
-    timeout-minutes: 70
+    name: iOS 27 app-hosted feature regressions
+    runs-on: xcode-27
+    timeout-minutes: 90
     env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
       LANG: en_US.UTF-8
       LC_ALL: en_US.UTF-8
     defaults:
@@ -26,6 +27,8 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 128
       - name: Fetch pinned dependencies
         run: git submodule update --init --recursive --depth 1 --jobs 8
       - name: Prepare app resources
@@ -33,98 +36,163 @@ jobs:
           set -euo pipefail
           python3 mikshat/prepare_branding.py
           python3 mikshat/prepare_satellite.py
-      - name: Record the selected SDK and simulator destination
+      - name: Record the selected toolchain
         run: |
           set -euo pipefail
           mkdir -p build/offline-maps-compile
           xcodebuild -version | tee build/offline-maps-compile/toolchain.txt
           xcrun --sdk iphonesimulator --show-sdk-version | tee -a build/offline-maps-compile/toolchain.txt
           swiftc --version | tee -a build/offline-maps-compile/toolchain.txt
-          python3 - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-          import subprocess
-
-          def simctl(*args):
-              return subprocess.check_output(['xcrun', 'simctl', *args], text=True, timeout=60)
-
-          directory = Path('build/offline-maps-compile')
-          runtimes = json.loads(simctl('list', '--json', 'runtimes'))['runtimes']
-          (directory / 'runtimes.json').write_text(json.dumps(runtimes, indent=2) + '\n')
-          available = [item for item in runtimes if item.get('isAvailable')
-                       and item['identifier'].startswith('com.apple.CoreSimulator.SimRuntime.iOS-')]
-          if not available:
-              raise SystemExit('The selected Xcode has no available iOS simulator runtime.')
-          runtime = max(available, key=lambda item: tuple(int(part) for part in item['version'].split('.')))
-          device_type = 'com.apple.CoreSimulator.SimDeviceType.iPhone-16'
-          types = json.loads(simctl('list', '--json', 'devicetypes'))['devicetypes']
-          if not any(item['identifier'] == device_type for item in types):
-              raise SystemExit('The selected Xcode has no iPhone 16 simulator device type.')
-          devices = json.loads(simctl('list', '--json', 'devices', 'available'))['devices']
-          matching = [item for item in devices.get(runtime['identifier'], [])
-                      if item.get('deviceTypeIdentifier') == device_type]
-          udid = matching[0]['udid'] if matching else simctl(
-              'create', 'Mikshat Source Compile', device_type, runtime['identifier']).strip()
-          selection = dict(device='iPhone 16', udid=udid, runtime=runtime['identifier'],
-                           version=runtime['version'], scope='Compilation only; no native test execution')
-          (directory / 'destination.json').write_text(json.dumps(selection, indent=2) + '\n')
-          with open(os.environ['GITHUB_ENV'], 'a') as stream:
-              stream.write(f'MIKSHAT_COMPILE_DESTINATION={udid}\n')
-          print(json.dumps(selection))
-          PY
       - name: Verify real Metal compilation with the selected Xcode
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-          import sys
-
-          sys.path.insert(0, 'mikshat/tests/update-native')
-          from prepare_metal import functional_check, run
-
-          directory = Path('build/offline-maps-compile/metal')
-          directory.mkdir(parents=True, exist_ok=True)
-          log = directory / 'preflight.log'
-          report = dict(commands=[], functionalChecks=[], passed=False,
-                        scope='Selected runner SDK compatibility; no iOS 27 behavior verification')
-          try:
-              run(['xcrun', '-k'], report, log)
-              report['passed'] = functional_check(directory, report, log, 0)
-              if not report['passed']:
-                  run(['xcodebuild', '-downloadComponent', 'MetalToolchain'], report, log, timeout=180)
-                  run(['xcrun', '-k'], report, log)
-                  report['passed'] = functional_check(directory, report, log, 1, 'afterDownload')
-          finally:
-              (directory / 'summary.json').write_text(json.dumps(report, indent=2) + '\n')
-          if not report['passed']:
-              raise SystemExit('The selected Xcode could not compile and link the Metal probe.')
-          PY
-      - name: Compile the app and all app-hosted XCTest sources
-        timeout-minutes: 55
+          python3 mikshat/tests/update-native/prepare_metal.py build/offline-maps-compile/metal
+      - name: Run the source-layout and feature verification matrix
+        timeout-minutes: 80
         run: |
           set -euo pipefail
-          xcodebuild build-for-testing \
-            -workspace xcode/omim.xcworkspace \
-            -scheme OMaps \
-            -configuration Debug \
-            -sdk iphonesimulator \
-            -destination "id=$MIKSHAT_COMPILE_DESTINATION" \
-            -destination-timeout 120 \
-            -derivedDataPath build/OfflineMapsCompileDerivedData \
-            ARCHS="$(uname -m)" \
-            ONLY_ACTIVE_ARCH=YES \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO \
-            COMPILER_INDEX_STORE_ENABLE=NO \
-            2>&1 | tee build/offline-maps-compile/xcodebuild.log
-          test -s build/OfflineMapsCompileDerivedData/Build/Products/Debug-iphonesimulator/OMapsTests.xctest/OMapsTests
-      - name: Preserve source compilation evidence
+          python3 mikshat/tests/update-native/rotation_diagnostic.py \
+            --production build/offline-maps-compile/feature-verification \
+            2>&1 | tee build/offline-maps-compile/native-driver.log
+      - name: Preserve native iOS verification evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mikshat-offline-maps-source-compile
+          name: mikshat-offline-maps-ios-native
           retention-days: 7
           if-no-files-found: warn
           path: build/offline-maps-compile/
+
+  map-core:
+    name: Native supplementary maps, styles and ruler policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CC: gcc-14
+      CXX: g++-14
+      QT_QPA_PLATFORM: offscreen
+      MIKSHAT_SUPPLEMENTARY_MAPS_DIR: ${{ github.workspace }}/iphone/Maps/Resources/Mikshat/SupplementaryMaps
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 128
+      - name: Fetch pinned dependencies
+        run: git submodule update --init --recursive --depth 1 --jobs 8
+      - name: Install focused native-test dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build ccache gcc-14 g++-14 python3-tornado \
+            qt6-base-dev libharfbuzz-dev libfreetype-dev libgl1-mesa-dev \
+            libxi-dev libxrandr-dev libxcursor-dev libxinerama-dev
+      - name: Verify and record the four actual map fixtures
+        run: |
+          set -euo pipefail
+          mkdir -p build/offline-map-core-evidence
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          directory = Path(os.environ['MIKSHAT_SUPPLEMENTARY_MAPS_DIR'])
+          manifest = json.loads((directory / 'manifest.json').read_text())
+          expected = {'desert-ksa-north.mwm', 'desert-ksa-south.mwm', 'desert-kuwait.mwm', 'desert-qatar.mwm'}
+          if {item['file'] for item in manifest} != expected or len(manifest) != len(expected):
+              raise SystemExit('The supplementary-map fixture manifest must list exactly four approved maps.')
+          for item in manifest:
+              data = (directory / item['file']).read_bytes()
+              if len(data) != item['size'] or hashlib.sha256(data).hexdigest() != item['sha256']:
+                  raise SystemExit('Supplementary map fixture failed verification: ' + item['file'])
+          Path('build/offline-map-core-evidence/map-sha256.json').write_text(json.dumps(manifest, indent=2) + '\n')
+          print('Verified all four bundled map sizes and SHA-256 hashes.')
+          PY
+      - name: Configure and build the focused native suites
+        run: |
+          set -euo pipefail
+          cmake -S . -B build/offline-map-core -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug -DSKIP_QT_GUI=ON -DBUILD_TESTING=ON \
+            -DBUILD_DEV_SANDBOX=OFF -DBUILD_OPENGL_TESTS=OFF -DCMAKE_UNITY_BUILD=ON \
+            -DCMAKE_C_FLAGS=-g1 '-DCMAKE_CXX_FLAGS=-g1 -DMIKSHAT_SUPPLEMENTARY_OVERVIEW_TESTS' \
+            -DUSE_CCACHE=ON -DPython3_EXECUTABLE=/usr/bin/python3 \
+            2>&1 | tee build/offline-map-core-evidence/configure.log
+          cmake --build build/offline-map-core --parallel 3 \
+            --target map_tests mwm_tests style_tests drape_frontend_tests \
+            2>&1 | tee build/offline-map-core-evidence/build.log
+      - name: Require every selected compiled native case to execute and pass
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import importlib.util
+          import json
+          from pathlib import Path
+          import re
+
+          path = Path('mikshat/tests/update-core/run.py')
+          spec = importlib.util.spec_from_file_location('focused_native_core', path)
+          runner = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(runner)
+          cases = {
+              'map_tests': [
+                  'Framework_SupplementaryMapCanToggleWithOutstandingReaderWithoutDeletingSource',
+                  'Framework_SupplementaryMapsCannotReplaceCoreWorldOrDownloaderCountries',
+              ],
+              'mwm_tests': [
+                  'ForEachFeatureID_WorldGeometryScaleContract',
+                  'MikshatOverview_PreservesWorldAndCancellation',
+                  'MikshatOverview_SupplementaryOutdoorGeometry',
+              ],
+              'style_tests': [
+                  'Classificator_MikshatOutdoorLabels',
+                  'Classificator_MikshatResourcesAndTracks',
+                  'Classificator_MikshatLandAndProtectedPalette',
+              ],
+              'drape_frontend_tests': [
+                  'DrawTileScale_DependsOnVisualScale',
+                  'Mikshat_TwentyKilometreRulerUsesOverviewZoom',
+                  'Mikshat_ProtectedAreaFillUsesActualTwoKilometreRuler',
+                  'ProtectedAreaFill_SeparateBatchesPreserveProgramOrder',
+                  'ProtectedAreaFillRuleProvenance',
+                  'Stylist_ProtectedAreaClassification',
+                  'Stylist_IsHatching',
+                  'Stylist_IsAreaPattern',
+                  'Stylist_IntermittentWaterAreaPriority',
+                  'Stylist_MikshatNamedFayda',
+                  'Stylist_MikshatUnpavedRoads',
+                  'ReadCancellation_IndexCancellationPreservesLifecycle',
+              ],
+          }
+          runner.SUITES = {
+              suite: (r'::(' + '|'.join(re.escape(name) for name in names) + r')$',
+                      tuple(r'::' + re.escape(name) + r'$' for name in names))
+              for suite, names in cases.items()
+          }
+          output = Path('build/offline-map-core-evidence').resolve()
+          reports, errors = {}, {}
+          for suite in cases:
+              try:
+                  reports[suite] = runner.run_suite(suite, Path('build/offline-map-core'), Path('data').resolve(), output)
+                  if len(reports[suite]['executedCases']) != len(cases[suite]):
+                      raise RuntimeError('The native suite did not execute its exact expected case count.')
+              except Exception as error:
+                  errors[suite] = str(error)
+                  print(suite + ': ' + str(error), flush=True)
+          summary = dict(passed=not errors and len(reports) == len(cases),
+                         expectedCaseCount=sum(len(names) for names in cases.values()),
+                         suites=reports, errors=errors,
+                         scope='Native map lifecycle, geometry, styles and ruler policy; no iOS UI assertion')
+          (output / 'summary.json').write_text(json.dumps(summary, indent=2) + '\n')
+          if not summary['passed']:
+              raise SystemExit('Focused native map validation failed; inspect preserved suite inventories and logs.')
+          PY
+      - name: Preserve native map verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mikshat-offline-maps-native-core
+          retention-days: 7
+          if-no-files-found: warn
+          path: build/offline-map-core-evidence/
