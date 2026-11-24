@@ -874,4 +874,41 @@ UNIT_CLASS_TEST(AsyncGuiThreadTestWithRoutingSession, TestAlternativeEstimatesPr
   });
   TEST(checkedSignal.WaitUntil(steady_clock::now() + kRouteBuildingMaxDuration), ("Alternative checking timeout."));
 }
+UNIT_CLASS_TEST(AsyncGuiThreadTestWithRoutingSession, TestMukshatRulerMovingOriginRetainsFollowing)
+{
+  TimedSignal built;
+  GetPlatform().RunTask(Platform::Thread::Gui, [&, this]()
+  {
+    InitRoutingSession();
+    m_session->SetRouter(make_unique<RulerRouter>(), nullptr);
+    m_session->SetRoutingCallbacks([&](RoutesResult const &, RouterResultCode code)
+    {
+      TEST_EQUAL(code, RouterResultCode::NoError, ());
+      built.Signal();
+    }, nullptr, nullptr, nullptr);
+    m_session->BuildRoute(Checkpoints(kTestRoute.front(), kTestRoute.back()), RouterDelegate::kNoTimeout);
+  });
+  TEST(built.WaitUntil(steady_clock::now() + kRouteBuildingMaxDuration), ());
+  for (int i = 0; i < 20; ++i)
+  {
+    TimedSignal rebuilt;
+    GetPlatform().RunTask(Platform::Thread::Gui, [&, this]()
+    {
+      if (i == 0)
+        TEST(m_session->EnableFollowMode(), ());
+      TEST(m_session->IsFollowing(), ());
+      m_session->RebuildRoute({0.0001 * (i + 1), 1.0 + 0.001 * (i + 1)},
+                              [&](RoutesResult const & result, RouterResultCode code)
+      {
+        TEST_EQUAL(code, RouterResultCode::NoError, ());
+        TEST(result.IsValid(), ());
+        TEST(m_session->IsFollowing(), ());
+        rebuilt.Signal();
+      }, nullptr, nullptr, RouterDelegate::kNoTimeout, SessionState::RouteRebuilding, false);
+      TEST(m_session->IsFollowing(), ());
+    });
+    TEST(rebuilt.WaitUntil(steady_clock::now() + kRouteBuildingMaxDuration), ());
+  }
+}
+
 }  // namespace routing_session_test
