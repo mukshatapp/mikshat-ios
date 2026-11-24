@@ -92,6 +92,7 @@ private:
   int8_t m_mapLangIndex;
   dp::BackgroundMode m_backgroundMode = dp::BackgroundMode::Default;
   float m_areaOpacity = 0.5f;
+  uint8_t m_outdoorVisibility = 0xFF;
 
   struct LessByTileInfo
   {

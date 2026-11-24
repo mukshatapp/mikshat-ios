@@ -1,7 +1,7 @@
 /* Shared by browsing, outdoors and vehicle styles, after their base rules.
- * At Saudi latitudes the 20 km ruler is approximately z9-10. These rules
- * expose available indexed features; they cannot recreate geometry or scale
- * index entries absent from a downloaded map. Keep data-source zooms intact.
+ * Keep outdoor rules available from z6: the renderer applies the actual
+ * metric-ruler thresholds for each class on the current screen. Geometry
+ * promotion supplies missing geometry in Country maps; World stays unchanged.
  */
 
 /* Settlements retain their collision priorities and capital symbols. */
@@ -35,14 +35,14 @@ node|z13-[place=hamlet]::int_name
 /* Intermittent streams/rivers inherit this blue name styling. Canals and
  * drains keep their separate base treatment. Tunnel waterways stay hidden.
  */
-line|z9-[waterway=river],
-line|z9-[waterway=stream]
+line|z6-[waterway=river],
+line|z6-[waterway=stream]
 {text: name; font-size: 11; text-position: line; text-color: @mikshat_wadi_label; text-halo-color: @label_halo_light; text-halo-radius: 1; text-halo-opacity: 0.8;}
 line|z15-[waterway=river],
 line|z15-[waterway=stream]
 {font-size: 12;}
-line|z9[waterway=river][!tunnel],
-line|z9-12[waterway=stream][!tunnel]
+line|z6-9[waterway=river][!tunnel],
+line|z6-12[waterway=stream][!tunnel]
 {color: @river; width: 0.7;}
 line[waterway][tunnel]
 {text: none;}
@@ -101,14 +101,13 @@ node|z17-[man_made=water_well][drinking_water=not],
 node|z17-[amenity=water_point][drinking_water=not]
 {icon-image: drinking-water-no-m.svg; icon-min-distance: 0;}
 
-/* A vegetated fayda can be mapped as meadow/grassland. Only these actual
- * landcover classes receive green names. Generic place=locality does not
- * distinguish a fayda from other places and therefore stays unchanged.
+/* A vegetated fayda can be mapped as meadow/grassland. These landcover
+ * classes and the explicitly named faydas below retain green names.
  */
-node|z9-[landuse=meadow],
-area|z9-[landuse=meadow],
-node|z9-[natural=grassland],
-area|z9-[natural=grassland]
+node|z6-[landuse=meadow],
+area|z6-[landuse=meadow],
+node|z6-[natural=grassland],
+area|z6-[natural=grassland]
 {text: name; text-position: center; font-size: 11; text-color: @mikshat_fayda_label; text-halo-color: @label_halo_light; text-halo-radius: 1; text-halo-opacity: 0.9;}
 node|z14-[landuse=meadow],
 area|z14-[landuse=meadow],
@@ -117,12 +116,12 @@ area|z14-[natural=grassland]
 {font-size: 12;}
 
 /* Explicitly named faydat that use the generic existing locality class.
- * Test the stored feature name at runtime, leaving other localities intact.
+ * Test the stored feature name at runtime to retain their green treatment.
  */
-node|z9-[place=locality][named_fayda],
-area|z9-[place=locality][named_fayda],
-node|z9-[natural=wetland][named_fayda],
-area|z9-[natural=wetland][named_fayda]
+node|z6-[place=locality][named_fayda],
+area|z6-[place=locality][named_fayda],
+node|z6-[natural=wetland][named_fayda],
+area|z6-[natural=wetland][named_fayda]
 {text: name; text-position: center; font-size: 12; text-color: @mikshat_fayda_label; text-halo-color: @label_halo_light; text-halo-radius: 1; text-halo-opacity: 0.9;}
 node|z14-[place=locality][named_fayda],
 area|z14-[place=locality][named_fayda],
@@ -130,19 +129,129 @@ node|z14-[natural=wetland][named_fayda],
 area|z14-[natural=wetland][named_fayda]
 {font-size: 13;}
 
-/* Kothic needs the complementary branch to retain the original locality
- * captions at their normal scales when the runtime predicate is false.
+/* The audited sandy landmarks use the existing locality class. Keep that
+ * class uniform without recoloring separately classified farms or hamlets;
+ * explicitly named faydas retain their green treatment above.
  */
-node|z9-[place=locality][!named_fayda],
-area|z9-[place=locality][!named_fayda],
-node|z9-[natural=wetland][!named_fayda],
-area|z9-[natural=wetland][!named_fayda]
+node|z6-[place=locality][!named_fayda],
+area|z6-[place=locality][!named_fayda]
+{text: name; text-position: center; text-offset: 0; font-size: 14; text-color: @mikshat_sand_label; text-halo-color: @mikshat_sand_halo; text-halo-radius: 1.2; text-halo-opacity: 0.95;}
+node|z14-[place=locality][!named_fayda],
+area|z14-[place=locality][!named_fayda]
+{font-size: 15;}
+node|z13-[place=locality][!named_fayda]::int_name
+{text-color: @mikshat_sand_label; text-halo-color: @mikshat_sand_halo; font-size: 12;}
+
+/* The complementary wetland branch keeps ordinary wetlands unchanged. */
+node|z6-[natural=wetland][!named_fayda],
+area|z6-[natural=wetland][!named_fayda]
 {}
 
 /* Surface metadata distinguishes genuinely unpaved motor roads from paved
  * service/residential roads. Keep their widths, casings and priorities.
  */
-line|z9-[highway][unpaved_road]
-{color: @mikshat_dirt_road; opacity: 1;}
-line|z9-[highway][!unpaved_road]
+/* Supply an overview stroke before each motor-road class has a base width.
+ * Runtime surface classification keeps paved roads on their original style.
+ */
+line|z6-8[highway=track][!tunnel][unpaved_road],
+line|z6-13[highway=track][tunnel][unpaved_road],
+line|z6-9[highway=motorway_link][unpaved_road],
+line|z6-9[highway=trunk_link][unpaved_road],
+line|z6-7[highway=primary][unpaved_road],
+line|z6-10[highway=primary_link][unpaved_road],
+line|z6-9[highway=secondary][unpaved_road],
+line|z6-12[highway=secondary_link][unpaved_road],
+line|z6-10[highway=tertiary][unpaved_road],
+line|z6-13[highway=tertiary_link][unpaved_road],
+line|z6-10[highway=unclassified][unpaved_road],
+line|z6-11[highway=residential][unpaved_road],
+line|z6-11[highway=living_street][unpaved_road],
+line|z6-11[highway=road][unpaved_road],
+line|z6-12[highway=service][unpaved_road]
+{width: 0.8;}
+line|z6-[highway][unpaved_road]
+{color: @mikshat_dirt_road; opacity: 1; dashes: none; casing-dashes: none;}
+line|z6-[highway][unpaved_road]::tunnelCasing
+{casing-dashes: none;}
+line|z6-[highway=motorway][unpaved_road],
+line|z6-[highway=motorway_link][unpaved_road],
+line|z6-[highway=trunk][unpaved_road],
+line|z6-[highway=trunk_link][unpaved_road],
+line|z6-[highway=primary][unpaved_road],
+line|z6-[highway=primary_link][unpaved_road],
+line|z6-[highway=secondary][unpaved_road],
+line|z6-[highway=secondary_link][unpaved_road],
+line|z6-[highway=tertiary][unpaved_road],
+line|z6-[highway=tertiary_link][unpaved_road],
+line|z6-[highway=unclassified][unpaved_road],
+line|z6-[highway=residential][unpaved_road],
+line|z6-[highway=living_street][unpaved_road],
+line|z6-[highway=road][unpaved_road],
+line|z6-[highway=service][unpaved_road],
+line|z6-[highway=track][unpaved_road]
+{text: name; text-position: line; text-color: @mikshat_dirt_road; text-halo-color: @label_halo_light; text-halo-radius: 1; text-halo-opacity: 0.9;}
+line|z6-[highway][!unpaved_road]
 {}
+
+
+/* Protected names, boundaries and fill share one style at every source and
+ * protection class. The renderer hides them above the 50 km metric ruler,
+ * then removes only fill/hatching at 2 km and closer.
+ */
+area|z6-[boundary=national_park],
+area|z6-[boundary=protected_area],
+area|z6-[leisure=nature_reserve]
+{fill-color: @mikshat_protected_fill; fill-opacity: 0.3;}
+
+node|z6-[boundary=national_park],
+area|z6-[boundary=national_park],
+node|z6-[boundary=protected_area],
+area|z6-[boundary=protected_area],
+node|z6-[leisure=nature_reserve],
+area|z6-[leisure=nature_reserve]
+{text: name; text-position: center; text-offset: 1; font-size: 12; text-color: @mikshat_protected_border; text-halo-color: @label_halo_light; text-halo-radius: 1; text-halo-opacity: 0.95; text-optional: false;}
+
+node|z13-[boundary=national_park],
+area|z13-[boundary=national_park],
+node|z13-[boundary=protected_area],
+area|z13-[boundary=protected_area],
+node|z13-[leisure=nature_reserve],
+area|z13-[leisure=nature_reserve]
+{font-size: 13;}
+
+line|z6-[boundary=national_park],
+line|z6-[boundary=protected_area],
+line|z6-[leisure=nature_reserve]
+{color: @mikshat_protected_border; width: 1; dashes: none;}
+line|z10-12[boundary=national_park],
+line|z10-12[boundary=protected_area],
+line|z10-12[leisure=nature_reserve]
+{width: 1.5;}
+line|z13-15[boundary=national_park],
+line|z13-15[boundary=protected_area],
+line|z13-15[leisure=nature_reserve]
+{width: 2.2;}
+line|z16-[boundary=national_park],
+line|z16-[boundary=protected_area],
+line|z16-[leisure=nature_reserve]
+{width: 3;}
+
+
+/* Sandy terrain names remain black in both themes, with a light outline so
+ * their larger lettering stays readable over the sand and dark backgrounds.
+ */
+node|z6-[natural=desert],
+area|z6-[natural=desert],
+node|z6-[natural=beach][surface=sand],
+area|z6-[natural=beach][surface=sand]
+{text: name; text-position: center; text-offset: 1; font-size: 14; text-color: @mikshat_sand_label; text-halo-color: @mikshat_sand_halo; text-halo-radius: 1.2; text-halo-opacity: 0.95;}
+node|z14-[natural=desert],
+area|z14-[natural=desert],
+node|z14-[natural=beach][surface=sand],
+area|z14-[natural=beach][surface=sand]
+{font-size: 15;}
+
+line|z15-[highway=track][unpaved_road]
+{font-size: 11;}
+line|z18-[highway=track][unpaved_road]
+{font-size: 12;}

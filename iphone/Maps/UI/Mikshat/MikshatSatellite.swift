@@ -12,6 +12,8 @@ final class MikshatSatelliteController {
   private weak var button: UIButton?
   private var isLoading = false
   private var topConstraint: NSLayoutConstraint?
+  private var foregroundObserver: NSObjectProtocol?
+  private weak var mapErrorAlert: UIAlertController?
   private var enabled: Bool { UserDefaults.standard.bool(forKey: "mikshat_satellite_enabled") }
 
   func install(in view: UIView) {
@@ -31,10 +33,18 @@ final class MikshatSatelliteController {
       topConstraint!,
       button.widthAnchor.constraint(equalToConstant: 48), button.heightAnchor.constraint(equalToConstant: 48),
     ])
-    button.showsMenuAsPrimaryAction = true
+    button.addAction(UIAction { [weak self] _ in
+      guard let self else { return }
+      self.apply(!self.enabled)
+    }, for: .touchUpInside)
     button.accessibilityIdentifier = "map.layers"
     self.button = button
-    MikshatSupplementaryMaps.shared.restoreSelection()
+    if foregroundObserver == nil {
+      foregroundObserver = NotificationCenter.default.addObserver(
+        forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main
+      ) { [weak self] _ in self?.enableBundledMaps() }
+    }
+    enableBundledMaps()
     refreshButton()
     loadSource()
   }
@@ -76,43 +86,34 @@ final class MikshatSatelliteController {
   }
 
   private func refreshButton() {
-    let maps = MikshatSupplementaryMaps.shared
-    let anyEnabled = enabled || !maps.enabledIDs.isEmpty
-    button?.backgroundColor = anyEnabled ? UIColor(red: 0.82, green: 0.94, blue: 0.85, alpha: 1) : .white
+    button?.isEnabled = source != nil
+    button?.backgroundColor = enabled ? UIColor(red: 0.82, green: 0.94, blue: 0.85, alpha: 1) : .white
     button?.setImage(UIImage(systemName: enabled ? "globe.europe.africa.fill" : "globe"), for: .normal)
-    button?.accessibilityLabel = L("mikshat_map_layers")
-    button?.accessibilityValue = L(anyEnabled ? "on" : "off")
-    button?.accessibilityTraits = anyEnabled ? [.button, .selected] : .button
+    button?.accessibilityLabel = L(enabled ? "mikshat_satellite_disable" : "mikshat_satellite_enable")
+    button?.accessibilityValue = L(enabled ? "on" : "off")
+    button?.accessibilityTraits = enabled ? [.button, .selected] : .button
+  }
 
-    let satellite = UIAction(title: L(enabled ? "mikshat_satellite_disable" : "mikshat_satellite_enable"),
-                             image: UIImage(systemName: "globe.europe.africa"),
-                             attributes: source == nil ? [.disabled] : [],
-                             state: enabled ? .on : .off) { [weak self] _ in
-      guard let self else { return }
-      self.apply(!self.enabled)
-    }
-    let offlineMaps = MikshatSupplementaryMaps.catalog.map { map in
-      UIAction(title: L(map.titleKey), state: maps.enabledIDs.contains(map.id) ? .on : .off) { [weak self] _ in
-        if !maps.setEnabled(!maps.enabledIDs.contains(map.id), id: map.id) {
-          self?.showMapError()
-        }
-        self?.refreshButton()
-      }
-    }
-    button?.menu = UIMenu(title: L("mikshat_map_layers"), children: [
-      satellite,
-      UIMenu(title: L("mikshat_supplementary_maps"), image: UIImage(systemName: "map"), children: offlineMaps),
-    ])
+  private func enableBundledMaps() {
+    if !MikshatSupplementaryMaps.shared.enableAll() { showMapError() }
   }
 
   private func showMapError() {
     DispatchQueue.main.async { [weak self] in
-      var presenter = self?.button?.window?.rootViewController
-      while let presented = presenter?.presentedViewController { presenter = presented }
+      guard let self, self.mapErrorAlert == nil,
+            var presenter = self.button?.window?.rootViewController else { return }
+      while let presented = presenter.presentedViewController { presenter = presented }
       let alert = UIAlertController(title: L("mikshat_supplementary_maps"),
                                     message: L("mikshat_supplementary_map_unavailable"), preferredStyle: .alert)
+      alert.addAction(UIAlertAction(title: L("downloader_retry"), style: .default) { [weak self, weak alert] _ in
+        alert?.dismiss(animated: true) {
+          self?.mapErrorAlert = nil
+          self?.enableBundledMaps()
+        }
+      })
       alert.addAction(UIAlertAction(title: L("ok"), style: .default))
-      presenter?.present(alert, animated: true)
+      self.mapErrorAlert = alert
+      presenter.present(alert, animated: true)
     }
   }
 }

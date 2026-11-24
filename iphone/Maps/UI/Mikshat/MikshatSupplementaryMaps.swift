@@ -12,39 +12,27 @@ final class MikshatSupplementaryMaps {
     .init(id: "desert-kuwait", titleKey: "mikshat_map_kuwait"),
     .init(id: "desert-qatar", titleKey: "mikshat_map_qatar"),
   ]
-  static let selectionKey = "mikshat_supplementary_maps_enabled"
-  static let shared = MikshatSupplementaryMaps(defaults: .standard) { id, enabled in
-    FrameworkHelper.setSupplementaryMap(id, enabled: enabled)
+  static let legacySelectionKey = "mikshat_supplementary_maps_enabled"
+  static let shared = MikshatSupplementaryMaps(defaults: .standard) { id in
+    FrameworkHelper.setSupplementaryMap(id, enabled: true)
   }
 
-  private let defaults: UserDefaults
-  private let apply: (String, Bool) -> Bool
-  private var didRestore = false
+  private let activate: (String) -> Bool
   private(set) var enabledIDs: Set<String> = []
 
-  init(defaults: UserDefaults, apply: @escaping (String, Bool) -> Bool) {
-    self.defaults = defaults
-    self.apply = apply
-  }
-
-  func restoreSelection() {
-    assert(Thread.isMainThread)
-    guard !didRestore else { return }
-    didRestore = true
-    let saved = Set(defaults.stringArray(forKey: Self.selectionKey) ?? [])
-    for map in Self.catalog where saved.contains(map.id) {
-      if apply(map.id, true) { enabledIDs.insert(map.id) }
-    }
+  init(defaults: UserDefaults, activate: @escaping (String) -> Bool) {
+    self.activate = activate
+    // Every bundled map is now part of the base map, including for existing
+    // users who had previously disabled some or all of the optional layers.
+    defaults.removeObject(forKey: Self.legacySelectionKey)
   }
 
   @discardableResult
-  func setEnabled(_ enabled: Bool, id: String) -> Bool {
+  func enableAll() -> Bool {
     assert(Thread.isMainThread)
-    guard Self.catalog.contains(where: { $0.id == id }) else { return false }
-    guard enabledIDs.contains(id) != enabled else { return true }
-    guard apply(id, enabled) else { return false }
-    if enabled { enabledIDs.insert(id) } else { enabledIDs.remove(id) }
-    defaults.set(Self.catalog.map(\.id).filter { enabledIDs.contains($0) }, forKey: Self.selectionKey)
-    return true
+    for map in Self.catalog where !enabledIDs.contains(map.id) {
+      if activate(map.id) { enabledIDs.insert(map.id) }
+    }
+    return enabledIDs.count == Self.catalog.count
   }
 }

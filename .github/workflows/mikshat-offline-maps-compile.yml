@@ -4,6 +4,7 @@ name: Mikshat offline maps native validation
   push:
     branches:
       - feature/offline-maps-search-4.6.19
+      - feature/automatic-outdoor-map-styling-4.6.20
   workflow_dispatch:
 
 permissions:
@@ -110,6 +111,22 @@ jobs:
           Path('build/offline-map-core-evidence/map-sha256.json').write_text(json.dumps(manifest, indent=2) + '\n')
           print('Verified all four bundled map sizes and SHA-256 hashes.')
           PY
+      - name: Prepare verified official Saudi map fixtures
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, 'mikshat/tests/update-native')
+          import renderer
+          directory = Path('build/offline-map-core-fixtures')
+          north = renderer.prepare_fixture(directory)
+          south = renderer.prepare_fixture(directory, fixture_info=renderer.SOUTH_FIXTURE)
+          with open(os.environ['GITHUB_ENV'], 'a') as stream:
+              stream.write('MIKSHAT_SAUDI_NORTH_MWM_PATH=' + str(north) + '\n')
+              stream.write('MIKSHAT_SAUDI_SOUTH_MWM_PATH=' + str(south) + '\n')
+          PY
       - name: Configure and build the focused native suites
         run: |
           set -euo pipefail
@@ -139,11 +156,15 @@ jobs:
               'map_tests': [
                   'Framework_SupplementaryMapCanToggleWithOutstandingReaderWithoutDeletingSource',
                   'Framework_SupplementaryMapsCannotReplaceCoreWorldOrDownloaderCountries',
+                  'PlacePage_UnpavedRoadDescriptorPreservesNamesAndPavedRoads',
+                  'MapObject_UnpavedRoadDescriptorPreservesOtherCategories',
               ],
               'mwm_tests': [
                   'ForEachFeatureID_WorldGeometryScaleContract',
                   'MikshatOverview_PreservesWorldAndCancellation',
                   'MikshatOverview_SupplementaryOutdoorGeometry',
+                  'MikshatOutdoor_ActualLocalitiesAndReportedTrack',
+                  'MikshatOutdoor_ActualProtectedAreasAcrossSources',
               ],
               'style_tests': [
                   'Classificator_MikshatOutdoorLabels',
@@ -163,6 +184,14 @@ jobs:
                   'StyleSnapshotFixture_Stylist_MikshatNamedFayda',
                   'StyleSnapshotFixture_Stylist_MikshatUnpavedRoads',
                   'ReadCancellation_IndexCancellationPreservesLifecycle',
+                  'Mikshat_OutdoorCategoryVisibilityUsesActualRuler',
+                  'ReadCoverageFixture_OutdoorVisibility_RulerTierRereadsOnceWithoutDrawZoomChange',
+                  'StyleSnapshotFixture_Stylist_OutdoorRulerEligibilityPreservesOtherTypes',
+                  'ProtectedAreaOutline_ExcludesInternalEdgesAndPreservesHoles',
+                  'ProtectedAreaOutline_MultipleComponentsAndTouchingVertices',
+                  'ProtectedAreaOutline_ClippingDoesNotInventTileBoundaries',
+                  'ProtectedAreaOutline_LargeMeshAndDegenerateTriangles',
+                  'VisualParamsFixture_ProtectedAreaOutline_IndependentOfFillGeometryAndOpacity',
               ],
           }
           runner.SUITES = {

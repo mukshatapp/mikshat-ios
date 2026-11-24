@@ -249,7 +249,7 @@ class ProductionGateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             report = self.evaluate(Path(temp), self.phases(), self.log().replace(original, "testUnrelatedMapCase"))
         self.assertFalse(report["passed"])
-        self.assertEqual(report["nativeExecution"]["casesStarted"], 24)
+        self.assertEqual(report["nativeExecution"]["casesStarted"], 25)
         self.assertEqual(report["nativeExecution"]["missingCases"], ["MikshatSupplementaryMapsTests." + original])
         self.assertEqual(report["nativeExecution"]["unexpectedCases"], ["MikshatSupplementaryMapsTests.testUnrelatedMapCase"])
 
@@ -268,10 +268,10 @@ class ProductionGateTests(unittest.TestCase):
             report = self.evaluate(Path(temp), self.phases(), log)
         self.assertFalse(report["passed"])
 
-    def test_production_filters_select_all_24_declared_methods_and_no_probe_case(self):
+    def test_production_filters_select_all_25_declared_methods_and_no_probe_case(self):
         filters = rotation_diagnostic.testing_filters(True)
-        self.assertEqual(len(filters), 24)
-        self.assertEqual(len(set(filters)), 24)
+        self.assertEqual(len(filters), 25)
+        self.assertEqual(len(set(filters)), 25)
         self.assertEqual(rotation_diagnostic.testing_filters(False), [
             "-only-testing:OMapsTests/MikshatMapSceneLayoutTests/" + rotation_diagnostic.CASE])
         files = {
@@ -282,19 +282,21 @@ class ProductionGateTests(unittest.TestCase):
             "SearchOnMapTests": "SearchOnMapTests.swift",
         }
         for name, methods in rotation_diagnostic.PRODUCTION_CASES.items():
-            path = (rotation_diagnostic.ROOT / "iphone/Maps/Tests/Core/Storage/MikshatSupplementaryMapsTests.swift"
-                    if name == "MikshatSupplementaryMapsTests" else rotation_diagnostic.ROOT /
+            core_files = {"MikshatSupplementaryMapsTests": "Storage/MikshatSupplementaryMapsTests.swift",
+                          "MikshatLocalizationTests": "Localization/MikshatLocalizationTests.swift"}
+            path = (rotation_diagnostic.ROOT / "iphone/Maps/Tests/Core" / core_files[name]
+                    if name in core_files else rotation_diagnostic.ROOT /
                     "iphone/Maps/Tests/UI/SearchOnMapTests" / files[name])
             source = path.read_text()
             for method in methods:
                 self.assertIn("func " + method + "(", source)
 
-    def test_tablets_require_23_component_cases_and_actual_locale_without_claiming_scene_rotation(self):
+    def test_tablets_require_24_component_cases_and_actual_locale_without_claiming_scene_rotation(self):
         with tempfile.TemporaryDirectory() as temp:
             directory = Path(temp)
             report = self.evaluate(directory, [], language="en", profile="tablet-en", family="tablet")
             self.assertTrue(report["passed"])
-            self.assertEqual(report["nativeExecution"]["expectedTotal"], 23)
+            self.assertEqual(report["nativeExecution"]["expectedTotal"], 24)
             self.assertFalse(report["productionEvidence"]["phoneSceneRotationRequired"])
             self.assertIsNone(report["productionEvidence"]["rotationPatternMatched"])
             for changes in ({"language": "ar"}, {"direction": "RTL"}, {"idiom": "phone"},
@@ -309,7 +311,7 @@ class ProductionGateTests(unittest.TestCase):
             self.assertFalse(self.evaluate(directory, [], no_marker, language="en", profile="tablet-en",
                                            family="tablet")["passed"])
         filters = rotation_diagnostic.testing_filters(True, "tablet")
-        self.assertEqual(len(filters), 23)
+        self.assertEqual(len(filters), 24)
         self.assertFalse(any(rotation_diagnostic.CASE in item for item in filters))
 
     def test_installed_phone_and_tablet_types_are_required(self):

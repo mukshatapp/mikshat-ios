@@ -1582,3 +1582,10 @@ area|z14-[piste:type=sled][area],
 
 line|z7-[route=ferry],
 {color: @ferry;width: 1;opacity: 0.6;dashes: 5.4,2.7;}
+
+
+/* Overview fallback only below this family's normal service-road widths. */
+line|z13-14[highway=service][unpaved_road]
+{width: 0.8;}
+line|z15[highway=service][service=driveway][unpaved_road]
+{width: 0.8;}

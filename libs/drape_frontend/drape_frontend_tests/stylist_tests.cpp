@@ -4,10 +4,12 @@
 
 #include "indexer/classificator.hpp"
 #include "indexer/classificator_loader.hpp"
+#include "indexer/drules_selector.hpp"
 #include "indexer/feature.hpp"
 #include "indexer/feature_visibility.hpp"
 #include "indexer/map_object.hpp"
 #include "indexer/map_style_reader.hpp"
+#include "indexer/mikshat_map_visibility.hpp"
 #include "indexer/mwm_set.hpp"
 #include "indexer/transliteration_loader.hpp"
 
@@ -128,6 +130,9 @@ void TestSameRules(df::Stylist const & actual, df::Stylist const & expected)
   TEST(std::equal(actual.m_lineRules.begin(), actual.m_lineRules.end(), expected.m_lineRules.begin(),
                   expected.m_lineRules.end()),
        ());
+  TEST(std::equal(actual.m_areaOutlineRules.begin(), actual.m_areaOutlineRules.end(),
+                  expected.m_areaOutlineRules.begin(), expected.m_areaOutlineRules.end()),
+       ());
 }
 }  // namespace
 
@@ -160,17 +165,21 @@ UNIT_CLASS_TEST(StyleSnapshotFixture, Stylist_MikshatNamedFayda)
 
 UNIT_CLASS_TEST(StyleSnapshotFixture, Stylist_MikshatUnpavedRoads)
 {
+  auto const unpavedSelector = drule::ParseSelector("unpaved_road");
+  TEST(unpavedSelector, ());
   for (auto const style : kStyles)
   {
-    uint32_t const brown = MapStyleIsDark(style) ? 0xC79A66 : 0x956138;
+    uint32_t const brown = MapStyleIsDark(style) ? 0xC79A66 : 0x635730;
     for (auto const highway : {"unclassified", "residential", "service", "secondary", "track"})
     {
       auto pavedFeature = FeatureType::CreateFromMapObject(SurfaceRoad(highway, "paved_good"));
+      TEST(!unpavedSelector->Test(*pavedFeature, 17), (style, highway));
       df::Stylist const paved(*pavedFeature, 17, StringUtf8Multilang::kEnglishCode, style);
       TEST(!paved.m_lineRules.empty(), (style, highway));
       for (auto const surface : {"unpaved_good", "unpaved_bad"})
       {
         auto unpavedFeature = FeatureType::CreateFromMapObject(SurfaceRoad(highway, surface));
+        TEST(unpavedSelector->Test(*unpavedFeature, 17), (style, highway, surface));
         df::Stylist const unpaved(*unpavedFeature, 17, StringUtf8Multilang::kEnglishCode, style);
         TEST_EQUAL(unpaved.m_lineRules.size(), paved.m_lineRules.size(), (style, highway, surface));
         size_t brownLines = 0;
@@ -181,19 +190,24 @@ UNIT_CLASS_TEST(StyleSnapshotFixture, Stylist_MikshatUnpavedRoads)
           if ((actual.color & 0xFFFFFF) == brown)
           {
             ++brownLines;
-            TEST_NOT_EQUAL(original.color & 0xFFFFFF, brown, (style, highway, surface));
+            // A paved track can share the reference brown RGB, but keeps its base opacity.
+            TEST_NOT_EQUAL(original.color, actual.color, (style, highway, surface));
+            TEST(!actual.dashdot, ("Dirt roads must be solid", style, highway, surface));
             actual.color = original.color;
+            actual.dashdot = original.dashdot;
           }
-          // Preserve the original width/dashes/priority and every casing.
+          // Only the dirt mainline color and dash pattern change; keep widths and every casing.
           TEST(actual == original, (style, highway, surface, i));
         }
         TEST_EQUAL(brownLines, 1, (style, highway, surface));
       }
     }
     auto unknownTrackFeature = FeatureType::CreateFromMapObject(SurfaceRoad("track", ""));
+    TEST(unpavedSelector->Test(*unknownTrackFeature, 17), (style));
     df::Stylist const unknownTrack(*unknownTrackFeature, 17, StringUtf8Multilang::kEnglishCode, style);
     TEST_EQUAL(unknownTrack.m_lineRules.size(), 1, (style));
     TEST_EQUAL(unknownTrack.m_lineRules.front()->color & 0xFFFFFF, brown, (style));
+    TEST(!unknownTrack.m_lineRules.front()->dashdot, (style));
   }
 }
 
@@ -350,6 +364,72 @@ UNIT_TEST(Stylist_IntermittentWaterAreaPriority)
   }
   reader.SetCurrentStyle(kDefaultMapStyle);
   classificator::Load();
+}
+
+UNIT_CLASS_TEST(StyleSnapshotFixture, Stylist_OutdoorRulerEligibilityPreservesOtherTypes)
+{
+  for (auto const style : kStyles)
+  {
+    auto const & cl = classif(style);
+    auto const water = cl.GetTypeByPath({"natural", "water"});
+    auto const protectedArea = cl.GetTypeByPath({"boundary", "protected_area", "2"});
+    auto mixed = FeatureType::CreateFromMapObject(WaterArea({protectedArea, water}));
+    auto waterOnly = FeatureType::CreateFromMapObject(WaterArea({water}));
+    df::Stylist const protectedVisible(*mixed, 6, StringUtf8Multilang::kEnglishCode, style,
+                                       feature::GetMikshatOutdoorVisibility(50000.0));
+    TEST(protectedVisible.m_hatchingRule != nullptr, (style));
+    TEST_EQUAL(protectedVisible.m_areaOutlineRules.size(), 1, ("Pure areas need a visible boundary", style));
+    df::Stylist const hiddenProtected(*mixed, 6, StringUtf8Multilang::kEnglishCode, style,
+                                      feature::GetMikshatOutdoorVisibility(100000.0));
+    df::Stylist const baseWater(*waterOnly, 6, StringUtf8Multilang::kEnglishCode, style);
+    TestSameRules(hiddenProtected, baseWater);
+
+    auto sand = FeatureType::CreateFromMapObject(
+        SampleFeature(cl.GetTypeByPath({"natural", "desert"}), feature::GeomType::Area));
+    df::Stylist const namedSand(*sand, 9, StringUtf8Multilang::kEnglishCode, style,
+                                feature::GetMikshatOutdoorVisibility(15000.0));
+    df::Stylist const distantSand(*sand, 9, StringUtf8Multilang::kEnglishCode, style,
+                                  feature::GetMikshatOutdoorVisibility(50000.0));
+    TEST(namedSand.m_captionRule != nullptr, (style));
+    TEST(distantSand.m_captionRule == nullptr, (style));
+    TEST(namedSand.m_areaRule != nullptr && distantSand.m_areaRule != nullptr, (style));
+    TEST_EQUAL(namedSand.m_areaRule, distantSand.m_areaRule,
+               ("Sand ground remains visible beyond the label threshold", style));
+
+    auto locality = FeatureType::CreateFromMapObject(NamedLocality("Generic locality without a terrain keyword"));
+    df::Stylist const namedLocality(*locality, 9, StringUtf8Multilang::kEnglishCode, style,
+                                    feature::GetMikshatOutdoorVisibility(15000.0));
+    df::Stylist const distantLocality(*locality, 9, StringUtf8Multilang::kEnglishCode, style,
+                                      feature::GetMikshatOutdoorVisibility(20000.0));
+    TEST(namedLocality.m_captionRule && namedLocality.m_captionRule->primary, (style));
+    TEST_EQUAL(namedLocality.m_captionRule->primary->color & 0xFFFFFF, 0, (style));
+    TEST(distantLocality.m_captionRule == nullptr, (style));
+
+    auto fayda = FeatureType::CreateFromMapObject(NamedLocality("فيضة الخويش"));
+    df::Stylist const namedFayda(*fayda, 9, StringUtf8Multilang::kEnglishCode, style,
+                                 feature::GetMikshatOutdoorVisibility(20000.0));
+    TEST(namedFayda.m_captionRule && namedFayda.m_captionRule->primary, (style));
+    TEST_EQUAL(namedFayda.m_captionRule->primary->color & 0xFFFFFF, MapStyleIsDark(style) ? 0x7AD49A : 0x207440,
+               ("Faydas retain their own green, 20 km category", style));
+    for (auto const & path : {base::StringIL{"place", "hamlet"}, {"natural", "peak"}})
+    {
+      auto other = FeatureType::CreateFromMapObject(SampleFeature(cl.GetTypeByPath(path), feature::GeomType::Point));
+      df::Stylist const baseline(*other, 17, StringUtf8Multilang::kEnglishCode, style);
+      df::Stylist const withoutOutdoorCategories(*other, 17, StringUtf8Multilang::kEnglishCode, style, 0);
+      TestSameRules(withoutOutdoorCategories, baseline);
+    }
+
+    for (auto const & path : {base::StringIL{"waterway", "stream"}, {"highway", "track"}})
+    {
+      auto line = FeatureType::CreateFromMapObject(SampleFeature(cl.GetTypeByPath(path), feature::GeomType::Line));
+      df::Stylist const visible(*line, 8, StringUtf8Multilang::kEnglishCode, style,
+                                feature::GetMikshatOutdoorVisibility(20000.0));
+      df::Stylist const hidden(*line, 8, StringUtf8Multilang::kEnglishCode, style,
+                               feature::GetMikshatOutdoorVisibility(50000.0));
+      TEST(!visible.m_lineRules.empty(), (style, path));
+      TEST(hidden.m_lineRules.empty() && hidden.m_pathtextRule == nullptr, (style, path));
+    }
+  }
 }
 
 UNIT_CLASS_TEST(StyleSnapshotFixture, Stylist_ExplicitStyleIgnoresGlobalSwitches)

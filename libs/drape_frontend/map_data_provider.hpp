@@ -9,6 +9,7 @@
 #include "geometry/rect2d.hpp"
 #include "indexer/feature.hpp"
 
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <vector>
@@ -23,7 +24,7 @@ public:
   using TReadFeaturesFn = std::function<void(TReadCallback<FeatureType> const &, std::vector<FeatureID> const &)>;
   using TStopReadFn = std::function<bool()>;
   using TReadIDsFn =
-      std::function<void(TReadCallback<FeatureID const> const &, m2::RectD const &, int, TStopReadFn const &)>;
+      std::function<void(TReadCallback<FeatureID const> const &, m2::RectD const &, int, TStopReadFn const &, uint8_t)>;
   using TIsCountryLoadedFn = std::function<bool(m2::PointD const &)>;
   using TIsCountryLoadedByNameFn = std::function<bool(std::string_view)>;
   using TUpdateCurrentCountryFn = std::function<void(m2::PointD const &, int)>;
@@ -36,7 +37,7 @@ public:
                   TCancelTileBackgroundReadingFn && cancelTileBackgroundReadingFn);
 
   void ReadFeaturesID(TReadCallback<FeatureID const> const & fn, m2::RectD const & r, int scale,
-                      TStopReadFn const & stop = {}) const;
+                      TStopReadFn const & stop = {}, uint8_t outdoorVisibility = 0xFF) const;
   void ReadFeatures(TReadCallback<FeatureType> const & fn, std::vector<FeatureID> const & ids) const;
 
   TTileBackgroundReadFn ReadTileBackgroundFn() const;

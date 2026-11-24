@@ -46,9 +46,11 @@ PRODUCTION_CASES = {
         "testInformationEndsWithOneAccessibleWeatherActionAndNoDuplicateCoordinateRows",),
     "MikshatSupplementaryMapsTests": (
         "testEveryBundledMapCanActivateDeactivateAndReactivateWithoutDeletingItsFile",
-        "testSelectionRestoresOnlyKnownMapsAndOnlyOnce",
-        "testSuccessfulTogglePersistsAndDisabledMapStaysOffAfterRelaunch",
-        "testFailedActivationAndDeactivationDoNotChangeSelection"),
+        "testAllBundledMapsActivateOnceIgnoringLegacySelections",
+        "testFreshInstallAndExistingDisabledMapsActivateAfterRelaunch",
+        "testFailedActivationRetriesOnlyMissingMaps"),
+    "MikshatLocalizationTests": (
+        "testSettingsAndNavigationNamesHaveBothInterfaceTranslations",),
     "SearchHistoryOnlyTests": (
         "test_LegacyCategoryAndInvalidIndicesOpenDirectHistoryWithoutPager",
         "test_HistorySelectionAndCoordinateDirectionTargetRemainIntact",

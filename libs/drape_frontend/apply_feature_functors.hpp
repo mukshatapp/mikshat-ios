@@ -29,6 +29,12 @@ struct TextViewParams;
 struct BuildingOutline;
 
 struct ApplyFeatureParams;
+
+// Extract true polygon boundaries before clipping: clipping triangles first would draw tile seams.
+// Shared mesh vertices are decoded identically, so exact endpoint comparisons preserve tiny edges.
+std::vector<m2::SharedSpline> BuildAreaOutlineSplines(std::vector<m2::PointD> const & triangles,
+                                                      m2::RectD const & clipRect);
+
 class BaseApplyFeature
 {
 public:
@@ -76,12 +82,13 @@ class ApplyAreaFeature : public ApplyPointFeature
 
 public:
   ApplyAreaFeature(Params const & params, FeatureType & f, CaptionDescription const & captions, bool isBuilding,
-                   bool isMwmBorder, float minPosZ, float posZ, float areaOpacity)
+                   bool isMwmBorder, float minPosZ, float posZ, float areaOpacity, bool collectAreaOutline = false)
     : TBase(params, f, captions)
     , m_minPosZ(minPosZ)
     , m_isBuilding(isBuilding)
     , m_isMwmBorder(isMwmBorder)
     , m_areaOpacity(areaOpacity)
+    , m_collectAreaOutline(collectAreaOutline)
   {
     m_posZ = posZ;
   }
@@ -91,6 +98,7 @@ public:
 
   bool HasGeometry() const { return !m_triangles.empty(); }
   void ProcessAreaRules(Stylist const & stylist, std::string_view hatchKey, std::string_view patternKey);
+  void ProcessAreaOutlines(Stylist::LineRulesT const & lineRules);
 
   struct Edge
   {
@@ -128,6 +136,7 @@ private:
   /// @}
 
   std::vector<PointT> m_triangles;
+  std::vector<PointT> m_outlineTriangles;
 
   /// @todo Factor out to a separate outline-building component.
   /// @{
@@ -139,8 +148,9 @@ private:
   bool const m_isBuilding;
   bool const m_isMwmBorder;
   // Multiplier applied to area-fill alpha. 1.0 means opaque (normal map); in Satellite mode it is the
-  // user-configured "area objects" opacity (0 -> fully hidden, geometry skipped before reaching here).
+  // user-configured "area objects" opacity (0 -> no fill, independent outline geometry is retained).
   float const m_areaOpacity;
+  bool const m_collectAreaOutline;
 };
 
 class ApplyLineFeatureGeometry : public BaseApplyFeature

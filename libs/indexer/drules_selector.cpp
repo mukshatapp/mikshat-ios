@@ -166,19 +166,7 @@ bool IsNamedFayda(FeatureType & ft, int)
 
 bool IsUnpavedRoad(FeatureType & ft, int)
 {
-  if (ft.GetGeomType() != feature::GeomType::Line)
-    return false;
-  feature::TypesHolder const types(ft);
-  auto const roadClass = ftypes::GetHighwayClass(types);
-  if (roadClass == ftypes::HighwayClass::Undefined || roadClass == ftypes::HighwayClass::Pedestrian ||
-      roadClass == ftypes::HighwayClass::Transported)
-    return false;
-  static ftypes::BaseCheckerEx const unpaved({{"psurface", "unpaved_good"}, {"psurface", "unpaved_bad"}});
-  static ftypes::BaseCheckerEx const paved({{"psurface", "paved_good"}, {"psurface", "paved_bad"}});
-  static ftypes::BaseCheckerEx const track({{"highway", "track"}});
-  // A mapped track keeps its conventional dirt styling unless the source
-  // explicitly identifies a paved surface. Explicit surface data wins.
-  return !paved(types) && (unpaved(types) || track(types));
+  return ftypes::IsUnpavedRoad(feature::TypesHolder(ft));
 }
 
 // Feature tag value evaluator for tag 'bbox_area' (bounding box area in sq.meters)

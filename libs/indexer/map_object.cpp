@@ -43,6 +43,16 @@ std::string_view FeatureNames::Get(int8_t langCode) const
 
 // MapObject -------------------------------------------------------------------------------
 
+namespace
+{
+std::string GetLocalizedMapObjectType(uint32_t type, feature::TypesHolder const & types)
+{
+  if (ftypes::IsWayChecker::Instance()(type) && ftypes::IsUnpavedRoad(types))
+    return platform::GetLocalizedString("mikshat_dirt_road_type");
+  return platform::GetLocalizedTypeName(classif().GetReadableObjectName(type));
+}
+}  // namespace
+
 void MapObject::SetFromFeatureType(FeatureType & ft)
 {
   m_mercator = feature::GetCenter(ft);
@@ -102,7 +112,7 @@ std::string MapObject::GetLocalizedType() const
   feature::TypesHolder copy(m_types);
   copy.SortBySpec();
 
-  return platform::GetLocalizedTypeName(classif().GetReadableObjectName(copy.GetBestType()));
+  return GetLocalizedMapObjectType(copy.GetBestType(), copy);
 }
 
 std::string MapObject::GetLocalizedAllTypes(bool withMainType) const
@@ -141,7 +151,7 @@ std::string MapObject::GetLocalizedAllTypes(bool withMainType) const
     else
       oss << feature::kFieldsSeparator;
 
-    oss << platform::GetLocalizedTypeName(classif().GetReadableObjectName(type));
+    oss << GetLocalizedMapObjectType(type, copy);
   }
 
   return oss.str();

@@ -15,6 +15,7 @@ final class MikshatLocalizationTests: XCTestCase {
       "mobile_data", "bookmarks", "bookmarks_and_tracks", "bookmarks_text_placement_title",
       "mikshat_icloud_sync_title", "mikshat_compass_settings", "mikshat_direct", "mikshat_record_track",
       "mikshat_save_share", "mikshat_save_location", "mikshat_share_location", "mikshat_go_to",
+      "mikshat_dirt_road_type",
       "pref_tts_voice_group_novelty", "pref_tts_voice_preview_play", "pref_tts_voice_preview_stop",
     ]
     for language in ["ar", "en"] {
@@ -31,6 +32,8 @@ final class MikshatLocalizationTests: XCTestCase {
       }
       XCTAssertEqual(bundle.localizedString(forKey: "CFBundleDisplayName", value: nil, table: "InfoPlist"),
                      language == "ar" ? "مكشات" : "Mikshat")
+      XCTAssertEqual(bundle.localizedString(forKey: "mikshat_dirt_road_type", value: nil, table: nil),
+                     language == "ar" ? "درب" : "Dirt track")
     }
   }
 

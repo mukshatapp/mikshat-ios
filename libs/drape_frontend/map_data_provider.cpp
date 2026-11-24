@@ -27,9 +27,9 @@ MapDataProvider::MapDataProvider(TReadIDsFn && idsReader, TReadFeaturesFn && fea
 }
 
 void MapDataProvider::ReadFeaturesID(TReadCallback<FeatureID const> const & fn, m2::RectD const & r, int scale,
-                                     TStopReadFn const & stop) const
+                                     TStopReadFn const & stop, uint8_t outdoorVisibility) const
 {
-  m_idsReader(fn, r, scale, stop);
+  m_idsReader(fn, r, scale, stop, outdoorVisibility);
 }
 
 void MapDataProvider::ReadFeatures(TReadCallback<FeatureType> const & fn, std::vector<FeatureID> const & ids) const

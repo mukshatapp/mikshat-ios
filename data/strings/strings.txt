@@ -47296,3 +47296,9 @@ comment = Mikshat offline map layers and exact search history
 tags = apple-maps
 en = This map could not be activated.
 ar = تعذّر تفعيل هذه الخريطة.
+
+[mikshat_dirt_road_type]
+comment = Generic feature category for dirt tracks and explicitly unpaved roads; preserve actual road names.
+tags = apple-maps,android-sdk,qt
+en = Dirt track
+ar = درب

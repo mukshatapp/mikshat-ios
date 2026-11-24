@@ -2,6 +2,8 @@
 
 #include "map/features_fetcher.hpp"
 
+#include "drape_frontend/stylist.hpp"
+
 #include "indexer/classificator.hpp"
 #include "indexer/classificator_loader.hpp"
 #include "indexer/feature_algo.hpp"
@@ -9,6 +11,7 @@
 #include "indexer/mikshat_map_visibility.hpp"
 #include "indexer/scales.hpp"
 #include "indexer/search_string_utils.hpp"
+#include "indexer/transliteration_loader.hpp"
 
 #include <glaze/json.hpp>
 
@@ -417,6 +420,194 @@ UNIT_TEST(MikshatOutdoor_ActualFeatureClassificationAudit)
             << ",\"requestedNameMatches\":" << totalMatches << ",\"nearbyRoads\":" << totalRoads << "}" << std::endl;
 }
 
+UNIT_TEST(MikshatOutdoor_ActualLocalitiesAndReportedTrack)
+{
+  InitTransliterationInstanceWithDefaultDirs();
+  classificator::Load();
+  std::array<MapStyle, 6> const styles = {MapStyleDefaultLight, MapStyleDefaultDark,   MapStyleVehicleLight,
+                                          MapStyleVehicleDark,  MapStyleOutdoorsLight, MapStyleOutdoorsDark};
+  for (auto const style : styles)
+    classificator::EnsureStyleLoaded(style);
+  auto const arabic = StringUtf8Multilang::GetLangIndex("ar");
+
+  char const * directory = std::getenv("MIKSHAT_SUPPLEMENTARY_MAPS_DIR");
+  char const * officialNorth = std::getenv("MIKSHAT_SAUDI_NORTH_MWM_PATH");
+  char const * officialSouth = std::getenv("MIKSHAT_SAUDI_SOUTH_MWM_PATH");
+  TEST(directory && *directory && officialNorth && *officialNorth && officialSouth && *officialSouth,
+       ("The real supplementary and both verified official fixtures are required"));
+  std::array<std::string, 4> const names = {"خب أبو خصام", "طعس مشرف", "الأمغر", "خب حشمة"};
+  std::array<std::array<uint32_t, 4>, 2> const indices = {
+      {{17844, 17877, 17886, 17896}, {613505, 613534, 613543, 613550}}};
+  std::array<std::string, 2> const paths = {std::string(directory) + "/desert-ksa-north.mwm", officialNorth};
+  size_t checked = 0;
+  for (size_t map = 0; map < paths.size(); ++map)
+  {
+    FeaturesFetcher source;
+    auto file = platform::LocalCountryFile::MakeTemporary(paths[map]);
+    file.SyncWithDisk();
+    auto const registered = source.RegisterMap(file);
+    TEST_EQUAL(registered.second, MwmSet::RegResult::Success, (paths[map]));
+    FeaturesLoaderGuard loader(source.GetDataSource(), registered.first);
+    for (size_t named = 0; named < names.size(); ++named)
+    {
+      auto feature = loader.GetFeatureByIndex(indices[map][named]);
+      bool sameName = false;
+      feature->ForEachName([&](int8_t, std::string_view name)
+      { sameName = sameName || NormalizeOutdoorAuditName(name) == NormalizeOutdoorAuditName(names[named]); });
+      TEST(sameName, (file.GetCountryName(), names[named]));
+      TEST_EQUAL(feature->GetGeomType(), feature::GeomType::Point, ());
+      TEST(feature::TypesHolder(*feature).Has(classif().GetTypeByPath({"place", "locality"})), ());
+      TEST_EQUAL(feature::GetMikshatOutdoorFeatureVisibility(*feature), feature::kMikshatSandyVisibility, ());
+      auto const rect = mercator::RectByCenterXYAndSizeInMeters(feature->GetCenter(), 8000.0);
+      for (int const scale : {9, 10, 14})
+      {
+        std::vector<FeatureID> ids;
+        source.ForEachFeatureIDForRendering(rect, [&](auto const & id) { ids.push_back(id); }, scale, {},
+                                            feature::GetMikshatOutdoorVisibility(15000.0));
+        TEST(std::find(ids.begin(), ids.end(), feature->GetID()) != ids.end(),
+             ("Every real named locality must be available at the same 15 km policy", map, named, scale));
+        for (auto const style : styles)
+        {
+          df::Stylist const visible(*feature, scale, arabic, style, feature::GetMikshatOutdoorVisibility(15000.0));
+          TEST(visible.m_captionRule && visible.m_captionRule->primary, (map, named, scale, style));
+          TEST_EQUAL(visible.m_captionRule->primary->color & 0xFFFFFF, 0, (map, named, scale, style));
+          TEST_GREATER_OR_EQUAL(visible.m_captionRule->primary->height, 14, (map, named, scale, style));
+          TEST(!visible.m_captionDescriptor.GetMainText().empty(), (map, named, scale, style));
+          df::Stylist const hidden(*feature, scale, arabic, style, feature::GetMikshatOutdoorVisibility(20000.0));
+          TEST(!hidden.m_captionRule,
+               ("The same category stays hidden outside its 15 km threshold", map, named, style));
+        }
+      }
+      ++checked;
+    }
+    if (map == 0)
+    {
+      // An identically named hamlet elsewhere is a settlement, not this locality category.
+      auto hamlet = loader.GetFeatureByIndex(15632);
+      TEST(feature::TypesHolder(*hamlet).Has(classif().GetTypeByPath({"place", "hamlet"})), ());
+      TEST_EQUAL(feature::GetMikshatOutdoorFeatureVisibility(*hamlet), 0, ());
+    }
+    else
+    {
+      auto road = loader.GetFeatureByIndex(202546);
+      TEST(feature::TypesHolder(*road).Has(classif().GetTypeByPath({"highway", "track"})), ());
+      TEST(ftypes::IsUnpavedRoad(feature::TypesHolder(*road)), ());
+      TEST_EQUAL(feature::GetMikshatOutdoorFeatureVisibility(*road), feature::kMikshatOutdoorVisibility, ());
+      auto const reportedPoint = mercator::FromLatLon(28.0 + 0.628 / 60.0, 42.0 + 0.426 / 60.0);
+      TEST_LESS(feature::GetMinDistanceMeters(*road, reportedPoint, FeatureType::BEST_GEOMETRY), 50.0, ());
+      for (auto const style : styles)
+      {
+        for (int const scale : {9, 14, 17})
+        {
+          df::Stylist const track(*road, scale, arabic, style, feature::GetMikshatOutdoorVisibility(20000.0));
+          TEST(!track.m_lineRules.empty(), (style, scale));
+          for (auto const line : track.m_lineRules)
+            TEST(!line->dashdot, ("The actual reported track must be solid", style, scale));
+        }
+      }
+    }
+  }
+
+  FeaturesFetcher southSource;
+  auto southFile = platform::LocalCountryFile::MakeTemporary(officialSouth);
+  southFile.SyncWithDisk();
+  auto const south = southSource.RegisterMap(southFile);
+  TEST_EQUAL(south.second, MwmSet::RegResult::Success, ());
+  FeaturesLoaderGuard southLoader(southSource.GetDataSource(), south.first);
+  auto fayda = southLoader.GetFeatureByIndex(609861);
+  TEST(ftypes::IsNamedFayda(*fayda), ());
+  TEST_EQUAL(feature::GetMikshatOutdoorFeatureVisibility(*fayda), feature::kMikshatOutdoorVisibility, ());
+  TEST_EQUAL(checked, 8, ("All four actual examples in both map sources must be verified"));
+  std::cout << "MIKSHAT_REAL_LOCALITY_POLICY {\"sources\":2,\"namedLandmarks\":" << checked
+            << ",\"reportedTrack\":202546,\"hamletControl\":15632,\"faydaControl\":609861}" << std::endl;
+}
+
+UNIT_TEST(MikshatOutdoor_ActualProtectedAreasAcrossSources)
+{
+  InitTransliterationInstanceWithDefaultDirs();
+  classificator::Load();
+  std::array<MapStyle, 6> const styles = {MapStyleDefaultLight, MapStyleDefaultDark,   MapStyleVehicleLight,
+                                          MapStyleVehicleDark,  MapStyleOutdoorsLight, MapStyleOutdoorsDark};
+  for (auto const style : styles)
+    classificator::EnsureStyleLoaded(style);
+  char const * directory = std::getenv("MIKSHAT_SUPPLEMENTARY_MAPS_DIR");
+  char const * officialNorth = std::getenv("MIKSHAT_SAUDI_NORTH_MWM_PATH");
+  char const * officialSouth = std::getenv("MIKSHAT_SAUDI_SOUTH_MWM_PATH");
+  TEST(directory && *directory && officialNorth && *officialNorth && officialSouth && *officialSouth,
+       ("Actual protected-area coverage is required from both map sources"));
+  auto const arabic = StringUtf8Multilang::GetLangIndex("ar");
+  std::array<std::string, 4> const paths = {std::string(directory) + "/desert-ksa-north.mwm",
+                                            std::string(directory) + "/desert-ksa-south.mwm", officialNorth,
+                                            officialSouth};
+  std::array<uint32_t, 4> const areas = {36786, 28626, 9947, 6867};
+  for (size_t map = 0; map < paths.size(); ++map)
+  {
+    FeaturesFetcher source;
+    auto file = platform::LocalCountryFile::MakeTemporary(paths[map]);
+    file.SyncWithDisk();
+    auto const registered = source.RegisterMap(file);
+    TEST_EQUAL(registered.second, MwmSet::RegResult::Success, (paths[map]));
+    FeaturesLoaderGuard loader(source.GetDataSource(), registered.first);
+    auto area = loader.GetFeatureByIndex(areas[map]);
+    TEST_EQUAL(area->GetGeomType(), feature::GeomType::Area, (map));
+    TEST(area->HasName(), (map));
+    TEST_EQUAL(feature::GetMikshatOutdoorFeatureVisibility(*area), feature::kMikshatProtectedVisibility, (map));
+    bool foundTriangle = false;
+    m2::PointD interior;
+    area->ForEachTriangle([&](auto const & a, auto const & b, auto const & c)
+    {
+      if (!foundTriangle)
+        interior = (a + b + c) / 3.0;
+      foundTriangle = true;
+    }, FeatureType::BEST_GEOMETRY);
+    TEST(foundTriangle, ("The actual area must have filled geometry", map));
+    auto const rect = mercator::RectByCenterXYAndSizeInMeters(interior, 15000.0);
+    for (int const scale : {6, 7, 8})
+    {
+      std::vector<FeatureID> ids;
+      source.ForEachFeatureIDForRendering(rect, [&](auto const & id) { ids.push_back(id); }, scale, {},
+                                          feature::GetMikshatOutdoorVisibility(50000.0));
+      TEST(std::find(ids.begin(), ids.end(), area->GetID()) != ids.end(),
+           ("The 50 km protected policy must return pure areas, not only separate line records", map, scale));
+      auto rendered = loader.GetFeatureByIndex(areas[map]);
+      feature::PrepareMikshatOverviewGeometry(*rendered, scale);
+      TEST(!rendered->IsEmptyGeometry(scale), (map, scale));
+      for (auto const style : styles)
+      {
+        df::Stylist const visible(*rendered, scale, arabic, style, feature::GetMikshatOutdoorVisibility(50000.0));
+        TEST(visible.m_captionRule && visible.m_captionRule->primary, (map, scale, style));
+        TEST(!visible.m_captionDescriptor.GetMainText().empty(), (map, scale, style));
+        TEST(visible.m_areaRule || visible.m_hatchingRule, (map, scale, style));
+        TEST(visible.m_isProtectedAreaFill || visible.m_isProtectedAreaHatching, (map, scale, style));
+        TEST(!visible.m_areaOutlineRules.empty(),
+             ("The outline must be independent of its suppressible fill", map, scale, style));
+        for (auto const border : visible.m_areaOutlineRules)
+        {
+          TEST_EQUAL(border->color & 0xFFFFFF, MapStyleIsDark(style) ? 0xBE97DF : 0x8557AC, (map, style));
+          TEST(!border->dashdot, (map, style));
+        }
+        df::Stylist const hidden(*rendered, scale, arabic, style, feature::GetMikshatOutdoorVisibility(100000.0));
+        TEST(!hidden.m_captionRule && !hidden.m_areaRule && !hidden.m_hatchingRule && hidden.m_areaOutlineRules.empty(),
+             ("Names, boundaries and fill share the same outer 50 km threshold", map, scale, style));
+      }
+    }
+    for (auto const style : styles)
+    {
+      df::Stylist const broad(*area, 8, arabic, style, feature::GetMikshatOutdoorVisibility(50000.0));
+      df::Stylist const closer(*area, 14, arabic, style, feature::GetMikshatOutdoorVisibility(2000.0));
+      df::Stylist const detail(*area, 17, arabic, style, feature::GetMikshatOutdoorVisibility(200.0));
+      TEST(
+          !broad.m_areaOutlineRules.empty() && !closer.m_areaOutlineRules.empty() && !detail.m_areaOutlineRules.empty(),
+          (map, style));
+      TEST_GREATER(closer.m_areaOutlineRules.front()->width, broad.m_areaOutlineRules.front()->width, (map, style));
+      TEST_GREATER(detail.m_areaOutlineRules.front()->width, closer.m_areaOutlineRules.front()->width, (map, style));
+      TEST(closer.m_captionRule && detail.m_captionRule, ("Names remain at the fill cutoff and closer", map, style));
+    }
+  }
+  std::cout << "MIKSHAT_REAL_PROTECTED_POLICY {\"sources\":4,\"areaFeatures\":4,\"overviewDrawScales\":[6,7,8]}"
+            << std::endl;
+}
+
 UNIT_TEST(MikshatOverview_SupplementaryOutdoorGeometry)
 {
   classificator::Load();
@@ -459,6 +650,39 @@ UNIT_TEST(MikshatOverview_SupplementaryOutdoorGeometry)
       auto original = loader.GetFeatureByIndex(index);
       auto const expectedRect = original->GetLimitRect(FeatureType::BEST_GEOMETRY);
       bool const line = original->GetGeomType() == feature::GeomType::Line;
+      auto const checkGeometry = [&](int scale)
+      {
+        // Keep each map's native simplification where it exists. Only missing
+        // overview geometry needs the authentic highest-detail fallback.
+        auto expected = loader.GetFeatureByIndex(index);
+        bool const needsFallback = expected->IsEmptyGeometry(scale);
+        if (needsFallback)
+        {
+          expected->ResetGeometry();
+          expected->GetLimitRect(FeatureType::BEST_GEOMETRY);
+        }
+        auto rendered = loader.GetFeatureByIndex(index);
+        feature::PrepareMikshatOverviewGeometry(*rendered, scale);
+        TEST(!rendered->IsEmptyGeometry(scale), (name, index, scale));
+        TEST_EQUAL(rendered->GetLimitRect(scale), expected->GetLimitRect(scale),
+                   ("Preserve available native geometry and only fill missing detail", name, index, scale));
+        std::vector<m2::PointD> expectedVertices;
+        std::vector<m2::PointD> renderedVertices;
+        auto const readVertices = [scale](FeatureType & f, std::vector<m2::PointD> & vertices)
+        {
+          f.ForEachPoint([&](auto const & point) { vertices.push_back(point); }, scale);
+          f.ForEachTriangle([&](auto const & a, auto const & b, auto const & c)
+          {
+            vertices.push_back(a);
+            vertices.push_back(b);
+            vertices.push_back(c);
+          }, scale);
+        };
+        readVertices(*expected, expectedVertices);
+        readVertices(*rendered, renderedVertices);
+        TEST(!renderedVertices.empty(), (name, index, scale));
+        TEST_EQUAL(renderedVertices, expectedVertices, (name, index, scale, needsFallback));
+      };
       auto center = expectedRect.Center();
       if (line)
         center = original->GetPoint(0);
@@ -477,20 +701,9 @@ UNIT_TEST(MikshatOverview_SupplementaryOutdoorGeometry)
       {
         auto const ids = ReadOverviewIds(source, rect, scale, true);
         TEST(std::binary_search(ids.begin(), ids.end(), original->GetID()), (name, index, scale));
-        auto rendered = loader.GetFeatureByIndex(index);
-        feature::PrepareMikshatOverviewGeometry(*rendered, scale);
-        TEST_EQUAL(rendered->GetLimitRect(scale), expectedRect,
-                   ("Overview must preserve the file's authentic geometry", name, index, scale));
-        if (line)
-          TEST_GREATER(rendered->GetPointsCount(), 1, (name, index, scale));
-        else
-          TEST_GREATER(rendered->GetTrgVerticesCount(scale), 0, (name, index, scale));
+        checkGeometry(scale);
       }
-      // At the overview/detail seam the reader must still expose the same
-      // authentic shape, while z15 resumes the map's native index contract.
-      auto detail = loader.GetFeatureByIndex(index);
-      feature::PrepareMikshatOverviewGeometry(*detail, 14);
-      TEST_EQUAL(detail->GetLimitRect(14), expectedRect, (name, index));
+      checkGeometry(14);
       auto nativeDetail = loader.GetFeatureByIndex(index);
       TEST(!nativeDetail->IsEmptyGeometry(15), ("Native geometry must exist after the supplement ends", name, index));
       if (line)

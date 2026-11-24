@@ -145,6 +145,20 @@ HighwayClass GetHighwayClass(feature::TypesHolder const & types)
   return HighwayClass::Undefined;
 }
 
+bool IsUnpavedRoad(feature::TypesHolder const & types)
+{
+  if (types.GetGeomType() != feature::GeomType::Line)
+    return false;
+  auto const roadClass = GetHighwayClass(types);
+  if (roadClass == HighwayClass::Undefined || roadClass == HighwayClass::Pedestrian ||
+      roadClass == HighwayClass::Transported)
+    return false;
+  static BaseCheckerEx const unpaved({{"psurface", "unpaved_good"}, {"psurface", "unpaved_bad"}});
+  static BaseCheckerEx const paved({{"psurface", "paved_good"}, {"psurface", "paved_bad"}});
+  static BaseCheckerEx const track({{"highway", "track"}});
+  return !paved(types) && (unpaved(types) || track(types));
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////
 // BaseChecker implementation
 

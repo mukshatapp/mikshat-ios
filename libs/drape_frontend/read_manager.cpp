@@ -1,9 +1,12 @@
 #include "drape_frontend/read_manager.hpp"
+#include "drape_frontend/gui/ruler_helper.hpp"
 #include "drape_frontend/message_subclasses.hpp"
 #include "drape_frontend/metaline_manager.hpp"
 #include "drape_frontend/visual_params.hpp"
 
 #include "platform/platform.hpp"
+
+#include "indexer/mikshat_map_visibility.hpp"
 
 #include "base/buffer_vector.hpp"
 
@@ -130,6 +133,9 @@ void ReadManager::UpdateCoverage(ScreenBase const & screen, bool have3dBuildings
 {
   m_modeChanged |= (m_have3dBuildings != have3dBuildings);
   m_have3dBuildings = have3dBuildings;
+  auto const outdoorVisibility = feature::GetMikshatOutdoorVisibility(gui::RulerHelper::GetMetricRulerDistance(screen));
+  m_modeChanged |= m_outdoorVisibility != outdoorVisibility;
+  m_outdoorVisibility = outdoorVisibility;
 
   if (m_modeChanged || forceUpdate || MustDropAllTiles(screen))
   {
@@ -229,10 +235,10 @@ void ReadManager::PushTaskBackForTileKey(TileKey const & tileKey, ref_ptr<dp::Te
                                          ref_ptr<MetalineManager> metalineMng)
 {
   ASSERT(m_pool != nullptr, ());
-  auto context = make_unique_dp<EngineContext>(TileKey(tileKey, m_generationCounter, m_userMarksGenerationCounter),
-                                               m_commutator, texMng, metalineMng, m_customFeaturesContext,
-                                               m_have3dBuildings && m_allow3dBuildings, m_trafficEnabled,
-                                               m_isolinesEnabled, m_mapLangIndex, m_backgroundMode, m_areaOpacity);
+  auto context = make_unique_dp<EngineContext>(
+      TileKey(tileKey, m_generationCounter, m_userMarksGenerationCounter), m_commutator, texMng, metalineMng,
+      m_customFeaturesContext, m_have3dBuildings && m_allow3dBuildings, m_trafficEnabled, m_isolinesEnabled,
+      m_mapLangIndex, m_backgroundMode, m_areaOpacity, m_outdoorVisibility);
   std::shared_ptr<TileInfo> tileInfo = std::make_shared<TileInfo>(std::move(context));
   m_tileInfos.insert(tileInfo);
 

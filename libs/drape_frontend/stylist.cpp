@@ -1,4 +1,5 @@
 #include "drape_frontend/stylist.hpp"
+#include "indexer/mikshat_map_visibility.hpp"
 
 #include "indexer/classificator.hpp"
 #include "indexer/classificator_loader.hpp"
@@ -216,7 +217,7 @@ void Stylist::ProcessKey(FeatureType & f, drule::Key const & key, drule::RulesHo
   }
 }
 
-Stylist::Stylist(FeatureType & f, uint8_t zoomLevel, int8_t deviceLang, MapStyle style)
+Stylist::Stylist(FeatureType & f, uint8_t zoomLevel, int8_t deviceLang, MapStyle style, uint8_t outdoorVisibility)
 {
   ASSERT(classificator::IsStyleLoaded(style), ("Drawing rules for the style are not loaded", style));
   auto const & rules = drule::GetRules(style);
@@ -234,6 +235,9 @@ Stylist::Stylist(FeatureType & f, uint8_t zoomLevel, int8_t deviceLang, MapStyle
     int overlaysMaxPriority = std::numeric_limits<int>::min();
     for (uint32_t t : types)
     {
+      auto const outdoorCategory = feature::GetMikshatOutdoorTypeVisibility(t, f);
+      if (outdoorCategory != 0 && (outdoorVisibility & outdoorCategory) == 0)
+        continue;
       int const priority = cl.GetObject(t)->GetMaxOverlaysPriority();
       if (priority > overlaysMaxPriority)
       {
@@ -253,6 +257,7 @@ Stylist::Stylist(FeatureType & f, uint8_t zoomLevel, int8_t deviceLang, MapStyle
   auto const geomType = types.GetGeomType();
 
   drule::KeysT keys;
+  drule::KeysT areaOutlineKeys;
   struct AreaRuleSource
   {
     size_t m_index;
@@ -262,12 +267,27 @@ Stylist::Stylist(FeatureType & f, uint8_t zoomLevel, int8_t deviceLang, MapStyle
   buffer_vector<AreaRuleSource, 4> areaRuleSources;
   for (uint32_t t : types)
   {
+    auto const outdoorCategory = feature::GetMikshatOutdoorTypeVisibility(t, f);
+    bool const outsideOutdoorScale = outdoorCategory != 0 && (outdoorVisibility & outdoorCategory) == 0;
+    if (outsideOutdoorScale && outdoorCategory != feature::kMikshatSandyVisibility)
+      continue;
+    if (geomType == feature::GeomType::Area && protectedAreaChecker(t))
+    {
+      drule::KeysT lineKeys;
+      cl.GetObject(t)->GetSuitable(zoomLevel, feature::GeomType::Line, lineKeys);
+      for (auto const & key : lineKeys)
+        if (key.m_type == drule::line)
+          areaOutlineKeys.push_back(key);
+    }
     drule::KeysT typeKeys;
     cl.GetObject(t)->GetSuitable(zoomLevel, geomType, typeKeys);
     auto const hatch = hatchingChecker.GetHatch(t);
 
     for (auto & k : typeKeys)
     {
+      // Sandy landcover remains visible; only its names have the 15 km threshold.
+      if (outsideOutdoorScale && (k.m_type == drule::caption || k.m_type == drule::pathtext))
+        continue;
       // The intermittent fill wins on the same feature, while separate permanent-water polygons draw above it.
       if (types.Size() > 1 && k.m_type == drule::area && areaPatternChecker.IsIntermittentWater(t))
         k.m_priority += kIntermittentWaterSelectionBoost;
@@ -287,8 +307,18 @@ Stylist::Stylist(FeatureType & f, uint8_t zoomLevel, int8_t deviceLang, MapStyle
   }
 
   feature::FilterRulesByRuntimeSelector(f, zoomLevel, rules, keys);
+  feature::FilterRulesByRuntimeSelector(f, zoomLevel, rules, areaOutlineKeys);
 
-  if (keys.empty())
+  if (!areaOutlineKeys.empty())
+  {
+    // Multiple protection tags still describe one boundary, not stacked copies.
+    auto const best =
+        std::max_element(areaOutlineKeys.begin(), areaOutlineKeys.end(),
+                         [](auto const & left, auto const & right) { return left.m_priority < right.m_priority; });
+    m_areaOutlineRules.push_back(rules.Find(*best)->GetLine());
+  }
+
+  if (keys.empty() && m_areaOutlineRules.empty())
     return;
 
   // Leave only one area drule and an optional hatching drule.

@@ -2,12 +2,17 @@
 
 #include "drape_frontend/base_renderer.hpp"
 #include "drape_frontend/engine_context.hpp"
+#include "drape_frontend/gui/ruler_helper.hpp"
 #include "drape_frontend/map_data_provider.hpp"
 #include "drape_frontend/message_subclasses.hpp"
 #include "drape_frontend/metaline_manager.hpp"
 #include "drape_frontend/read_manager.hpp"
 #include "drape_frontend/tile_info.hpp"
 #include "drape_frontend/visual_params.hpp"
+
+#include "indexer/mikshat_map_visibility.hpp"
+
+#include "geometry/mercator.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -213,7 +218,7 @@ UNIT_TEST(ReadCancellation_IndexCancellationPreservesLifecycle)
     df::TileInfo tile(make_unique_dp<df::EngineContext>(MakeContext(df::TileKey(1, 2, 15), commutator)));
     bool indexRead = false;
     bool featuresRead = false;
-    df::MapDataProvider model([&](auto const & callback, auto const &, int, auto const & stop)
+    df::MapDataProvider model([&](auto const & callback, auto const &, int, auto const & stop, uint8_t)
     {
       indexRead = true;
       TEST(stop && !stop(), ());
@@ -238,7 +243,7 @@ class ReadCoverageFixture
 public:
   ReadCoverageFixture()
     : m_receiver(m_commutator)
-    , m_model([this](auto const &, auto const &, int, auto const &) { NotifyRead(); },
+    , m_model([this](auto const &, auto const &, int, auto const &, uint8_t visibility) { NotifyRead(visibility); },
               [](auto const &, auto const &) {}, [](std::string_view) { return true; }, [](auto const &, int) {},
               [](auto const &, auto) { return false; }, [](auto const &, auto) {})
     , m_metalines(make_ref(&m_commutator), m_model)
@@ -250,10 +255,11 @@ public:
   }
   ~ReadCoverageFixture() { Stop(); }
 
-  void NotifyRead()
+  void NotifyRead(uint8_t visibility)
   {
     std::lock_guard lock(m_mutex);
     ++m_indexReads;
+    m_readVisibility.push_back(visibility);
     m_condition.notify_one();
   }
   void Update(df::TTilesCollection const & tiles)
@@ -297,6 +303,7 @@ public:
   std::mutex m_mutex;
   std::condition_variable m_condition;
   size_t m_indexReads = 0;
+  std::vector<uint8_t> m_readVisibility;
   df::ThreadsCommutator m_commutator;
   ReadReceiver m_receiver;
   df::MapDataProvider m_model;
@@ -349,6 +356,46 @@ UNIT_CLASS_TEST(ReadCoverageFixture, ReadCancellation_ExplicitInvalidationAdvanc
   m_reader.InvalidateAll();
   TEST_EQUAL(m_reader.GetCancellationRevision(), revision + 2, ());
   Stop();
+  CheckLifecycle();
+}
+UNIT_CLASS_TEST(ReadCoverageFixture, OutdoorVisibility_RulerTierRereadsOnceWithoutDrawZoomChange)
+{
+  auto const screenAt = [](double metres)
+  {
+    auto const center = mercator::FromLatLon(25.0, 45.0);
+    auto const east = mercator::GetSmPoint(center, metres, 0.0);
+    ScreenBase screen;
+    screen.OnSize(0, 0, 256, 256);
+    screen.SetFromParams(center, 0.0, (east.x - center.x) / 60.0);
+    return screen;
+  };
+  m_screen = screenAt(14990.0);
+  auto const originalScale = df::GetDrawTileScale(m_screen);
+  TEST_EQUAL(gui::RulerHelper::GetMetricRulerDistance(m_screen), 15000.0, ());
+  Update({m_a});
+  TEST(WaitForReads(1), ());
+  auto const revision = m_reader.GetCancellationRevision();
+  Update({m_a});
+  TEST_EQUAL(m_reader.GetCancellationRevision(), revision, ());
+
+  m_screen = screenAt(15010.0);
+  TEST_EQUAL(df::GetDrawTileScale(m_screen), originalScale, ());
+  TEST_EQUAL(gui::RulerHelper::GetMetricRulerDistance(m_screen), 20000.0, ());
+  Update({m_a});
+  TEST(WaitForReads(2), ());
+  TEST_EQUAL(m_reader.GetCancellationRevision(), revision + 1, ("The category transition retires the old tile"));
+
+  m_screen = screenAt(15020.0);
+  TEST_EQUAL(df::GetDrawTileScale(m_screen), originalScale, ());
+  Update({m_a});
+  TEST_EQUAL(m_reader.GetCancellationRevision(), revision + 1,
+             ("The same ruler tier must not repeat registration or reads"));
+  Stop();
+  TEST_EQUAL(m_indexReads, 2, ());
+  TEST_EQUAL(m_readVisibility,
+             (std::vector<uint8_t>{feature::kMikshatAllVisibility,
+                                   feature::kMikshatProtectedVisibility | feature::kMikshatOutdoorVisibility}),
+             ("The exact screen policy must reach the native index reader"));
   CheckLifecycle();
 }
 }  // namespace read_cancellation_tests

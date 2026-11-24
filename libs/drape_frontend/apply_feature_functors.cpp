@@ -26,6 +26,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <map>
 
 namespace df
 {
@@ -494,6 +495,76 @@ void ApplyPointFeature::ProcessPointRules(drule::SymbolRule const * symbolRule, 
   }
 }
 
+std::vector<m2::SharedSpline> BuildAreaOutlineSplines(std::vector<m2::PointD> const & triangles,
+                                                      m2::RectD const & clipRect)
+{
+  ASSERT_EQUAL(triangles.size() % 3, 0, ());
+  using Edge = std::pair<m2::PointD, m2::PointD>;
+  std::vector<Edge> edges;
+  edges.reserve(triangles.size());
+  for (size_t i = 0; i < triangles.size(); i += 3)
+  {
+    auto const & a = triangles[i];
+    auto const & b = triangles[i + 1];
+    auto const & c = triangles[i + 2];
+    if (m2::robust::OrientedS(a, b, c) == 0.0)
+      continue;
+    for (auto const & edge : {Edge{a, b}, Edge{b, c}, Edge{c, a}})
+      edges.emplace_back(std::min(edge.first, edge.second), std::max(edge.first, edge.second));
+  }
+
+  // Sorting avoids the quadratic vertex/edge searches used for small building outlines.
+  std::sort(edges.begin(), edges.end());
+  std::vector<Edge> boundary;
+  for (size_t i = 0; i < edges.size();)
+  {
+    size_t next = i + 1;
+    while (next < edges.size() && edges[next] == edges[i])
+      ++next;
+    if (next == i + 1)
+      boundary.push_back(edges[i]);
+    i = next;
+  }
+
+  std::map<m2::PointD, std::vector<size_t>> adjacency;
+  for (size_t i = 0; i < boundary.size(); ++i)
+  {
+    adjacency[boundary[i].first].push_back(i);
+    adjacency[boundary[i].second].push_back(i);
+  }
+
+  std::vector<bool> used(boundary.size(), false);
+  std::vector<m2::SharedSpline> result;
+  for (size_t i = 0; i < boundary.size(); ++i)
+  {
+    if (used[i])
+      continue;
+
+    std::vector<m2::PointD> path{boundary[i].first};
+    do
+    {
+      auto & incident = adjacency.at(path.back());
+      while (!incident.empty() && used[incident.back()])
+        incident.pop_back();
+      if (incident.empty())
+        break;
+
+      auto const edgeIndex = incident.back();
+      incident.pop_back();
+      used[edgeIndex] = true;
+      auto const & edge = boundary[edgeIndex];
+      path.push_back(edge.first == path.back() ? edge.second : edge.first);
+    }
+    while (path.back() != path.front());
+
+    if (path.size() < 2)
+      continue;
+    for (auto & spline : m2::ClipSplineByRect(clipRect, m2::SharedSpline(std::move(path))))
+      result.push_back(std::move(spline));
+  }
+  return result;
+}
+
 // Not sure with kEmptyTriangleS, check these:
 // https://github.com/organicmaps/organicmaps/issues/2643
 // https://github.com/organicmaps/organicmaps/issues/2862
@@ -508,6 +579,16 @@ void ApplyAreaFeature::operator()(PointT const & p1, PointT const & p2, PointT c
 
   double constexpr kEmptyTriangleS = kMwmPointAccuracy * kMwmPointAccuracy * 0.01;
   if (fabs(crossProduct) < kEmptyTriangleS)
+    return;
+
+  if (m_collectAreaOutline)
+  {
+    m_outlineTriangles.push_back(p1);
+    m_outlineTriangles.push_back(p2);
+    m_outlineTriangles.push_back(p3);
+  }
+
+  if (m_areaOpacity <= 0.0f)
     return;
 
   if (m_isBuilding)
@@ -662,6 +743,24 @@ void ApplyAreaFeature::ProcessAreaRules(Stylist const & stylist, std::string_vie
     if (areaRule->priority < drule::kBasePriorityBgTop)
       areaDepth = drule::CalcAreaBySizeDepth(m_f);
     ProcessRule(*areaRule, areaDepth, {}, patternKey, stylist.m_isProtectedAreaFill);
+  }
+}
+
+void ApplyAreaFeature::ProcessAreaOutlines(Stylist::LineRulesT const & lineRules)
+{
+  auto const splines = BuildAreaOutlineSplines(m_outlineTriangles, m_params.m_tileRect);
+  for (auto const * rule : lineRules)
+  {
+    LineViewParams params;
+    params.m_tileCenter = m_params.m_tileRect.Center();
+    ExtractLineParams(*rule, m_params.m_vparams.GetVisualScale(), params);
+    params.m_depth = PriorityToDepth(rule->priority, drule::line, 0);
+    params.m_rank = m_f.GetRank();
+    params.m_baseGtoPScale = m_params.m_currentScaleGtoP;
+    params.m_zoomLevel = m_params.m_tileKey.m_zoomLevel;
+    // Ordinary line batches remain visible when protected fill batches are hidden at close scales.
+    for (auto const & spline : splines)
+      m_params.m_insertShape(make_unique_dp<LineShape>(spline, params));
   }
 }
 

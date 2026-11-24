@@ -1788,9 +1788,9 @@ m2::PointD Framework::P3dtoG(m2::PointD const & p) const
 
 void Framework::CreateDrapeEngine(ref_ptr<dp::GraphicsContextFactory> contextFactory, DrapeCreationParams && params)
 {
-  auto idReadFn = [this](auto const & fn, m2::RectD const & r, int scale, auto const & stop)
+  auto idReadFn = [this](auto const & fn, m2::RectD const & r, int scale, auto const & stop, uint8_t outdoorVisibility)
   {
-    m_featuresFetcher.ForEachFeatureIDForRendering(r, fn, scale, stop);
+    m_featuresFetcher.ForEachFeatureIDForRendering(r, fn, scale, stop, outdoorVisibility);
 
     if (stop && stop())
       return;

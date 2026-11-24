@@ -185,3 +185,6 @@
 
 @mikshat_protected_fill: #6E528A;
 @mikshat_protected_border: #BE97DF;
+
+@mikshat_sand_label: #000000;
+@mikshat_sand_halo: #FFFFFF;

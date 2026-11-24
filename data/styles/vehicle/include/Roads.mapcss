@@ -659,7 +659,7 @@ line|z18[highway=track],
 {width: 1.9; dashes: 7,3;}
 line|z19-[highway=track],
 {width: 2.5; dashes: 7,3;}
-line|z16-[highway=track][tunnel?],
+line|z16-[highway=track][tunnel?][!unpaved_road],
 {width: 0;}
 
 line|z17-[highway=path],
@@ -1043,3 +1043,14 @@ line|z19-[railway=tram]
 /*line|z10-[route=ferry],
 line|z10-[route=ferry_motorcar]
 {color: @ferry;width: 1;opacity: 1;dashes: 5.4,2.7;}*/
+
+
+/* Overview fallback only below this family's normal service-road widths. */
+line|z13[highway=service][unpaved_road]
+{width: 0.8;}
+line|z14[highway=service][service=driveway][unpaved_road]
+{width: 0.8;}
+
+/* Keep unpaved track variants continuous through the browsing/detail seam. */
+line|z14-15[highway=track][tunnel][unpaved_road]
+{width: 1.1;}

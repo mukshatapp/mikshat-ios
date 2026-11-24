@@ -568,3 +568,9 @@ line|z15-[power=minor_line],
 {color: @powerline; width: 1; opacity: 0.6;}
 line|z15-[power=minor_line]::dash,
 {color: @powerline; width: 4; opacity: 0.6; dashes: 1,80;}
+
+/* Surface-classified dirt service roads retain the category's eligibility. */
+line|z13-14[highway=service][service=busway][unpaved_road],
+line|z13-14[highway=service][service=parking_aisle][unpaved_road],
+line|z13-15[highway=service][service=driveway][unpaved_road]
+{width: 0.8;}

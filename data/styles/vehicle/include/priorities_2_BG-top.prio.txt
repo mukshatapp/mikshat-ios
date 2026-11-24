@@ -37,8 +37,8 @@ landuse-basin-intermittent                          # area z12-
 natural-water-intermittent                          # area z1- (also has caption z10-)
 === 20
 
-waterway-river                                      # line z9- (also has pathtext z9-)
-waterway-river-intermittent                         # line z9- (also has pathtext z9-)
-waterway-stream                                     # line z9-12 (also has pathtext z9-)
-waterway-stream-intermittent                        # line z9-12 (also has pathtext z9-)
+waterway-river                                      # line z6- (also has pathtext z6-)
+waterway-river-intermittent                         # line z6- (also has pathtext z6-)
+waterway-stream                                     # line z6-12 (also has pathtext z6-)
+waterway-stream-intermittent                        # line z6-12 (also has pathtext z6-)
 === 10

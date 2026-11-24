@@ -124,13 +124,15 @@ public:
 
   using LineRulesT = buffer_vector<drule::LineRule const *, 4>;
   LineRulesT m_lineRules;
+  // Pure protected polygons need their boundary even without a separate line feature.
+  LineRulesT m_areaOutlineRules;
 
   ftypes::RoadShieldsSetT m_roadShields;
 
   CaptionDescription m_captionDescriptor;
 
   // Use the caller's style snapshot for both rule keys and their holder.
-  Stylist(FeatureType & f, uint8_t zoomLevel, int8_t deviceLang, MapStyle style);
+  Stylist(FeatureType & f, uint8_t zoomLevel, int8_t deviceLang, MapStyle style, uint8_t outdoorVisibility = 0xFF);
 
 private:
   void ProcessKey(FeatureType & f, drule::Key const & key, drule::RulesHolder const & rules, bool isProtectedArea);

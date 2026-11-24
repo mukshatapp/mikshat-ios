@@ -3,8 +3,10 @@
 
 #include "indexer/classificator.hpp"
 #include "indexer/drawing_rules.hpp"
+#include "indexer/feature.hpp"
 #include "indexer/feature_data.hpp"
 #include "indexer/feature_visibility.hpp"
+#include "indexer/map_object.hpp"
 
 #include "base/logging.hpp"
 #include "base/stl_helpers.hpp"
@@ -432,6 +434,38 @@ UNIT_TEST(Classificator_IntermittentWaterwayRules)
 
 namespace
 {
+class MikshatRoadObject : public osm::MapObject
+{
+public:
+  explicit MikshatRoadObject(std::string_view highway, std::string_view surface = {}, bool tunnel = false,
+                             std::string_view service = {})
+  {
+    m_geomType = GeomType::Line;
+    m_points = {{0, 0}, {0.01, 0.01}};
+    if (!service.empty())
+      m_types.Add(classif().GetTypeByPath({"highway", "service", service}));
+    else
+      m_types.Add(tunnel ? classif().GetTypeByPath({"highway", highway, "tunnel"})
+                         : classif().GetTypeByPath({"highway", highway}));
+    if (!surface.empty())
+      m_types.Add(classif().GetTypeByPath({"psurface", surface}));
+    m_name.Add("en", "Outdoor road");
+  }
+};
+
+class MikshatLocalityObject : public osm::MapObject
+{
+public:
+  explicit MikshatLocalityObject(std::string_view name)
+  {
+    m_geomType = GeomType::Point;
+    m_points = {{0, 0}};
+    m_types.Add(classif().GetTypeByPath({"place", "locality"}));
+    m_name.Add("default", name);
+    m_name.Add("ar", name);
+  }
+};
+
 drule::BaseRule const * GetMikshatRule(base::StringIL const & path, int level, GeomType geometry, drule::TypeT kind)
 {
   drule::KeysT keys;
@@ -524,22 +558,103 @@ UNIT_TEST(Classificator_MikshatResourcesAndTracks)
     TEST(trackName && trackName->GetPathtext() && trackName->GetPathtext()->primary, (style));
 
     uint32_t const trackColor = MapStyleIsDark(style) ? 0xC79A66 : 0x635730;
-    for (int const zoom : {9, 10, 14, 17})
+    for (int const zoom : {6, 9, 10, 14, 17, 19})
     {
+      auto feature = FeatureType::CreateFromMapObject(MikshatRoadObject("track"));
       drule::KeysT keys;
       GetDrawRule({classif().GetTypeByPath({"highway", "track"})}, zoom, GeomType::Line, keys);
+      FilterRulesByRuntimeSelector(*feature, zoom, drule::GetCurrentRules(), keys);
       bool hasDirtTrack = false;
       for (auto const & key : keys)
       {
         auto const * line = drule::GetCurrentRules().Find(key)->GetLine();
         if (line && (line->color & 0xFFFFFF) == trackColor)
         {
-          TEST(line->dashdot, (style, zoom));
+          TEST(!line->dashdot, (style, zoom));
           hasDirtTrack = true;
         }
       }
       TEST(hasDirtTrack, (style, zoom));
     }
+    for (int const zoom : {6, 9, 14, 17})
+    {
+      auto feature = FeatureType::CreateFromMapObject(MikshatRoadObject("track", "paved_good"));
+      drule::KeysT keys;
+      GetDrawRule({classif().GetTypeByPath({"highway", "track"})}, zoom, GeomType::Line, keys);
+      FilterRulesByRuntimeSelector(*feature, zoom, drule::GetCurrentRules(), keys);
+      bool hasPavedTrack = false;
+      for (auto const & key : keys)
+        if (auto const * line = drule::GetCurrentRules().Find(key)->GetLine())
+        {
+          TEST(line->dashdot, ("Explicitly paved tracks retain their existing stroke", style, zoom));
+          hasPavedTrack = true;
+        }
+      TEST_EQUAL(hasPavedTrack, zoom >= 9, (style, zoom));
+    }
+    for (auto const highway :
+         {"motorway", "motorway_link", "trunk", "trunk_link", "primary", "primary_link", "secondary", "secondary_link",
+          "tertiary", "tertiary_link", "unclassified", "residential", "living_street", "road", "service", "track"})
+      for (int zoom = 6; zoom <= 19; ++zoom)
+      {
+        auto feature = FeatureType::CreateFromMapObject(MikshatRoadObject(highway, "unpaved_good"));
+        drule::KeysT keys;
+        GetDrawRule({classif().GetTypeByPath({"highway", highway})}, zoom, GeomType::Line, keys);
+        FilterRulesByRuntimeSelector(*feature, zoom, drule::GetCurrentRules(), keys);
+        bool visible = false;
+        bool named = false;
+        for (auto const & key : keys)
+        {
+          auto const * rule = drule::GetCurrentRules().Find(key);
+          if (auto const * line = rule->GetLine())
+          {
+            TEST(!line->dashdot, (style, highway, zoom));
+            visible = visible || (line->width > 0 && (line->color & 0xFFFFFF) == trackColor);
+          }
+          if (auto const * text = rule->GetPathtext())
+            named = named || (text->primary && text->primary->height >= 10);
+        }
+        TEST(visible, ("Dirt roads need continuous overview/detail eligibility", style, highway, zoom));
+        TEST(named, ("Dirt-road names need continuous overview/detail eligibility", style, highway, zoom));
+      }
+    for (auto const service : {"driveway", "parking_aisle"})
+      for (int const zoom : {13, 14, 15})
+      {
+        auto feature = FeatureType::CreateFromMapObject(MikshatRoadObject("service", "unpaved_good", false, service));
+        drule::KeysT keys;
+        GetDrawRule({classif().GetTypeByPath({"highway", "service", service})}, zoom, GeomType::Line, keys);
+        FilterRulesByRuntimeSelector(*feature, zoom, drule::GetCurrentRules(), keys);
+        bool visible = false;
+        bool named = false;
+        for (auto const & key : keys)
+        {
+          auto const * rule = drule::GetCurrentRules().Find(key);
+          if (auto const * line = rule->GetLine())
+          {
+            TEST(!line->dashdot, (style, service, zoom));
+            visible = visible || (line->width > 0 && (line->color & 0xFFFFFF) == trackColor);
+          }
+          if (auto const * text = rule->GetPathtext())
+            named = named || (text->primary && text->primary->height >= 10);
+        }
+        TEST(visible && named, ("Unpaved service subtypes must not disappear at closer scales", style, service, zoom));
+      }
+    for (auto const highway :
+         {"primary", "secondary", "tertiary", "unclassified", "residential", "living_street", "service", "track"})
+      for (int const zoom : {14, 17, 19})
+      {
+        auto feature = FeatureType::CreateFromMapObject(MikshatRoadObject(highway, "unpaved_good", true));
+        drule::KeysT keys;
+        GetDrawRule({classif().GetTypeByPath({"highway", highway, "tunnel"})}, zoom, GeomType::Line, keys);
+        FilterRulesByRuntimeSelector(*feature, zoom, drule::GetCurrentRules(), keys);
+        bool visible = false;
+        for (auto const & key : keys)
+          if (auto const * line = drule::GetCurrentRules().Find(key)->GetLine())
+          {
+            TEST(!line->dashdot, ("Dirt-road casings must also be solid", style, highway, zoom));
+            visible = visible || (line->width > 0 && (line->color & 0xFFFFFF) == trackColor);
+          }
+        TEST(visible, (style, highway, zoom));
+      }
   });
 }
 
@@ -555,20 +670,72 @@ UNIT_TEST(Classificator_MikshatLandAndProtectedPalette)
       TEST(sand && sand->GetArea(), (style));
       TEST_EQUAL(sand->GetArea()->color & 0xFFFFFF, 0xEBA426, ("Actual shipped 4.6.16 sand", style));
     }
+    for (auto const & path : vector<base::StringIL>{{"natural", "desert"}, {"natural", "beach", "sand"}})
+      for (int const zoom : {6, 9, 14, 19})
+        for (auto const geometry : {GeomType::Point, GeomType::Area})
+        {
+          auto const * name = GetMikshatRule(path, zoom, geometry, drule::caption);
+          TEST(name && name->GetCaption() && name->GetCaption()->primary, (style, path, zoom, geometry));
+          auto const & text = *name->GetCaption()->primary;
+          TEST_EQUAL(text.color & 0xFFFFFF, 0, (style, path, zoom));
+          TEST_EQUAL(text.stroke_color & 0xFFFFFF, 0xFFFFFF, (style, path, zoom));
+          TEST_GREATER_OR_EQUAL(text.height, 14, (style, path, zoom));
+        }
+    for (auto const name : {"خب أبو خصام", "طعس مشرف", "الأمغر", "خب حشمة", "موقع بري آخر", "فيضة الخويش"})
+    {
+      auto feature = FeatureType::CreateFromMapObject(MikshatLocalityObject(name));
+      bool const fayda = std::string_view(name) == "فيضة الخويش";
+      uint32_t const expectedColor = fayda ? (MapStyleIsDark(style) ? 0x7AD49A : 0x207440) : 0;
+      for (int const zoom : {6, 9, 14, 19})
+      {
+        drule::KeysT keys;
+        GetDrawRule({classif().GetTypeByPath({"place", "locality"})}, zoom, GeomType::Point, keys);
+        FilterRulesByRuntimeSelector(*feature, zoom, drule::GetCurrentRules(), keys);
+        bool found = false;
+        for (auto const & key : keys)
+          if (auto const * caption = drule::GetCurrentRules().Find(key)->GetCaption())
+          {
+            TEST(caption->primary, (style, name, zoom));
+            TEST_EQUAL(caption->primary->color & 0xFFFFFF, expectedColor, (style, name, zoom));
+            TEST_GREATER_OR_EQUAL(caption->primary->height, fayda ? 12 : 14, (style, name, zoom));
+            found = true;
+          }
+        TEST(found, (style, name, zoom));
+      }
+    }
     uint32_t const fillColor = MapStyleIsDark(style) ? 0x6E528A : 0xCFB8E8;
     uint32_t const borderColor = MapStyleIsDark(style) ? 0xBE97DF : 0x8557AC;
     for (auto const & path : vector<base::StringIL>{{"boundary", "national_park"},
                                                     {"boundary", "protected_area"},
                                                     {"boundary", "protected_area", "1"},
+                                                    {"boundary", "protected_area", "2"},
+                                                    {"boundary", "protected_area", "3"},
+                                                    {"boundary", "protected_area", "4"},
+                                                    {"boundary", "protected_area", "5"},
                                                     {"boundary", "protected_area", "6"},
                                                     {"leisure", "nature_reserve"}})
     {
-      auto const * fill = GetMikshatRule(path, 9, GeomType::Area, drule::area);
-      TEST(fill && fill->GetArea(), (style, path));
-      TEST_EQUAL(fill->GetArea()->color & 0xFFFFFF, fillColor, (style, path));
-      auto const * border = GetMikshatRule(path, 15, GeomType::Line, drule::line);
-      TEST(border && border->GetLine(), (style, path));
-      TEST_EQUAL(border->GetLine()->color & 0xFFFFFF, borderColor, (style, path));
+      float previousWidth = 0;
+      for (int const zoom : {6, 9, 10, 13, 16, 19})
+      {
+        auto const * fill = GetMikshatRule(path, zoom, GeomType::Area, drule::area);
+        TEST(fill && fill->GetArea(), (style, path, zoom));
+        TEST_EQUAL(fill->GetArea()->color & 0xFFFFFF, fillColor, (style, path, zoom));
+        for (auto const geometry : {GeomType::Point, GeomType::Area})
+        {
+          auto const * name = GetMikshatRule(path, zoom, geometry, drule::caption);
+          TEST(name && name->GetCaption() && name->GetCaption()->primary, (style, path, zoom, geometry));
+          TEST_EQUAL(name->GetCaption()->primary->color & 0xFFFFFF, borderColor, (style, path, zoom));
+          TEST_GREATER_OR_EQUAL(name->GetCaption()->primary->height, 12, (style, path, zoom));
+        }
+        auto const * border = GetMikshatRule(path, zoom, GeomType::Line, drule::line);
+        TEST(border && border->GetLine(), (style, path, zoom));
+        TEST_EQUAL(border->GetLine()->color & 0xFFFFFF, borderColor, (style, path, zoom));
+        TEST(!border->GetLine()->dashdot, (style, path, zoom));
+        TEST_GREATER_OR_EQUAL(border->GetLine()->width, previousWidth, (style, path, zoom));
+        previousWidth = border->GetLine()->width;
+      }
+      TEST_GREATER(previousWidth, 1, ("Protected boundaries must become thicker at closer scales", style, path));
     }
   });
 }

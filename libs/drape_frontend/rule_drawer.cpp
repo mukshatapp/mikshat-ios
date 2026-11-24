@@ -295,12 +295,14 @@ void RuleDrawer::ProcessAreaAndPointStyle(FeatureType & f, Stylist const & s)
       m_context->GetBackgroundMode() == dp::BackgroundMode::Satellite ? m_context->GetAreaOpacity() : 1.0f;
 
   ApplyAreaFeature apply(m_applyParams, f, s.m_captionDescriptor, isBuilding, m_isMwmBorder(types),
-                         areaMinHeight /* minPosZ */, areaHeight /* posZ */, areaOpacity);
+                         areaMinHeight /* minPosZ */, areaHeight /* posZ */, areaOpacity,
+                         !s.m_areaOutlineRules.empty());
 
-  if (areaOpacity > 0.0f && !skipTriangles && (s.m_areaRule || s.m_hatchingRule))
+  bool const drawFill = areaOpacity > 0.0f && !skipTriangles && (s.m_areaRule || s.m_hatchingRule);
+  if (drawFill || !s.m_areaOutlineRules.empty())
   {
     f.ForEachTriangle(apply, m_zoomLevel);
-    if (apply.HasGeometry())
+    if (drawFill && apply.HasGeometry())
     {
       std::string_view hatchKey;
       if (s.m_hatchingRule)
@@ -310,6 +312,8 @@ void RuleDrawer::ProcessAreaAndPointStyle(FeatureType & f, Stylist const & s)
         patternKey = m_isAreaPattern.GetPattern(types);
       apply.ProcessAreaRules(s, hatchKey, patternKey);
     }
+    if (!s.m_areaOutlineRules.empty())
+      apply.ProcessAreaOutlines(s.m_areaOutlineRules);
   }
 
   /// @todo Can we put this check in the beginning of this function?
@@ -424,11 +428,11 @@ void RuleDrawer::operator()(FeatureType & f)
       style = MapStyleIsDark(m_mapStyle) ? MapStyleOutdoorsDark : MapStyleOutdoorsLight;
   }
 
-  Stylist const s(f, m_zoomLevel, m_deviceLang, style);
+  Stylist const s(f, m_zoomLevel, m_deviceLang, style, m_context->GetOutdoorVisibility());
 
   // No drawing rules.
   if (!s.m_symbolRule && !s.m_captionRule && !s.m_houseNumberRule && s.m_lineRules.empty() && !s.m_areaRule &&
-      !s.m_hatchingRule)
+      !s.m_hatchingRule && s.m_areaOutlineRules.empty())
     return;
 
 #ifdef DEBUG
@@ -436,7 +440,7 @@ void RuleDrawer::operator()(FeatureType & f)
   bool const hasLine = !s.m_lineRules.empty();
   bool const hasLineAdd = s.m_shieldRule || s.m_pathtextRule;
   bool const hasPoint = s.m_symbolRule || s.m_captionRule || s.m_houseNumberRule;
-  bool const hasArea = s.m_areaRule || s.m_hatchingRule;
+  bool const hasArea = s.m_areaRule || s.m_hatchingRule || !s.m_areaOutlineRules.empty();
 
   ASSERT(!((hasLine || hasLineAdd) && (hasPoint || hasArea)),
          ("Line drules mixed with point/area ones", f.DebugString()));
