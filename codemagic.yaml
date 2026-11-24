@@ -98,12 +98,7 @@ workflows:
       - name: Check Xcode and Metal
         script: |
           set -euo pipefail
-          xcodebuild -version
-          if ! xcrun metal -v >/dev/null 2>&1; then
-            xcodebuild -downloadComponent MetalToolchain
-            xcrun -k
-          fi
-          xcrun metal -v
+          python3 mikshat/tests/update-native/prepare_metal.py build/metal-preflight
       - name: Download pinned dependencies
         script: |
           set -euo pipefail
@@ -207,6 +202,8 @@ workflows:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
       - /tmp/mikshat-archive.log
+      - build/metal-preflight/preflight.log
+      - build/metal-preflight/summary.json
       - build/rotation-verification/rotation-diagnostics.zip
       - build/rotation-verification/summary.json
       - build/ios/xcarchive/*.xcarchive/dSYMs/*.dSYM
