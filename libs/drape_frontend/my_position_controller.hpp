@@ -1,5 +1,7 @@
 #pragma once
 
+#include "drape_frontend/gps_animation_timing.hpp"
+
 #include "drape_frontend/animation/arrow_animation.hpp"
 #include "drape_frontend/drape_hints.hpp"
 #include "drape_frontend/frame_values.hpp"
@@ -149,7 +151,7 @@ private:
   m2::PointD GetRoutingRotationPixelCenter() const;
 
   ArrowPose GetDrawablePose() const;
-  void AnimateArrow(ArrowPose const & oldPose, ScreenBase const & screen);
+  void AnimateArrow(ArrowPose const & oldPose, ScreenBase const & screen, double duration = 0.20);
 
   bool AlmostCurrentPosition(m2::PointD const & pos) const;
   bool AlmostCurrentAzimut(double azimut) const;
@@ -192,6 +194,8 @@ private:
   std::optional<AnimationClock::time_point> m_autoZoomBlockedUntil;
   base::Timer m_updateLocationTimer;
   double m_lastLocationTimestamp;
+  GpsAnimationTiming m_gpsAnimationTiming;
+  double m_gpsAnimationDuration = 0.20;
 
   m2::RectD m_pixelRect;
   m2::RectD m_visiblePixelRect;

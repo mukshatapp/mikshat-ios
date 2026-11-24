@@ -512,6 +512,9 @@ void UserEventStream::SetScreen(ScreenBase const & target, double duration,
                                 std::optional<m2::PointD> anchor)
 {
   auto const & current = GetCurrentScreen();
+  // GPS-driven camera and arrow share a cadence, so the marker stays attached while following.
+  if (duration > 0.0 && arrowTarget && arrowTarget->m_durationSeconds > 0.0)
+    duration = arrowTarget->m_durationSeconds;
   bool const animate = duration > 0.0 && current != target && IsLocalCameraMove(current, target);
   if (arrowTarget)
     m_animationSystem.AnimateArrowTo(*arrowTarget, m_eventTime, animate ? duration : 0.0);

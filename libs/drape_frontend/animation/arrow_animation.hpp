@@ -10,6 +10,7 @@ struct ArrowPose
 {
   m2::PointD m_position;
   double m_azimuth;
+  double m_durationSeconds = 0.0;
 };
 
 class ArrowAnimation : public Animation

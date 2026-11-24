@@ -406,11 +406,31 @@ void MyPositionController::NextMode(ScreenBase const & screen)
 void MyPositionController::OnLocationUpdate(location::GpsInfo const & info, bool isNavigable, ScreenBase const & screen)
 {
   auto const oldPose = GetDrawablePose();
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  if (m_isPositionAssigned && info.m_horizontalAccuracy > 200.0)
+  {
+    m_positionIsObsolete = true;
+    return;
+  }
+  bool const stopped = info.HasSpeed() && info.m_speed <= 0.5;
+  auto const seconds = std::chrono::duration<double>(AnimationClock::now().time_since_epoch()).count();
+  m_gpsAnimationDuration = m_gpsAnimationTiming.Update(seconds, !stopped);
+#else
+  bool const stopped = false;
+#endif
 
   m2::RectD const rect = mercator::MetersToXY(info.m_longitude, info.m_latitude, info.m_horizontalAccuracy);
   // Use FromLatLon instead of rect.Center() since in case of large info.m_horizontalAccuracy
   // there is significant difference between the real location and the estimated one.
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  auto const measuredPosition = mercator::FromLatLon(info.m_latitude, info.m_longitude);
+  // Suppress stationary GPS jitter in the renderer, keeping the raw fix untouched upstream.
+  if (!m_isPositionAssigned || !stopped ||
+      mercator::DistanceOnEarth(m_position, measuredPosition) > std::clamp(info.m_horizontalAccuracy, 3.0, 30.0))
+    m_position = measuredPosition;
+#else
   m_position = mercator::FromLatLon(info.m_latitude, info.m_longitude);
+#endif
   m_errorRadius = rect.SizeX() * 0.5;
   m_horizontalAccuracy = info.m_horizontalAccuracy;
 
@@ -435,7 +455,7 @@ void MyPositionController::OnLocationUpdate(location::GpsInfo const & info, bool
   bool const isMovingFast = info.HasSpeed() && info.m_speed > kMinSpeedThresholdMps;
   bool const glueArrowInRouting = isNavigable && m_isArrowGluedInRouting;
 
-  if ((!m_isCompassAvailable || glueArrowInRouting || isMovingFast) && info.HasBearing())
+  if (!stopped && (!m_isCompassAvailable || glueArrowInRouting || isMovingFast) && info.HasBearing())
   {
     SetDirection(math::DegToRad(info.m_bearing));
     m_lastGPSBearingTimer.Reset();
@@ -443,7 +463,7 @@ void MyPositionController::OnLocationUpdate(location::GpsInfo const & info, bool
 
   if (m_isPositionAssigned && (!AlmostCurrentPosition(oldPose.m_position) || !AlmostCurrentAzimut(oldPose.m_azimuth)))
   {
-    AnimateArrow(oldPose, screen);
+    AnimateArrow(oldPose, screen, m_gpsAnimationDuration);
     m_isDirtyViewport = true;
   }
 
@@ -792,9 +812,12 @@ ArrowPose MyPositionController::GetDrawablePose() const
   return m_animationSystem.GetArrowPose().value_or(ArrowPose{m_position, m_drawDirection});
 }
 
-void MyPositionController::AnimateArrow(ArrowPose const & oldPose, ScreenBase const & screen)
+void MyPositionController::AnimateArrow(ArrowPose const & oldPose, ScreenBase const & screen, double duration)
 {
-  ArrowPose const target{AdjustPointForViewport(m_position, screen), m_drawDirection};
+  ArrowPose target{AdjustPointForViewport(m_position, screen), m_drawDirection};
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  target.m_durationSeconds = duration;
+#endif
   m2::PointD const start(mercator::NearestWrapX(oldPose.m_position.x, target.m_position.x), oldPose.m_position.y);
   if (!IsWithinAnimationDistance(screen, start, target.m_position))
   {
@@ -811,7 +834,7 @@ void MyPositionController::AnimateArrow(ArrowPose const & oldPose, ScreenBase co
   }
 
   m_arrowTarget.reset();
-  m_animationSystem.AnimateArrowTo(target, AnimationClock::now(), kCameraAnimationTimeSec);
+  m_animationSystem.AnimateArrowTo(target, AnimationClock::now(), duration);
 }
 
 void MyPositionController::EnablePerspectiveInRouting(bool enablePerspective)
@@ -852,8 +875,10 @@ void MyPositionController::DeactivateRouting()
 
     m_isDirectionAssigned = m_isCompassAvailable && m_isDirectionAssigned;
 
+#if !defined(MUKSHAT_LEGACY_SDK_ABI)
     ChangeMode(location::Follow);
     ChangeModelView(m_position, 0.0, m_visiblePixelRect.Center(), kDoNotChangeZoom);
+#endif
   }
 }
 
@@ -874,6 +899,10 @@ void MyPositionController::DeactivateRouting()
 
 void MyPositionController::CheckNotFollowRouting()
 {
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  // Explicit browsing remains owned by the user in the Mukshat consumer.
+  return;
+#endif
   if (!m_blockRoutingNotFollowTimer && IsInRouting() && m_mode == location::NotFollow)
   {
     CHECK_ON_TIMEOUT(m_routingNotFollowNotifyId, kMaxNotFollowRoutingTimeSec, CheckNotFollowRouting);

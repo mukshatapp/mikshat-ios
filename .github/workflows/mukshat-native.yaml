@@ -27,6 +27,10 @@ jobs:
       - name: Install NDK and CMake
         run: |
           sdkmanager 'ndk;29.0.14206865' 'cmake;3.31.6'
+      - name: Check GPS render timing policy
+        run: |
+          g++ -std=c++23 -I libs tools/mukshat/motion_timing_test.cpp -o /tmp/motion-timing-test
+          /tmp/motion-timing-test
       - name: Verify all preserved JNI declarations
         run: python3 tools/mukshat/verify_jni_contract.py
       - name: Build native engine for the preserved Mukshat SDK
