@@ -151,6 +151,7 @@ workflows:
           xcode-project build-ipa \
             --workspace "$XCODE_WORKSPACE" \
             --scheme "$XCODE_SCHEME" \
+            --archive-xcargs "COMPILER_INDEX_STORE_ENABLE=NO MARKETING_VERSION=$APP_VERSION CURRENT_PROJECT_VERSION=$MIKSHAT_BUILD_NUMBER" \
             --config Release "$@" 2>&1 | tee /tmp/mikshat-archive.log
       - name: Validate versions in signed IPA
         script: |
@@ -161,7 +162,11 @@ workflows:
           import plistlib
           import re
           import zipfile
-          ipas = list(Path("build/ios/ipa").glob("*.ipa"))
+          original_ipas = list(Path("build/ios/ipa").glob("*.ipa"))
+          # Only validated files retain the extension collected for publishing.
+          ipas = [path.with_suffix(".ipa.rejected") for path in original_ipas]
+          for original, candidate in zip(original_ipas, ipas):
+              original.replace(candidate)
           if len(ipas) != 1:
               raise SystemExit(f"Expected one IPA, found {len(ipas)}")
           errors = []
@@ -197,6 +202,7 @@ workflows:
               errors.append(f"Missing required bundle: {bundle}")
           if errors:
               raise SystemExit("\n".join(errors))
+          ipas[0].replace(original_ipas[0])
           PY
     artifacts:
       - build/ios/ipa/*.ipa
