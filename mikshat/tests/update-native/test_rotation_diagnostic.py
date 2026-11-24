@@ -155,6 +155,42 @@ class ProbePlanTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             rotation_diagnostic.patch_plan(original, "preview-insets", production=True)
 
+    def test_each_profile_replaces_frozen_arabic_launch_arguments_without_changing_other_targets(self):
+        original = {"TestConfigurations": [{"TestTargets": [
+            {"BlueprintName": "OMapsTests", "TestLanguage": "ar", "TestRegion": "SA",
+             "CommandLineArguments": ["-AppleLanguages", "(ar)", "-OtherFlag", "-AppleLocale", "ar_SA",
+                                      "-AppleLanguages", "(ar)", "-IsTests", "-MikshatPreviewInsetsNever"]},
+            {"BlueprintName": "OtherTests", "TestLanguage": "ar", "CommandLineArguments": ["-AppleLanguages", "(ar)"]}
+        ]}]}
+        for profile in rotation_diagnostic.PRODUCTION_PROFILES:
+            with self.subTest(profile=profile["id"]):
+                plan = rotation_diagnostic.patch_plan(original, "automatic", True,
+                                                       language=profile["language"], region=profile["region"])
+                target, other = plan["TestConfigurations"][0]["TestTargets"]
+                args = target["CommandLineArguments"]
+                self.assertEqual(args.count("-AppleLanguages"), 1)
+                self.assertEqual(args[args.index("-AppleLanguages") + 1], "(" + profile["language"] + ")")
+                self.assertEqual(args.count("-AppleLocale"), 1)
+                self.assertEqual(args[args.index("-AppleLocale") + 1], profile["language"] + "_" + profile["region"])
+                self.assertEqual(target["TestLanguage"], profile["language"])
+                self.assertEqual(target["TestRegion"], profile["region"])
+                self.assertIn("-OtherFlag", args)
+                self.assertIn("-IsTests", args)
+                self.assertIn(rotation_diagnostic.PRODUCTION_FLAG, args)
+                self.assertFalse(set(args) & rotation_diagnostic.PROBE_FLAGS)
+                self.assertEqual(other, original["TestConfigurations"][0]["TestTargets"][1])
+        self.assertEqual(original["TestConfigurations"][0]["TestTargets"][0]["TestLanguage"], "ar")
+        self.assertEqual(original["TestConfigurations"][0]["TestTargets"][0]["CommandLineArguments"][1], "(ar)")
+
+    def test_profile_locale_arguments_require_complete_pairs(self):
+        for args in (["-AppleLanguages"], ["-AppleLocale"], ["-AppleLanguages", "-IsTests"]):
+            with self.subTest(args=args), self.assertRaises(ValueError):
+                rotation_diagnostic.patch_plan({"BlueprintName": "OMapsTests", "CommandLineArguments": args},
+                                                "automatic", True, language="en", region="US")
+        for profile in ({"language": "en"}, {"region": "US"}, {"language": "fr", "region": "FR"}):
+            with self.subTest(profile=profile), self.assertRaises(ValueError):
+                rotation_diagnostic.patch_plan({"BlueprintName": "OMapsTests"}, "automatic", True, **profile)
+
 
 class ProductionGateTests(unittest.TestCase):
     def phases(self, language="ar"):

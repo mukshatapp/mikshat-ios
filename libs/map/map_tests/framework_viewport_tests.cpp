@@ -59,8 +59,10 @@ UNIT_TEST(Framework_GetViewportCenter)
 
 UNIT_TEST(Framework_SupplementaryMapCanToggleWithOutstandingReaderWithoutDeletingSource)
 {
-  platform::tests_support::ScopedDir directory("supplementary-map-lifecycle");
-  auto const path = base::JoinPath(directory.GetFullPath(), "supplementary-test.mwm");
+  auto const directory = base::JoinPath(GetPlatform().WritableDir(), "supplementary-map-lifecycle");
+  // Keep the source for every lifecycle assertion, then clean it after Framework releases its readers.
+  platform::tests_support::ScopedDirCleanup cleanup(directory);
+  auto const path = base::JoinPath(directory, "supplementary-test.mwm");
   auto file = platform::LocalCountryFile::MakeTemporary(path);
   Framework framework({}, false /* loadMaps */);
   {
@@ -110,6 +112,9 @@ UNIT_TEST(Framework_SupplementaryMapCanToggleWithOutstandingReaderWithoutDeletin
   TEST(!framework.IsCountryLoadedByName("supplementary-test"), ());
   TEST(GetPlatform().IsFileExistsByFullPath(path), ());
   TEST(framework.SetSupplementaryMapEnabled(file, true), ());
+  TEST(framework.SetSupplementaryMapEnabled(file, false), ());
+  TEST(!framework.IsCountryLoadedByName("supplementary-test"), ());
+  TEST(GetPlatform().IsFileExistsByFullPath(path), ());
 }
 
 UNIT_TEST(Framework_SupplementaryMapsCannotReplaceCoreWorldOrDownloaderCountries)

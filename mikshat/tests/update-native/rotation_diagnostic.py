@@ -115,9 +115,13 @@ def output(args):
     return subprocess.check_output(args, text=True, timeout=30).strip()
 
 
-def patch_plan(original, mode, production=False):
+def patch_plan(original, mode, production=False, *, language=None, region=None):
     if mode not in MODES or (production and mode != "automatic"):
         raise ValueError("Unknown layout diagnostic mode")
+    if (language is None) != (region is None):
+        raise ValueError("A native language profile requires both language and region")
+    if language is not None and (language not in {"ar", "en"} or region not in {"SA", "US"}):
+        raise ValueError("Unknown native language profile")
     plan = deepcopy(original)
     count = 0
     def visit(value):
@@ -125,8 +129,26 @@ def patch_plan(original, mode, production=False):
         if isinstance(value, dict):
             if value.get("BlueprintName") == "OMapsTests" or str(value.get("TestBundlePath", "")).endswith("/OMapsTests.xctest"):
                 args = value.get("CommandLineArguments", [])
-                if not isinstance(args, list):
+                if not isinstance(args, list) or not all(isinstance(arg, str) for arg in args):
                     raise ValueError("Unexpected native target launch arguments")
+                if language is not None:
+                    # The build-for-testing plan captures Arabic. Its launch
+                    # arguments take precedence over later testLanguage flags.
+                    # Replace paired values on each fresh test host instead.
+                    filtered = []
+                    offset = 0
+                    while offset < len(args):
+                        if args[offset] in {"-AppleLanguages", "-AppleLocale"}:
+                            if offset + 1 >= len(args) or args[offset + 1].startswith("-"):
+                                raise ValueError("A paired native locale argument has no value")
+                            offset += 2
+                        else:
+                            filtered.append(args[offset])
+                            offset += 1
+                    args = filtered + ["-AppleLanguages", "(" + language + ")",
+                                       "-AppleLocale", language + "_" + region]
+                    value["TestLanguage"] = language
+                    value["TestRegion"] = region
                 args = [arg for arg in args if arg not in PROBE_FLAGS | {PRODUCTION_FLAG}]
                 if "-IsTests" not in args:
                     args.append("-IsTests")
@@ -465,7 +487,8 @@ def main():
             command(["xcrun", "simctl", "privacy", udid, "grant", "location", BUNDLE])
             command(["xcrun", "simctl", "location", udid, "set", "26.2317333333,44.9453"])
             plan_path = products / ("MikshatTitleInsets-" + run["id"] + ".xctestrun")
-            plan_path.write_bytes(plistlib.dumps(patch_plan(plans[0][1], mode, args.production)))
+            plan_path.write_bytes(plistlib.dumps(patch_plan(plans[0][1], mode, args.production,
+                                                          language=run["language"], region=run["region"])))
             sampler = PhaseSampler(udid, directory / "native-samples")
             result_bundle = ROOT / "build" / ("RotationDiagnostic-" + run["id"] + ".xcresult")
             test = ["xcodebuild", "test-without-building", "-xctestrun", str(plan_path),
@@ -514,6 +537,13 @@ def main():
                 if path.is_file() and path != archive:
                     package.write(path, str(path.relative_to(destination)))
         print(json.dumps(summary), flush=True)
+        for item in results:
+            print("Native verification result: " + json.dumps({
+                "profile": item.get("profile", item["mode"]),
+                "passed": item["passed"], "localeConfirmed": item["localeConfirmed"],
+                "observedLocale": item.get("layoutProfilesObserved", []),
+                "nativeCasesPassed": item["nativeExecution"]["passed"],
+            }), flush=True)
     if not summary["allNativeCasesPassed"] or (args.production and not summary["productionLayoutSimulatorVerified"]):
         raise SystemExit("The rotation verification did not establish all required native cases; inspect the classification and native stacks")
 
