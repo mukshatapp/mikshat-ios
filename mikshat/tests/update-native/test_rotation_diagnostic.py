@@ -69,16 +69,72 @@ class SamplingScopeTests(unittest.TestCase):
         self.assertNotEqual(status, 0)
         self.assertGreater(sampler.ticks, 0)
 
+    def test_sample_timeout_retains_streams_and_uses_one_reverified_lldb_fallback(self):
+        with tempfile.TemporaryDirectory() as temp:
+            sampler = hang_sampler.PhaseSampler("isolated-sim", temp)
+            sampler.executable = Path("/sim/app/Organic Maps")
+            sampler.journal = Path(temp) / "journal.jsonl"
+            phase = self.phase(timestamp=time.time() - 30)
+            sampler.started = phase["timestamp"] - 1
+            sampler.journal.write_text(json.dumps(phase) + '\n{"incomplete":')
+            calls = []
+            def run(args, **kwargs):
+                calls.append(args)
+                if args[0] == "ps":
+                    return subprocess.CompletedProcess(args, 0, stdout=str(sampler.executable) + " -IsTests", stderr="")
+                if args[0] == "/usr/bin/sample":
+                    Path(args[-1]).write_text("Sampling process; no thread frames yet")
+                    raise subprocess.TimeoutExpired(args, 20, output=b"captured raw samples", stderr=b"symbolication pending")
+                return subprocess.CompletedProcess(args, 0, stdout="* thread #1\n  frame #0: 0x123 UIKitCore`layout\n", stderr="")
+            with patch.object(hang_sampler.subprocess, "run", side_effect=run):
+                sampler.sample(phase)
+                sampler.sample(phase)
+            self.assertEqual(sum(args[:2] == ["xcrun", "lldb"] for args in calls), 1)
+            first_lldb = next(index for index, args in enumerate(calls) if args[:2] == ["xcrun", "lldb"])
+            self.assertEqual(calls[first_lldb - 1][0], "ps")
+            reports = [json.loads(line) for line in (Path(temp) / "monitor.jsonl").read_text().splitlines()]
+            sample = reports[0]
+            self.assertTrue(sample["timedOut"])
+            self.assertTrue(sample["partialFilePresent"])
+            self.assertIn("captured raw samples", sample["stdout"])
+            self.assertIn("symbolication pending", sample["stderr"])
+            self.assertFalse(sample["stackFramesCaptured"])
+            self.assertTrue(next(row for row in reports if row["event"] == "stale-phase-lldb")["stackFramesCaptured"])
+
+    def test_fallback_never_attaches_after_the_test_phase_changes(self):
+        with tempfile.TemporaryDirectory() as temp:
+            sampler = hang_sampler.PhaseSampler("isolated-sim", temp)
+            sampler.executable = Path("/sim/app/Organic Maps")
+            sampler.journal = Path(temp) / "journal.jsonl"
+            phase = self.phase(timestamp=time.time() - 30)
+            sampler.journal.write_text(json.dumps(dict(phase, sequence=2, phase="test.completed")) + "\n")
+            with patch.object(hang_sampler.subprocess, "run", return_value=subprocess.CompletedProcess(
+                    [], 0, stdout=str(sampler.executable), stderr="")) as run:
+                sampler.fallback(phase)
+            self.assertEqual(run.call_count, 1)
+            report = json.loads((Path(temp) / "monitor.jsonl").read_text())
+            self.assertEqual(report["result"], "fallback-identity-or-phase-changed")
+            self.assertNotIn(phase["pid"], sampler.fallback_pids)
+            next_phase = dict(phase, sequence=3, phase="scene.geometry.wait")
+            sampler.started = phase["timestamp"] - 1
+            sampler.journal.write_text(json.dumps(next_phase) + '\n{"partial":')
+            with patch.object(hang_sampler.subprocess, "run", return_value=subprocess.CompletedProcess(
+                    [], 0, stdout=str(sampler.executable), stderr="")) as run:
+                sampler.fallback(next_phase)
+            self.assertEqual(run.call_count, 2, "Skipped attachment must not consume the later stale phase's capture budget")
+            self.assertIn(phase["pid"], sampler.fallback_pids)
+
 
 class ProbePlanTests(unittest.TestCase):
-    def test_only_the_native_target_gets_the_never_probe_and_renderer_stays_off(self):
+    def test_only_native_target_gets_each_explicit_probe_and_renderer_stays_off(self):
         original = {"TestTargets": [{"BlueprintName": "OMapsTests", "CommandLineArguments": ["-IsTests", "-MikshatRequireRenderer"]},
                                      {"BlueprintName": "UnrelatedTests", "CommandLineArguments": ["-MikshatRequireRenderer"]}]}
         automatic = rotation_diagnostic.patch_plan(original, "automatic")
-        never = rotation_diagnostic.patch_plan(original, "never")
-        self.assertEqual(automatic["TestTargets"][0]["CommandLineArguments"], ["-IsTests"])
-        self.assertEqual(never["TestTargets"][0]["CommandLineArguments"], ["-IsTests", "-MikshatTitleInsetsNever"])
-        self.assertIn("-MikshatRequireRenderer", never["TestTargets"][1]["CommandLineArguments"])
+        self.assertEqual(automatic["TestTargets"][0]["CommandLineArguments"], ["-IsTests", "-MikshatRotationDiagnostics"])
+        for mode, flag in [("fixed-title", "-MikshatFixedTitleHeight"), ("preview-insets", "-MikshatPreviewInsetsNever")]:
+            plan = rotation_diagnostic.patch_plan(original, mode)
+            self.assertEqual(plan["TestTargets"][0]["CommandLineArguments"], ["-IsTests", "-MikshatRotationDiagnostics", flag])
+            self.assertIn("-MikshatRequireRenderer", plan["TestTargets"][1]["CommandLineArguments"])
         self.assertIn("-MikshatRequireRenderer", original["TestTargets"][0]["CommandLineArguments"])
 
     def test_missing_or_duplicate_native_target_is_infrastructure_failure(self):
@@ -89,22 +145,95 @@ class ProbePlanTests(unittest.TestCase):
 
 
 class EvidenceClassificationTests(unittest.TestCase):
-    def test_unapplied_probe_is_not_a_successful_ab_comparison(self):
-        self.assertEqual(rotation_diagnostic.classify([
-            dict(passed=False, modeApplied=True), dict(passed=True, modeApplied=False)]), "modeNotApplied")
+    def rows(self, passed=False):
+        return [dict(mode=mode, passed=passed, modeApplied=True) for mode in rotation_diagnostic.MODES]
 
-    def test_native_failure_without_a_hang_stack_cannot_prove_the_hang_difference(self):
-        self.assertEqual(rotation_diagnostic.classify([
-            dict(passed=False, modeApplied=True, hangStackCollected=False),
-            dict(passed=True, modeApplied=True)]), "otherFailure")
+    def test_unapplied_probe_is_not_a_successful_ab_comparison(self):
+        rows = self.rows()
+        rows[1].update(passed=True, modeApplied=False)
+        self.assertEqual(rotation_diagnostic.classify(rows), "modeNotApplied")
+
+    def test_baseline_failure_and_probe_pass_comparison_does_not_claim_a_hang_cause(self):
+        rows = self.rows()
+        rows[1].update(passed=True, hangStackCollected=False)
+        self.assertEqual(rotation_diagnostic.classify(rows), "baselineFailsProbePasses")
 
     def test_expected_diagnostic_outcomes_remain_distinct(self):
         self.assertEqual(rotation_diagnostic.classify([]), "infrastructureFailed")
-        self.assertEqual(rotation_diagnostic.classify([
-            dict(passed=False, modeApplied=True, hangStackCollected=True),
-            dict(passed=True, modeApplied=True)]), "autoHangsNeverPasses")
-        self.assertEqual(rotation_diagnostic.classify([dict(passed=True, modeApplied=True)] * 2), "bothPass")
-        self.assertEqual(rotation_diagnostic.classify([dict(passed=False, modeApplied=True)] * 2), "bothFail")
+        self.assertEqual(rotation_diagnostic.classify(self.rows(True)), "allPass")
+        self.assertEqual(rotation_diagnostic.classify(self.rows(False)), "allFail")
+        rows = self.rows()
+        rows[2]["mode"] = "fixed-title"
+        self.assertEqual(rotation_diagnostic.classify(rows), "infrastructureFailed")
+
+    def test_nonempty_error_output_is_not_a_native_stack_or_a_passing_test(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            samples = directory / "native-samples"
+            samples.mkdir()
+            (samples / "sample-error.txt").write_text("Analysis of process 123; no call graph")
+            report = rotation_diagnostic.evaluate_mode("automatic", directory, -15, True)
+            self.assertFalse(report["nativeStackCollected"])
+            self.assertFalse(report["passed"])
+            (samples / "lldb-stack.txt").write_text("* thread #1\n  frame #0: 0x123 UIKitCore`layout\n")
+            report = rotation_diagnostic.evaluate_mode("automatic", directory, -15, True)
+            self.assertTrue(report["nativeStackCollected"])
+            self.assertTrue(report["hangStackCollected"])
+            self.assertFalse(report["passed"], "A captured stack must never convert zero executed cases into a pass")
+
+    def test_zero_native_starts_remain_infrastructure_failure_even_with_a_probe_marker(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            samples = directory / "native-samples"
+            samples.mkdir()
+            (samples / "phases-seen.jsonl").write_text(json.dumps(dict(phase="probe.titleInsetsAutomatic.observed", behavior=0)) + "\n")
+            report = rotation_diagnostic.evaluate_mode("automatic", directory, 0, False)
+            self.assertTrue(report["modeApplied"])
+            self.assertFalse(report["passed"])
+            rows = self.rows(True)
+            rows[0] = report
+            self.assertEqual(rotation_diagnostic.classify(rows), "infrastructureFailed")
+
+
+class DiagnosticExportTests(unittest.TestCase):
+    def test_export_copies_only_capped_text_and_preserves_optional_timeout_details(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            reports = root / "Library/Logs/DiagnosticReports"
+            reports.mkdir(parents=True)
+            (reports / "Organic Maps.ips").write_text('{"threads": []}')
+            (reports / "Other App.ips").write_text("unrelated")
+            (reports / "Organic binary.ips").write_bytes(b"\x00binary")
+            bundle = root / "Result.xcresult"
+            bundle.mkdir()
+            destination = root / "output"
+            destination.mkdir()
+            def run(args, **kwargs):
+                if "help" in args:
+                    return subprocess.CompletedProcess(args, 0, stdout="--path PATH --output-path OUTPUT --only-failures", stderr="")
+                exported = Path(args[args.index("--output-path") + 1])
+                exported.mkdir()
+                # The four MiB boundary splits this final Arabic character.
+                (exported / "native.hang").write_text("x" + "ض" * (2 * 1024 * 1024 + 1))
+                (exported / "binary.trace").write_bytes(b"\x00binary")
+                raise subprocess.TimeoutExpired(args, 60, output=b"partial export", stderr=b"export timed out")
+            with patch.object(rotation_diagnostic.Path, "home", return_value=root), patch.object(
+                    rotation_diagnostic.subprocess, "run", side_effect=run):
+                report = rotation_diagnostic.collect_diagnostics(bundle, destination, time.time() - 1)
+            names = {row["file"] for row in report["files"]}
+            self.assertIn("host-app-reports/Organic Maps.ips", names)
+            self.assertNotIn("host-app-reports/Other App.ips", names)
+            self.assertNotIn("host-app-reports/Organic binary.ips", names)
+            exported = next(row for row in report["files"] if row["file"] == "xcresult-diagnostics/native.hang")
+            self.assertEqual(exported["bytes"], 4 * 1024 * 1024 - 1)
+            (destination / "exported-diagnostics" / exported["file"]).read_text(encoding="utf-8")
+            self.assertTrue(exported["truncated"])
+            self.assertTrue(report["commands"][-1]["timedOut"])
+            self.assertIn("partial export", report["commands"][-1]["stdout"])
+            attachments = [row for row in report["commands"] if row["command"][2:4] == ["export", "attachments"]]
+            self.assertEqual(len(attachments), 1)
+            self.assertIn("--only-failures", attachments[0]["command"])
+            self.assertIn("xcresult-attachments/native.hang", names)
 
 
 if __name__ == "__main__":

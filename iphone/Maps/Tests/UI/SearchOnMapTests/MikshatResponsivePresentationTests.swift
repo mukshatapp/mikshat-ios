@@ -2,6 +2,7 @@
 import XCTest
 import UIKit
 import CoreLocation
+import ObjectiveC.runtime
 
 final class MikshatResponsivePresentationTests: XCTestCase {
   @MainActor
@@ -272,6 +273,24 @@ final class MikshatMapSceneLayoutTests: XCTestCase {
       RotationPhaseDiagnostics.record("probe.titleInsetsAutomatic.observed",
                                       extra: ["behavior": titleTextView.contentInsetAdjustmentBehavior.rawValue])
     }
+    if ProcessInfo.processInfo.arguments.contains("-MikshatFixedTitleHeight") {
+      // The synthetic fixture title fits on one line. This deliberately removes
+      // only its UITextView intrinsic sizing from the experiment, not production.
+      let height = ceil(try XCTUnwrap(titleTextView.font).lineHeight)
+      titleTextView.isScrollEnabled = true
+      let fixedHeight = titleTextView.heightAnchor.constraint(equalToConstant: height)
+      fixedHeight.identifier = "MikshatDiagnosticFixedTitleHeight"
+      fixedHeight.isActive = true
+      RotationPhaseDiagnostics.record("probe.fixedTitleHeight.applied",
+                                      extra: ["heightConstraint": fixedHeight.constant, "measuredHeight": height,
+                                              "scrollEnabled": titleTextView.isScrollEnabled])
+    }
+    if ProcessInfo.processInfo.arguments.contains("-MikshatPreviewInsetsNever") {
+      let preview = try XCTUnwrap(page.layout.headerViewControllers.compactMap { $0 as? PlacePagePreviewViewController }.first)
+      preview.stackView.insetsLayoutMarginsFromSafeArea = false
+      RotationPhaseDiagnostics.record("probe.previewInsetsNever.applied",
+                                      extra: ["insetsLayoutMarginsFromSafeArea": preview.stackView.insetsLayoutMarginsFromSafeArea])
+    }
     RotationPhaseDiagnostics.snapshot(in: page.view)
     await settleMapScene(map)
     let coordinates = try XCTUnwrap(try sceneElement("placePage.coordinates", in: page.view) as? PlacePageCoordinatesView)
@@ -279,6 +298,12 @@ final class MikshatMapSceneLayoutTests: XCTestCase {
     let expected = MikshatNavigationMath.coordinatePairs(latitude: coordinate.latitude,
                                                          longitude: coordinate.longitude)[1]
       .components(separatedBy: "\n")
+    // Arm only after the initial page has settled. No layout-affecting getters
+    // run from the hook until the content stack has already repeated 20 times.
+    if ProcessInfo.processInfo.arguments.contains("-MikshatRotationDiagnostics") {
+      try RotationLayoutDiagnostics.install(in: page.view)
+    }
+    defer { RotationLayoutDiagnostics.uninstall() }
     for cycle in 0..<3 {
       for orientation in [UIInterfaceOrientation.landscapeRight, .portrait, .landscapeLeft, .portrait] {
         RotationPhaseDiagnostics.record("rotation.begin", extra: ["cycle": cycle, "orientation": orientation.rawValue])
@@ -742,6 +767,141 @@ private enum RotationPhaseDiagnostics {
       values["outerSafeAreaInsets"] = String(describing: outer.safeAreaInsets)
     }
     record("title.snapshot.end", extra: values)
+  }
+}
+
+// This hook exists only in the hosted test target. In particular, replacing a
+// method on UIStackView must not replace an inherited UIView implementation.
+// Keep the original IMP and install a class-local override, then restore it.
+@MainActor
+private enum RotationLayoutDiagnostics {
+  private static weak var pageRoot: UIView?
+  private static weak var contentStack: UIStackView?
+  private static var originalImplementation: IMP?
+  private static var pass = 0
+  private static var captures = 0
+  private static var completedCaptures = 0
+  private static let threshold = 20
+  private static let maximumCaptures = 4
+  private static let layoutSelector = #selector(UIView.layoutSubviews)
+
+  static func install(in root: UIView) throws {
+    uninstall()
+    let descendants = presentationDescendants(root)
+    let scroll = try XCTUnwrap(descendants.first { $0.accessibilityIdentifier == "placePage.scroll" } as? UIScrollView)
+    let stack = try XCTUnwrap(scroll.subviews.compactMap { $0 as? UIStackView }.first)
+    let original = try XCTUnwrap(class_getInstanceMethod(UIStackView.self, layoutSelector))
+    let replacement = try XCTUnwrap(class_getInstanceMethod(UIStackView.self,
+                                                            #selector(UIStackView.mikshatRotationDiagnosticLayoutSubviews)))
+    pageRoot = root
+    contentStack = stack
+    pass = 0
+    captures = 0
+    completedCaptures = 0
+    RotationPhaseDiagnostics.record("layout.probe.hierarchy",
+                                    extra: ["contentStack": pointer(stack),
+                                            "views": hierarchy(in: root, includeInsets: true)])
+    originalImplementation = method_getImplementation(original)
+    class_replaceMethod(UIStackView.self, layoutSelector, method_getImplementation(replacement),
+                        method_getTypeEncoding(original))
+    RotationPhaseDiagnostics.record("layout.probe.armed", extra: ["threshold": threshold,
+                                                                  "maximumCaptures": maximumCaptures])
+  }
+
+  static func uninstall() {
+    if let originalImplementation,
+       let method = class_getInstanceMethod(UIStackView.self, layoutSelector) {
+      class_replaceMethod(UIStackView.self, layoutSelector, originalImplementation, method_getTypeEncoding(method))
+    }
+    originalImplementation = nil
+    pageRoot = nil
+    contentStack = nil
+    pass = 0
+    captures = 0
+    completedCaptures = 0
+  }
+
+  static func layout(_ stack: UIStackView) {
+    guard let originalImplementation else { return }
+    typealias LayoutImplementation = @convention(c) (AnyObject, Selector) -> Void
+    let original = unsafeBitCast(originalImplementation, to: LayoutImplementation.self)
+    var capture: Int?
+    var capturedPass = 0
+    if stack === contentStack {
+      pass += 1
+      if pass > threshold, captures < maximumCaptures {
+        captures += 1
+        capture = captures
+        capturedPass = pass
+        record("entry", stack: stack, capture: captures, pass: capturedPass)
+      }
+    }
+    original(stack, layoutSelector)
+    if let capture {
+      record("exit", stack: stack, capture: capture, pass: capturedPass)
+      completedCaptures += 1
+      // Preserve every bounded geometry record before one raw backtrace. Do
+      // not invoke CoreSymbolication from a potentially stuck layout transaction.
+      if completedCaptures == maximumCaptures {
+        RotationPhaseDiagnostics.record("layout.probe.callStack",
+                                        extra: ["stack": pointer(stack),
+                                                "addresses": Thread.callStackReturnAddresses.prefix(48).map {
+                                                  "0x" + String($0.uint64Value, radix: 16)
+                                                }])
+      }
+    }
+  }
+
+  private static func record(_ edge: String, stack: UIStackView, capture: Int, pass: Int) {
+    guard let pageRoot else { return }
+    RotationPhaseDiagnostics.record("layout.probe." + edge,
+                                    extra: ["pass": pass, "capture": capture, "stack": pointer(stack),
+                                            "arranged": stack.arrangedSubviews.map { geometry($0, includeInsets: false) },
+                                            "views": hierarchy(in: pageRoot, includeInsets: false)])
+  }
+
+  private static func pointer(_ object: AnyObject) -> String {
+    "0x" + String(UInt(bitPattern: Unmanaged.passUnretained(object).toOpaque()), radix: 16)
+  }
+
+  private static func hierarchy(in root: UIView, includeInsets: Bool) -> [[String: Any]] {
+    Array(presentationDescendants(root).prefix(256)).map { geometry($0, includeInsets: includeInsets) }
+  }
+
+  // Never request intrinsicContentSize, sizeThatFits, or a fitting layout from
+  // this observer: doing so could recursively enter the TextKit/layout loop.
+  private static func geometry(_ view: UIView, includeInsets: Bool) -> [String: Any] {
+    var values: [String: Any] = ["pointer": pointer(view), "class": NSStringFromClass(type(of: view)),
+                                "identifier": view.accessibilityIdentifier ?? "", "frame": String(describing: view.frame),
+                                "bounds": String(describing: view.bounds), "hidden": view.isHidden]
+    if let superview = view.superview { values["superview"] = pointer(superview) }
+    if let stack = view as? UIStackView {
+      values["arranged"] = stack.arrangedSubviews.map { pointer($0) }
+      values["axis"] = stack.axis.rawValue
+      values["distribution"] = stack.distribution.rawValue
+      values["spacing"] = stack.spacing
+    }
+    if includeInsets {
+      values["safeAreaInsets"] = String(describing: view.safeAreaInsets)
+      values["layoutMargins"] = String(describing: view.layoutMargins)
+      values["insetsLayoutMarginsFromSafeArea"] = view.insetsLayoutMarginsFromSafeArea
+      values["preservesSuperviewLayoutMargins"] = view.preservesSuperviewLayoutMargins
+      if let stack = view as? UIStackView {
+        values["isLayoutMarginsRelativeArrangement"] = stack.isLayoutMarginsRelativeArrangement
+      }
+      if let text = view as? UITextView {
+        values["textContainerInset"] = String(describing: text.textContainerInset)
+        values["contentInset"] = String(describing: text.contentInset)
+        values["adjustedContentInset"] = String(describing: text.adjustedContentInset)
+      }
+    }
+    return values
+  }
+}
+
+private extension UIStackView {
+  @objc func mikshatRotationDiagnosticLayoutSubviews() {
+    RotationLayoutDiagnostics.layout(self)
   }
 }
 

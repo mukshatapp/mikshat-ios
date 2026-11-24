@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the same app-hosted rotation case in fresh automatic/never title-inset hosts.
+"""Run the same app-hosted rotation case in three fresh layout-probe hosts.
 
 This diagnostic does not upload an app or claim a production fix. Native failures
 remain failures; summaries distinguish unavailable infrastructure and unapplied
@@ -7,8 +7,10 @@ probes from an observed A/B difference.
 """
 
 import argparse
+import codecs
 from copy import deepcopy
 import importlib.util
+from itertools import islice
 import json
 import os
 from pathlib import Path
@@ -16,14 +18,20 @@ import plistlib
 import re
 import signal
 import subprocess
+import tempfile
 import time
 import zipfile
 
-from hang_sampler import BUNDLE, PhaseSampler
+from hang_sampler import BUNDLE, PhaseSampler, captured_text, stack_has_frames
 
 
 CASE = "testSelectedPointStaysAttachedAndResponsiveWhileTheSamePageRotatesRepeatedly"
 ROOT = Path(__file__).resolve().parents[3]
+MODES = {
+    "automatic": (None, "probe.titleInsetsAutomatic.observed"),
+    "fixed-title": ("-MikshatFixedTitleHeight", "probe.fixedTitleHeight.applied"),
+    "preview-insets": ("-MikshatPreviewInsetsNever", "probe.previewInsetsNever.applied"),
+}
 
 
 def command(args, **kwargs):
@@ -36,6 +44,8 @@ def output(args):
 
 
 def patch_plan(original, mode):
+    if mode not in MODES:
+        raise ValueError("Unknown layout diagnostic mode")
     plan = deepcopy(original)
     count = 0
     def visit(value):
@@ -45,11 +55,13 @@ def patch_plan(original, mode):
                 args = value.get("CommandLineArguments", [])
                 if not isinstance(args, list):
                     raise ValueError("Unexpected native target launch arguments")
-                args = [arg for arg in args if arg not in ("-MikshatTitleInsetsNever", "-MikshatRequireRenderer")]
+                args = [arg for arg in args if arg not in ("-MikshatTitleInsetsNever", "-MikshatRequireRenderer",
+                        "-MikshatFixedTitleHeight", "-MikshatPreviewInsetsNever", "-MikshatRotationDiagnostics")]
                 if "-IsTests" not in args:
                     args.append("-IsTests")
-                if mode == "never":
-                    args.append("-MikshatTitleInsetsNever")
+                args.append("-MikshatRotationDiagnostics")
+                if MODES[mode][0]:
+                    args.append(MODES[mode][0])
                 value["CommandLineArguments"] = args
                 count += 1
             for child in value.values():
@@ -64,17 +76,19 @@ def patch_plan(original, mode):
 
 
 def classify(passes):
-    if len(passes) != 2 or any(item.get("infrastructureError") for item in passes):
+    if (len(passes) != len(MODES) or {item.get("mode") for item in passes} != set(MODES)
+            or any(item.get("infrastructureError") or item.get("nativeExecution", {}).get("casesStarted") == 0
+                   for item in passes)):
         return "infrastructureFailed"
     if any(not item.get("modeApplied") for item in passes):
         return "modeNotApplied"
-    automatic, never = passes
-    if automatic["passed"] and never["passed"]:
-        return "bothPass"
-    if automatic.get("hangStackCollected") and not automatic["passed"] and never["passed"]:
-        return "autoHangsNeverPasses"
-    if not automatic["passed"] and not never["passed"]:
-        return "bothFail"
+    by_mode = {item["mode"]: item for item in passes}
+    if all(item["passed"] for item in passes):
+        return "allPass"
+    if not by_mode["automatic"]["passed"] and any(by_mode[mode]["passed"] for mode in MODES if mode != "automatic"):
+        return "baselineFailsProbePasses"
+    if not any(item["passed"] for item in passes):
+        return "allFail"
     return "otherFailure"
 
 
@@ -120,14 +134,20 @@ def evaluate_mode(mode, directory, status, timed_out):
     journal = directory / "native-samples/phases-seen.jsonl"
     if journal.exists():
         phases = [json.loads(line) for line in journal.read_text().splitlines() if line.strip()]
-    expected = "probe.titleInsetsNever.applied" if mode == "never" else "probe.titleInsetsAutomatic.observed"
-    behavior = 2 if mode == "never" else 0
-    applied = any(item.get("phase") == expected and item.get("behavior") == behavior for item in phases)
-    samples = list((directory / "native-samples").glob("sample-*.txt"))
+    candidates = [item for item in phases if item.get("phase") == MODES[mode][1]]
+    if mode == "automatic":
+        applied = any(item.get("behavior") == 0 for item in candidates)
+    elif mode == "fixed-title":
+        applied = any(item.get("scrollEnabled") is True
+                      and isinstance(item.get("heightConstraint"), (int, float)) and item["heightConstraint"] > 0
+                      for item in candidates)
+    else:
+        applied = any(item.get("insetsLayoutMarginsFromSafeArea") is False for item in candidates)
+    samples = list((directory / "native-samples").glob("sample-*.txt")) + list((directory / "native-samples").glob("lldb-*.txt"))
+    frames = [path for path in samples if stack_has_frames(path.read_text(errors="replace"),
+                                                        "lldb" if path.name.startswith("lldb-") else "sample")]
     monitor_path = directory / "native-samples/monitor.jsonl"
     monitor = [json.loads(line) for line in monitor_path.read_text().splitlines() if line.strip()] if monitor_path.exists() else []
-    synchronous_samples = [item for item in monitor if item.get("result") == "sampled"
-                           and str(item.get("phase", {}).get("phase", "")).endswith(".begin")]
     native_timeout = timed_out or any(re.search(r"exceeded execution time|test.*timed? out|test timeout", line, re.I)
                                      for line in native.get("testFailures", []))
     result = {"mode": mode, "commandExitStatus": status, "timedOut": timed_out,
@@ -135,16 +155,101 @@ def evaluate_mode(mode, directory, status, timed_out):
               "localeConfirmed": any(str(item.get("language", "")).startswith("ar")
                                      and item.get("direction") == "RTL" for item in phases),
               "lastPhase": phases[-1] if phases else None,
-              "nativeStackCollected": any(path.stat().st_size > 0 for path in samples),
-              "hangStackCollected": native_timeout and bool(synchronous_samples),
-              "stackReviewRequired": bool(samples),
+              "nativeStackCollected": bool(frames),
+              "stackEvidenceFiles": [str(path.relative_to(directory)) for path in frames],
+              "hangStackCollected": native_timeout and bool(frames),
+              "stackReviewRequired": bool(frames),
+              "debuggerFallbackAttempted": any(item.get("debuggerAttachAttempted") for item in monitor),
               "nativeExecution": native,
               "passed": status == 0 and not timed_out and applied and native["passed"]
                         and any(str(item.get("language", "")).startswith("ar")
                                 and item.get("direction") == "RTL" for item in phases),
               "scope": "UIKit-only simulator probe; no physical-device, real-feature or Metal assertion"}
+    if native["casesStarted"] == 0:
+        result["infrastructureError"] = "No native XCTest case started"
     (directory / "summary.json").write_text(json.dumps(result, indent=2) + "\n")
     return result
+
+
+def collect_diagnostics(result_bundle, directory, started):
+    """Optional, capped text exports; failure never replaces the native result."""
+    target = directory / "exported-diagnostics"
+    target.mkdir(parents=True, exist_ok=True)
+    report = {"files": [], "commands": [], "errors": [], "budgetBytes": 16 * 1024 * 1024}
+    remaining = report["budgetBytes"]
+    extensions = {".ips", ".hang", ".crash", ".spin", ".spindump", ".txt", ".log"}
+
+    def copy_text(root, label, recent_app_only=False):
+        nonlocal remaining
+        if not root.exists():
+            return
+        paths = list(islice(root.rglob("*"), 512))
+        paths.sort(key=lambda path: (0 if "spindump" in path.name.lower() else
+                                    1 if path.suffix.lower() in {".ips", ".hang", ".crash", ".spin", ".spindump"} else 2,
+                                    str(path)))
+        for path in paths:
+            if remaining <= 0:
+                break
+            try:
+                if path.is_symlink() or not path.is_file() or path.suffix.lower() not in extensions:
+                    continue
+                if recent_app_only and (path.stat().st_mtime < started - 2
+                                        or not any(name in path.name.lower() for name in ("organic", "omaps", "mikshat"))):
+                    continue
+                limit = min(4 * 1024 * 1024, remaining)
+                with path.open("rb") as stream:
+                    data = stream.read(limit)
+                if b"\x00" in data:
+                    continue
+                source_size = path.stat().st_size
+                # A byte cap may split the final Arabic character. Keep every
+                # complete character while still rejecting binary/invalid text.
+                data = codecs.getincrementaldecoder("utf-8")().decode(data, final=source_size <= len(data)).encode("utf-8")
+                relative = Path(label) / path.relative_to(root)
+                destination = target / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(data)
+                remaining -= len(data)
+                report["files"].append({"file": str(relative), "bytes": len(data),
+                                         "sourceBytes": source_size, "truncated": source_size > len(data)})
+            except (OSError, UnicodeDecodeError) as error:
+                report["errors"].append(str(error))
+
+    def optional(args, timeout):
+        entry = {"command": args}
+        try:
+            result = subprocess.run(args, text=True, capture_output=True, timeout=timeout)
+            entry.update(exitStatus=result.returncode, stdout=captured_text(result.stdout), stderr=captured_text(result.stderr))
+        except subprocess.TimeoutExpired as error:
+            entry.update(timedOut=True, stdout=captured_text(error.output), stderr=captured_text(error.stderr), error=str(error))
+        except OSError as error:
+            entry["error"] = str(error)
+        report["commands"].append(entry)
+        return entry
+
+    try:
+        if result_bundle.exists():
+            for kind in ("attachments", "diagnostics"):
+                help_result = optional(["xcrun", "xcresulttool", "help", "export", kind], 10)
+                help_text = help_result.get("stdout", "") + help_result.get("stderr", "")
+                supported = (help_result.get("exitStatus") == 0 and "--path" in help_text and "--output-path" in help_text
+                             and (kind != "attachments" or "--only-failures" in help_text))
+                if supported:
+                    with tempfile.TemporaryDirectory(prefix="mikshat-xcresult-" + kind + "-") as temp:
+                        exported = Path(temp) / "export"
+                        export = ["xcrun", "xcresulttool", "export", kind, "--path", str(result_bundle),
+                                  "--output-path", str(exported)]
+                        if kind == "attachments":
+                            export.append("--only-failures")
+                        optional(export, 60)
+                        copy_text(exported, "xcresult-" + kind)
+                else:
+                    report["errors"].append("Installed xcresulttool did not advertise the expected " + kind + " export command")
+        copy_text(Path.home() / "Library/Logs/DiagnosticReports", "host-app-reports", True)
+    except (OSError, ValueError) as error:
+        report["errors"].append(str(error))
+    (target / "manifest.json").write_text(json.dumps(report, indent=2) + "\n")
+    return report
 
 
 def main():
@@ -158,7 +263,7 @@ def main():
     results = []
     simulators = []
     summary = {"productionFixVerified": False, "passes": results,
-               "scope": "Diagnostic A/B title-inset probe on an isolated iPhone simulator; no upload"}
+               "scope": "Three UIKit-only layout probes on isolated iPhone simulators; no upload"}
     try:
         toolchain = output(["xcodebuild", "-version"])
         (destination / "toolchain.txt").write_text(toolchain + "\n")
@@ -171,7 +276,7 @@ def main():
         if len(matching) != 1:
             raise RuntimeError("Exactly one installed, available iOS 27.0 runtime is required")
         runtime = matching[0]["identifier"]
-        for mode in ("automatic", "never"):
+        for mode in MODES:
             udid = output(["xcrun", "simctl", "create", "Mikshat rotation " + mode,
                            "com.apple.CoreSimulator.SimDeviceType.iPhone-16", runtime])
             simulators.append(udid)
@@ -200,10 +305,10 @@ def main():
                 if plistlib.loads((app / "Info.plist").read_bytes()).get("CFBundleIdentifier") == BUNDLE]
         if len(apps) != 1:
             raise RuntimeError("Expected exactly one compiled Debug app host")
-        for mode, udid in zip(("automatic", "never"), simulators):
+        for mode, udid in zip(MODES, simulators):
             directory = destination / mode
             directory.mkdir()
-            if mode == "never":
+            if mode != "automatic":
                 command(["xcrun", "simctl", "boot", udid])
                 command(["xcrun", "simctl", "bootstatus", udid, "-b"], timeout=180)
             command(["xcrun", "simctl", "install", udid, str(apps[0])])
@@ -212,15 +317,17 @@ def main():
             plan_path = products / ("MikshatTitleInsets-" + mode + ".xctestrun")
             plan_path.write_bytes(plistlib.dumps(patch_plan(plans[0][1], mode)))
             sampler = PhaseSampler(udid, directory / "native-samples")
+            result_bundle = ROOT / "build" / ("RotationDiagnostic-" + mode + ".xcresult")
             test = ["xcodebuild", "test-without-building", "-xctestrun", str(plan_path),
                     "-destination", "id=" + udid, "-destination-timeout", "60",
-                    "-resultBundlePath", str(ROOT / "build" / ("RotationDiagnostic-" + mode + ".xcresult")),
+                    "-resultBundlePath", str(result_bundle),
                     "-parallel-testing-enabled", "NO", "-test-timeouts-enabled", "YES",
                     "-testLanguage", "ar", "-testRegion", "SA",
                     "-default-test-execution-time-allowance", "60", "-maximum-test-execution-time-allowance", "60",
                     "-only-testing:OMapsTests/MikshatMapSceneLayoutTests/" + CASE,
                     "CODE_SIGNING_REQUIRED=NO", "CODE_SIGNING_ALLOWED=NO"]
             status, timed_out = run_bounded(test, directory / "xcodebuild-test.log", sampler, 180)
+            collect_diagnostics(result_bundle, directory, sampler.started)
             results.append(evaluate_mode(mode, directory, status, timed_out))
             command(["xcrun", "simctl", "shutdown", udid])
         summary["classification"] = classify(results)
@@ -243,7 +350,8 @@ def main():
                     subprocess.run(["xcrun", "simctl", operation, udid], text=True, capture_output=True, timeout=30)
                 except (OSError, subprocess.TimeoutExpired) as error:
                     summary.setdefault("cleanupErrors", []).append(str(error))
-        summary["allNativeCasesPassed"] = len(results) == 2 and all(item["passed"] for item in results)
+        summary["passedProbeModes"] = [item["mode"] for item in results if item["mode"] != "automatic" and item["passed"]]
+        summary["allNativeCasesPassed"] = len(results) == len(MODES) and all(item["passed"] for item in results)
         (destination / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
         archive = destination / "rotation-diagnostics.zip"
         with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as package:
@@ -252,7 +360,7 @@ def main():
                     package.write(path, str(path.relative_to(destination)))
         print(json.dumps(summary), flush=True)
     if not summary["allNativeCasesPassed"]:
-        raise SystemExit("The diagnostic did not establish two passing native cases; inspect the classification and native stacks")
+        raise SystemExit("The diagnostic did not establish three passing native cases; inspect the classification and native stacks")
 
 
 if __name__ == "__main__":
