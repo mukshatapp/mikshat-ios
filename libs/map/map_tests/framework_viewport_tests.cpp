@@ -81,8 +81,8 @@ UNIT_TEST(Framework_SupplementaryMapCanToggleWithOutstandingReaderWithoutDeletin
   auto const countCategoryMatches = [&]
   {
     size_t count = 0;
-    search::ForEachOfTypesInRect(framework.GetDataSource(), {classif().GetTypeByPath({"amenity", "cafe"})},
-                               viewport, [&](auto const &) { ++count; });
+    search::ForEachOfTypesInRect(framework.GetDataSource(), {classif().GetTypeByPath({"amenity", "cafe"})}, viewport,
+                                 [&](auto const &) { ++count; });
     return count;
   };
 
