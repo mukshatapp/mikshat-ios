@@ -1639,3 +1639,6 @@
 
 /* Mikshat offline map layers and exact search history */
 "mikshat_supplementary_map_unavailable" = "This map could not be activated.";
+
+/* Generic feature category for dirt tracks and explicitly unpaved roads; preserve actual road names. */
+"mikshat_dirt_road_type" = "Dirt track";

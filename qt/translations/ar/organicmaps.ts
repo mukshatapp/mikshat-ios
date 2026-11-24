@@ -61,12 +61,12 @@
 <message id="bookmarks">
 <extracomment>Should be used in the bookmarks-only context, see bookmarks_and_tracks if tracks are also implied.</extracomment>
 <source>Bookmarks</source>
-<translation>الإشارات المرجعية</translation>
+<translation>المفضلة</translation>
 </message>
 <message id="bookmarks_and_tracks">
 <extracomment>&quot;Bookmarks and Tracks&quot; dialog title. Also used in iPhone home screen quick actions.</extracomment>
 <source>Bookmarks and Tracks</source>
-<translation>الإشارات المرجعية والمسارات</translation>
+<translation>المفضلة والمسارات</translation>
 </message>
 <message id="name">
 <extracomment>Add bookmark dialog - bookmark name</extracomment>
@@ -310,7 +310,7 @@
 <message id="bookmark">
 <extracomment>bookmark button text</extracomment>
 <source>bookmark</source>
-<translation>إشارة مرجعية</translation>
+<translation>موقع مفضل</translation>
 </message>
 <message id="categories">
 <source>Categories</source>
@@ -456,7 +456,7 @@
 <message id="bookmarks_import">
 <extracomment>Bookmark categories screen, button that opens folder selection dialog to import KML/KMZ/GPX/KMB files</extracomment>
 <source>Import Bookmarks and Tracks</source>
-<translation>استيراد الإشارات المرجعية والمسارات</translation>
+<translation>استيراد المفضلة والمسارات</translation>
 </message>
 <message id="please_wait">
 <source>Please wait…</source>
@@ -499,7 +499,7 @@
 <message id="bookmarks_text_placement_title">
 <extracomment>Settings/Bookmark Text Placement</extracomment>
 <source>Bookmark names on the map</source>
-<translation>أسماء الإشارات المرجعية على الخريطة</translation>
+<translation>أسماء المفضلة على الخريطة</translation>
 </message>
 <message id="show_to_the_right">
 <source>Show to the right</source>
@@ -1251,6 +1251,11 @@
 <extracomment>About dialog: %@ placeholders are paths to license files. Preserve the Qt company name.</extracomment>
 <source>Qt 6 (C) The Qt Company Ltd. and other contributors. License texts: %1 and %2.</source>
 <translation>Qt 6 (C) The Qt Company Ltd. and other contributors. License texts: %1 and %2.</translation>
+</message>
+<message id="mikshat_dirt_road_type">
+<extracomment>Generic feature category for dirt tracks and explicitly unpaved roads; preserve actual road names.</extracomment>
+<source>Dirt track</source>
+<translation>درب</translation>
 </message>
 </context>
 </TS>

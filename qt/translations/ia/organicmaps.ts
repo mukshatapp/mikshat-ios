@@ -1252,5 +1252,10 @@
 <source>Qt 6 (C) The Qt Company Ltd. and other contributors. License texts: %1 and %2.</source>
 <translation>Qt 6 (C) The Qt Company Ltd. and other contributors. License texts: %1 and %2.</translation>
 </message>
+<message id="mikshat_dirt_road_type">
+<extracomment>Generic feature category for dirt tracks and explicitly unpaved roads; preserve actual road names.</extracomment>
+<source>Dirt track</source>
+<translation>Dirt track</translation>
+</message>
 </context>
 </TS>
