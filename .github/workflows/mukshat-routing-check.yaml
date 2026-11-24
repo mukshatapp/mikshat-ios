@@ -17,18 +17,18 @@ jobs:
       - name: Install host test dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y ninja-build qt6-base-dev libqt6svg6-dev libfreetype-dev libharfbuzz-dev libicu-dev libgl1-mesa-dev g++-15
+          sudo apt-get install -y ninja-build qt6-base-dev libqt6svg6-dev libfreetype-dev libharfbuzz-dev libicu-dev libgl1-mesa-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev g++-15
       - name: Configure real native tests
         env:
           CC: gcc-15
           CXX: g++-15
-        run: cmake -S . -B build-session -G Ninja -DCMAKE_BUILD_TYPE=Release -DOMIM_QT_VERSION=6 -DSKIP_QT_GUI=ON -DSKIP_TOOLS=ON -DBUILD_TESTING=ON -DUSE_PCH=OFF
+        run: cmake -S . -B build-session -G Ninja -DCMAKE_BUILD_TYPE=Release -DOMIM_QT_VERSION=6 -DSKIP_QT_GUI=ON -DSKIP_TOOLS=ON -DBUILD_TESTING=ON -DUSE_PCH=OFF -DBUILD_DEV_SANDBOX=OFF
       - name: Build session tests
         run: cmake --build build-session --target routing_tests --parallel 4
       - name: Exercise real Ruler router and existing follow-state regression
         env:
           QT_QPA_PLATFORM: offscreen
-        run: ./build-session/routing_tests --filter='TestMukshatRulerMovingOriginRetainsFollowing|TestFollowRouteFlagPersistence' 2>&1 | tee ruler-session-results.txt
+        run: set -o pipefail; ./build-session/routing_tests --filter='TestMukshatRulerMovingOriginRetainsFollowing|TestFollowRouteFlagPersistence' 2>&1 | tee ruler-session-results.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
