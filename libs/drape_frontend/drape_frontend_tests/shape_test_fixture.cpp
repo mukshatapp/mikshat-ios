@@ -1,5 +1,6 @@
 #include "drape_frontend/drape_frontend_tests/shape_test_fixture.hpp"
 
+#include "drape_frontend/render_state_extension.hpp"
 #include "drape_frontend/shape_view_params.hpp"
 #include "drape_frontend/visual_params.hpp"
 
@@ -7,6 +8,7 @@
 #include "drape/gl_includes.hpp"
 #include "drape/oglcontext.hpp"
 #include "drape/support_manager.hpp"
+#include "drape/utils/projection.hpp"
 
 #include "qt_tstfrm/test_main_loop.hpp"
 
@@ -15,6 +17,9 @@
 #include "base/file_name_utils.hpp"
 
 #include <QtGui/QPainter>
+
+#include <chrono>
+#include <thread>
 
 namespace df::test_support
 {
@@ -146,6 +151,31 @@ void ShapeTestFixture::Flush()
 
   // Upload any new texture data that was requested during AddShape (color/stipple regions).
   m_texMng->UpdateDynamicTextures(make_ref(m_context));
+
+  if (m_screen)
+  {
+    // Glyph rasterization runs asynchronously. Do not accept a blank frame while it is still pending.
+    auto const deadline = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    bool ready = false;
+    while (!ready && std::chrono::steady_clock::now() < deadline)
+    {
+      ready = true;
+      for (auto & entry : m_buckets)
+      {
+        for (size_t i = 0; i < entry.m_bucket->GetOverlayHandlesCount(); ++i)
+        {
+          auto handle = entry.m_bucket->GetOverlayHandle(i);
+          bool const glyphsReady = handle->Update(*m_screen);
+          handle->SetIsVisible(glyphsReady);
+          ready = ready && glyphsReady;
+        }
+      }
+      m_texMng->UpdateDynamicTextures(make_ref(m_context));
+      if (!ready)
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    CHECK(ready, ("GPU fixture timed out waiting for actual text glyphs"));
+  }
 }
 
 void ShapeTestFixture::Render()
@@ -167,18 +197,40 @@ void ShapeTestFixture::Render()
   gpu::MapProgramParams params;
   params.m_modelView = glsl::mat4(modelViewScale, 0, 0, 0, 0, modelViewScale, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
   params.m_projection = glsl::mat4(1.0f / halfW, 0, 0, 0, 0, 1.0f / halfH, 0, 0, 0, 0, -0.5f, 0.5f, 0, 0, 0, 1);
+  if (m_screen)
+  {
+    // Apply* shapes carry production depth priorities, unlike the zero-depth geometry fixtures.
+    auto const projection = dp::MakeProjection(m_context->GetApiVersion(), -halfW, halfW, -halfH, halfH);
+    params.m_projection = glsl::make_mat4(projection.data());
+  }
   params.m_pivotTransform = glsl::mat4(1.0f);
   params.m_opacity = 1.0f;
   params.m_zScale = 1.0f;
 
   for (auto & entry : m_buckets)
   {
+    if (m_screen && IsProtectedAreaFill(entry.m_state) && !IsProtectedAreaFillVisible(*m_screen))
+      continue;
+
     auto const programId = entry.m_state.GetProgram<gpu::Program>();
     auto program = m_progMng->GetProgram(programId);
     program->Bind();
     dp::ApplyState(contextRef, program, entry.m_state);
 
     entry.m_bucket->GetBuffer()->Build(contextRef, program);
+    if (m_screen)
+    {
+      auto const & glyphParams = VisualParams::Instance().GetGlyphVisualParams();
+      if (programId == gpu::Program::TextOutlined)
+      {
+        params.m_contrastGamma = glsl::vec2(glyphParams.m_outlineContrast, glyphParams.m_outlineGamma);
+        params.m_isOutlinePass = 1.0f;
+        m_progMng->GetParamsSetter()->Apply(contextRef, program, params);
+        entry.m_bucket->Render(contextRef, entry.m_state.GetDrawAsLine());
+      }
+      params.m_contrastGamma = glsl::vec2(glyphParams.m_contrast, glyphParams.m_gamma);
+      params.m_isOutlinePass = 0.0f;
+    }
     m_progMng->GetParamsSetter()->Apply(contextRef, program, params);
     entry.m_bucket->Render(contextRef, entry.m_state.GetDrawAsLine());
   }

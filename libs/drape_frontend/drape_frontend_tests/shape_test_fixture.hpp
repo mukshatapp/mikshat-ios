@@ -11,10 +11,13 @@
 
 #include "shaders/program_manager.hpp"
 
+#include "geometry/screenbase.hpp"
+
 #include <QtGui/QImage>
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace df::test_support
@@ -50,6 +53,17 @@ public:
   /// Sets the scale from world coordinates to pixels. Must be called before Render().
   void SetWorldToPixelScale(float scale) { m_worldToPixelScale = scale; }
 
+  /// Opt in to real glyph uploads and the production protected-fill screen policy.
+  /// Isolated labels are made visible without running the map collision engine.
+  void SetScreen(ScreenBase const & screen)
+  {
+    m_screen = screen;
+    SetWorldToPixelScale(static_cast<float>(1.0 / screen.GetScale()));
+  }
+
+  /// Only valid inside the Render() callback, for the production Apply* helpers.
+  ref_ptr<dp::TextureManager> GetTextureManager() { return make_ref(m_texMng); }
+
   /// The last rendered frame; valid after Render() returns.
   QImage const & GetLastImage() const { return m_lastImage; }
 
@@ -68,6 +82,7 @@ private:
   uint32_t m_width = 0;
   uint32_t m_height = 0;
   float m_worldToPixelScale = 1.0f;
+  std::optional<ScreenBase> m_screen;
   drape_ptr<dp::Framebuffer> m_framebuffer;
 
   std::unique_ptr<dp::GraphicsContext> m_context;

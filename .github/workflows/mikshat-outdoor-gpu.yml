@@ -1,0 +1,87 @@
+name: Mikshat outdoor native OpenGL rendering
+
+'on':
+  push:
+    branches: [feature/automatic-outdoor-map-styling-4.6.20]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mikshat-outdoor-gpu-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CC: gcc-14
+      CXX: g++-14
+      QT_QPA_PLATFORM: xcb
+      LIBGL_ALWAYS_SOFTWARE: '1'
+      MIKSHAT_SUPPLEMENTARY_MAPS_DIR: ${{ github.workspace }}/iphone/Maps/Resources/Mikshat/SupplementaryMaps
+      MIKSHAT_GPU_ARTIFACTS_DIR: ${{ github.workspace }}/build/outdoor-gpu-evidence/images
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned dependencies
+        run: git submodule update --init --recursive --depth 1 --jobs 8
+      - name: Install native rendering dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build gcc-14 g++-14 qt6-base-dev libqt6opengl6-dev xvfb xauth \
+            libharfbuzz-dev libfreetype-dev libgl1-mesa-dev libgl1-mesa-dri \
+            libxi-dev libxrandr-dev libxcursor-dev libxinerama-dev
+      - name: Build isolated native rendering fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/outdoor-gpu-evidence
+          cmake -S . -B build/outdoor-gpu -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug -DSKIP_QT_GUI=ON -DBUILD_TESTING=ON \
+            -DBUILD_DEV_SANDBOX=OFF -DBUILD_OPENGL_TESTS=ON -DCMAKE_UNITY_BUILD=ON \
+            -DCMAKE_C_FLAGS=-g1 -DCMAKE_CXX_FLAGS=-g1 -DPython3_EXECUTABLE=/usr/bin/python3 \
+            2>&1 | tee build/outdoor-gpu-evidence/configure.log
+          cmake --build build/outdoor-gpu --parallel 3 --target drape_frontend_tests \
+            2>&1 | tee build/outdoor-gpu-evidence/build.log
+      - name: Render actual bundled map geometry and captions
+        shell: bash
+        run: |
+          set -euo pipefail
+          xvfb-run -a -s '-screen 0 1280x1024x24' python3 - <<'PY'
+          import importlib.util
+          import json
+          from pathlib import Path
+          import re
+
+          spec = importlib.util.spec_from_file_location('outdoor_gpu_runner', 'mikshat/tests/update-core/run.py')
+          runner = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(runner)
+          cases = (
+              'OutdoorGpuFixture_MikshatOutdoorGPU_ActualLocalityCaptions15km',
+              'OutdoorGpuFixture_MikshatOutdoorGPU_ActualDirtAndWadi20km',
+              'OutdoorGpuFixture_MikshatOutdoorGPU_ActualProtectedBoundary50To2km',
+          )
+          patterns = tuple(r'::' + re.escape(case) + r'$' for case in cases)
+          runner.SUITES = {'drape_frontend_tests': (r'::(' + '|'.join(cases) + r')$', patterns)}
+          output = Path('build/outdoor-gpu-evidence').resolve()
+          report = runner.run_suite('drape_frontend_tests', Path('build/outdoor-gpu'), Path('data').resolve(), output)
+          if len(report['executedCases']) != len(cases):
+              raise SystemExit('Every native OpenGL rendering case must execute.')
+          images = sorted((output / 'images').glob('*.png'))
+          if not images or any(image.stat().st_size == 0 for image in images):
+              raise SystemExit('Native rendering must produce nonempty image artifacts.')
+          (output / 'scope.json').write_text(json.dumps(dict(
+              passed=True, images=[image.name for image in images],
+              scope='Isolated native OpenGL fixtures using actual bundled map geometry and generated styles; no full iOS, Metal, or physical-device claim.'
+          ), indent=2) + '\n')
+          PY
+      - name: Preserve actual native rendering evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mikshat-outdoor-native-opengl
+          retention-days: 7
+          if-no-files-found: warn
+          path: build/outdoor-gpu-evidence/
