@@ -8,7 +8,12 @@
 #include "drape_frontend/render_group.hpp"
 #include "drape_frontend/render_state_extension.hpp"
 
+#include "indexer/classificator.hpp"
+#include "indexer/classificator_loader.hpp"
 #include "indexer/feature.hpp"
+#include "indexer/map_object.hpp"
+#include "indexer/map_style_reader.hpp"
+#include "indexer/transliteration_loader.hpp"
 
 #include "shaders/programs.hpp"
 
@@ -58,6 +63,18 @@ void AppendQuad(std::vector<Point> & triangles, Point const & a, Point const & b
 {
   triangles.insert(triangles.end(), {a, b, c, a, c, d});
 }
+
+class OutlineArea : public osm::MapObject
+{
+public:
+  explicit OutlineArea(uint32_t type)
+  {
+    m_geomType = feature::GeomType::Area;
+    AppendQuad(m_triangles, {-1, -1}, {1, -1}, {1, 1}, {-1, 1});
+    m_types.Add(type);
+    m_name.Add("en", "Reserve");
+  }
+};
 }  // namespace
 
 // The analytic hatch repeats with mod() over the lattice coordinate, so only its fractional part (the
@@ -240,41 +257,41 @@ UNIT_TEST(ProtectedAreaOutline_LargeMeshAndDegenerateTriangles)
 
 UNIT_CLASS_TEST(VisualParamsFixture, ProtectedAreaOutline_IndependentOfFillGeometryAndOpacity)
 {
+  InitTransliterationInstanceWithDefaultDirs();
+  classificator::EnsureStyleLoaded(GetStyleReader().GetCurrentStyle());
+  classificator::EnsureStyleLoaded(MapStyleDefaultLight);
+  OutlineArea const area(classif(MapStyleDefaultLight).GetTypeByPath({"leisure", "nature_reserve"}));
+  auto feature = FeatureType::CreateFromMapObject(area);
+  df::Stylist const stylist(*feature, 14, StringUtf8Multilang::GetLangIndex("en"), MapStyleDefaultLight);
+  TEST(stylist.m_areaRule || stylist.m_hatchingRule, ());
+  TEST(!stylist.m_areaOutlineRules.empty(), ());
+
   df::ApplyFeatureParams params;
   params.Init(df::TileKey(0, 0, 14));
   params.m_tileRect = {-2, -2, 2, 2};
   df::TMapShapes shapes;
   params.m_insertShape = [&shapes](drape_ptr<df::MapShape> && shape) { shapes.push_back(std::move(shape)); };
-  FeatureType feature(FeatureID{}, 0);
-  df::CaptionDescription const captions;
-  drule::LineRule outline;
-  outline.width = 3;
-  outline.priority = drule::kBasePriorityFg;
-  drule::AreaRule fill;
-  fill.priority = drule::kBasePriorityBgTop;
-  df::Stylist stylist;
-  stylist.m_areaRule = &fill;
-  stylist.m_isProtectedAreaFill = true;
-
   for (float const opacity : {0.0f, 1.0f})
   {
-    df::ApplyAreaFeature apply(params, feature, captions, false, false, 0, 0, opacity, true);
-    apply({-1, -1}, {1, -1}, {1, 1});
-    apply({-1, -1}, {1, 1}, {-1, 1});
+    df::ApplyAreaFeature apply(params, *feature, stylist.m_captionDescriptor, false, false, 0, 0, opacity, true);
+    feature->ForEachTriangle(apply, 14);
     TEST_EQUAL(apply.HasGeometry(), opacity > 0, (opacity));
     if (opacity > 0)
     {
-      apply.ProcessAreaRules(stylist, {}, {});
-      TEST_EQUAL(shapes.size(), 1, ());
-      TEST(dynamic_cast<df::AreaShape *>(shapes.front().get()) != nullptr, ());
+      apply.ProcessAreaRules(stylist, stylist.m_hatchingPattern, {});
+      size_t const expectedFills = (stylist.m_areaRule ? 1 : 0) + (stylist.m_hatchingRule ? 1 : 0);
+      TEST_EQUAL(shapes.size(), expectedFills, ());
+      for (auto const & shape : shapes)
+        TEST(dynamic_cast<df::AreaShape *>(shape.get()) != nullptr, ());
       shapes.clear();
     }
 
     // Satellite opacity=0 produces a border without a fill; normal fills can also consume their
     // triangle vector before the independent border is emitted and later hidden by the 2 km cutoff.
-    apply.ProcessAreaOutlines({&outline});
-    TEST_EQUAL(shapes.size(), 1, (opacity));
-    TEST(dynamic_cast<df::LineShape *>(shapes.front().get()) != nullptr, (opacity));
+    apply.ProcessAreaOutlines(stylist.m_areaOutlineRules);
+    TEST_EQUAL(shapes.size(), stylist.m_areaOutlineRules.size(), (opacity));
+    for (auto const & shape : shapes)
+      TEST(dynamic_cast<df::LineShape *>(shape.get()) != nullptr, (opacity));
     shapes.clear();
   }
   TEST(!df::IsProtectedAreaFill(df::CreateRenderState(gpu::Program::Line, df::DepthLayer::GeometryLayer)), ());
