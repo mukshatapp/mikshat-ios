@@ -520,7 +520,7 @@ void UserEventStream::SetScreen(ScreenBase const & target, double duration,
     m_animationSystem.AnimateArrowTo(*arrowTarget, m_eventTime, animate ? duration : 0.0);
   if (animate)
   {
-    m_animationSystem.StartMapAnimation({type, current, target, m_eventTime, duration, anchor});
+    m_animationSystem.StartMapAnimation({type, current, target, m_eventTime, duration, anchor, arrowTarget && arrowTarget->m_durationSeconds > 0.0});
     return;
   }
 

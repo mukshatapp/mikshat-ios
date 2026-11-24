@@ -151,7 +151,7 @@ private:
   m2::PointD GetRoutingRotationPixelCenter() const;
 
   ArrowPose GetDrawablePose() const;
-  void AnimateArrow(ArrowPose const & oldPose, ScreenBase const & screen, double duration = 0.20);
+  void AnimateArrow(ArrowPose const & oldPose, ScreenBase const & screen, double duration = 0.20, bool gps = false);
 
   bool AlmostCurrentPosition(m2::PointD const & pos) const;
   bool AlmostCurrentAzimut(double azimut) const;

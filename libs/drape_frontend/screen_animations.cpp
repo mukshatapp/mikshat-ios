@@ -8,8 +8,8 @@ namespace df
 {
 MapAnimation::MapAnimation(Type type, ScreenBase const & start, ScreenBase const & end,
                            AnimationClock::time_point requestedAt, double duration,
-                           std::optional<m2::PointD> pixelAnchor)
-  : Animation(requestedAt, duration)
+                           std::optional<m2::PointD> pixelAnchor, bool continuousGps)
+  : Animation(requestedAt, duration, continuousGps)
   , m_type(type)
   , m_pixelAnchor(pixelAnchor)
   , m_start(GetPose(start, pixelAnchor))

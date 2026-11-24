@@ -6,7 +6,7 @@ namespace df
 {
 ArrowAnimation::ArrowAnimation(ArrowPose const & start, ArrowPose const & end, AnimationClock::time_point requestedAt,
                                double duration)
-  : Animation(requestedAt, duration)
+  : Animation(requestedAt, duration, end.m_durationSeconds > 0.0)
   , m_start(start)
   , m_end(end)
 {}

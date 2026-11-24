@@ -20,7 +20,7 @@ public:
   };
 
   MapAnimation(Type type, ScreenBase const & start, ScreenBase const & end, AnimationClock::time_point requestedAt,
-               double duration, std::optional<m2::PointD> pixelAnchor = std::nullopt);
+               double duration, std::optional<m2::PointD> pixelAnchor = std::nullopt, bool continuousGps = false);
 
   Type GetType() const { return m_type; }
   void Apply(ScreenBase & screen) const;

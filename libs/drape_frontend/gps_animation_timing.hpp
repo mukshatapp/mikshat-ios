@@ -5,6 +5,8 @@
 
 namespace df
 {
+inline constexpr double kMaxGpsAnimationTimeSec = 1.2;
+
 // Visual interpolation only: never extrapolate positions or change recorded GPS data.
 class GpsAnimationTiming
 {
@@ -18,7 +20,7 @@ public:
       if (std::isfinite(interval) && interval > 0.0 && interval <= 3.0)
       {
         m_interval = 0.5 * m_interval + 0.5 * interval;
-        result = std::clamp(0.9 * m_interval, 0.12, 0.80);
+        result = std::clamp(1.05 * m_interval, 0.12, kMaxGpsAnimationTimeSec);
       }
       else
         m_interval = 0.8;

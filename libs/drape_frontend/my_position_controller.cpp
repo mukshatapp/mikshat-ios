@@ -463,7 +463,7 @@ void MyPositionController::OnLocationUpdate(location::GpsInfo const & info, bool
 
   if (m_isPositionAssigned && (!AlmostCurrentPosition(oldPose.m_position) || !AlmostCurrentAzimut(oldPose.m_azimuth)))
   {
-    AnimateArrow(oldPose, screen, m_gpsAnimationDuration);
+    AnimateArrow(oldPose, screen, m_gpsAnimationDuration, true);
     m_isDirtyViewport = true;
   }
 
@@ -812,11 +812,11 @@ ArrowPose MyPositionController::GetDrawablePose() const
   return m_animationSystem.GetArrowPose().value_or(ArrowPose{m_position, m_drawDirection});
 }
 
-void MyPositionController::AnimateArrow(ArrowPose const & oldPose, ScreenBase const & screen, double duration)
+void MyPositionController::AnimateArrow(ArrowPose const & oldPose, ScreenBase const & screen, double duration, bool gps)
 {
   ArrowPose target{AdjustPointForViewport(m_position, screen), m_drawDirection};
 #if defined(MUKSHAT_LEGACY_SDK_ABI)
-  target.m_durationSeconds = duration;
+  target.m_durationSeconds = gps ? duration : 0.0;
 #endif
   m2::PointD const start(mercator::NearestWrapX(oldPose.m_position.x, target.m_position.x), oldPose.m_position.y);
   if (!IsWithinAnimationDistance(screen, start, target.m_position))
