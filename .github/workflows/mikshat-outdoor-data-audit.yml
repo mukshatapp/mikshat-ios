@@ -1,0 +1,86 @@
+name: Mikshat outdoor feature data audit
+
+'on':
+  push:
+    branches: [feature/automatic-outdoor-map-styling-4.6.20]
+    paths:
+      - .github/workflows/mikshat-outdoor-data-audit.yml
+      - libs/map/mwm_tests/mwm_index_test.cpp
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mikshat-outdoor-data-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  classify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    env:
+      CC: gcc-14
+      CXX: g++-14
+      QT_QPA_PLATFORM: offscreen
+      MIKSHAT_SUPPLEMENTARY_MAPS_DIR: ${{ github.workspace }}/iphone/Maps/Resources/Mikshat/SupplementaryMaps
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned dependencies
+        run: git submodule update --init --recursive --depth 1 --jobs 8
+      - name: Install native test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build gcc-14 g++-14 qt6-base-dev \
+            libharfbuzz-dev libfreetype-dev libgl1-mesa-dev libxi-dev libxrandr-dev \
+            libxcursor-dev libxinerama-dev
+      - name: Prepare verified official Saudi fixtures
+        run: |
+          mkdir -p build/outdoor-audit-evidence
+          python3 - <<'PY'
+          import os
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, 'mikshat/tests/update-native')
+          import renderer
+          directory = Path('build/outdoor-audit-evidence')
+          north = renderer.prepare_fixture(directory)
+          south = renderer.prepare_fixture(directory, fixture_info=renderer.SOUTH_FIXTURE)
+          with open(os.environ['GITHUB_ENV'], 'a') as stream:
+              stream.write('MIKSHAT_SAUDI_NORTH_MWM_PATH=' + str(north) + '\n')
+              stream.write('MIKSHAT_SAUDI_SOUTH_MWM_PATH=' + str(south) + '\n')
+          PY
+      - name: Build native feature audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          cmake -S . -B build/outdoor-audit -G Ninja \
+            -DCMAKE_BUILD_TYPE=Debug -DSKIP_QT_GUI=ON -DBUILD_TESTING=ON \
+            -DBUILD_DEV_SANDBOX=OFF -DBUILD_OPENGL_TESTS=OFF -DCMAKE_UNITY_BUILD=ON \
+            -DCMAKE_C_FLAGS=-g1 '-DCMAKE_CXX_FLAGS=-g1 -DMIKSHAT_SUPPLEMENTARY_OVERVIEW_TESTS' \
+            -DPython3_EXECUTABLE=/usr/bin/python3 \
+            2>&1 | tee build/outdoor-audit-evidence/configure.log
+          cmake --build build/outdoor-audit --parallel 3 --target mwm_tests \
+            2>&1 | tee build/outdoor-audit-evidence/build.log
+      - name: Audit real feature names and classifications
+        run: |
+          python3 - <<'PY'
+          import importlib.util
+          from pathlib import Path
+          spec = importlib.util.spec_from_file_location('audit_native', 'mikshat/tests/update-core/run.py')
+          runner = importlib.util.module_from_spec(spec)
+          spec.loader.exec_module(runner)
+          case = r'::MikshatOutdoor_ActualFeatureClassificationAudit$'
+          runner.SUITES = {'mwm_tests': (case, (case,))}
+          runner.run_suite('mwm_tests', Path('build/outdoor-audit'), Path('data').resolve(),
+                           Path('build/outdoor-audit-evidence').resolve())
+          PY
+      - name: Preserve feature audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mikshat-outdoor-feature-audit
+          retention-days: 7
+          path: |
+            build/outdoor-audit-evidence/
+            !build/outdoor-audit-evidence/fixture/*.mwm

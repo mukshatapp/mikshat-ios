@@ -8,6 +8,9 @@
 #include "indexer/ftypes_matcher.hpp"
 #include "indexer/mikshat_map_visibility.hpp"
 #include "indexer/scales.hpp"
+#include "indexer/search_string_utils.hpp"
+
+#include <glaze/json.hpp>
 
 #include <algorithm>
 #include <array>
@@ -15,6 +18,7 @@
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -276,6 +280,143 @@ UNIT_TEST(MikshatOverview_SaudiIndexedPoints)
 #endif  // MIKSHAT_SAUDI_OVERVIEW_TESTS
 
 #ifdef MIKSHAT_SUPPLEMENTARY_OVERVIEW_TESTS
+namespace
+{
+struct OutdoorFeatureAuditRecord
+{
+  std::string m_event;
+  std::string m_source;
+  uint32_t m_feature = 0;
+  std::string m_geometry;
+  std::vector<std::string> m_names;
+  std::vector<std::string> m_types;
+  double m_latitude = 0.0;
+  double m_longitude = 0.0;
+  double m_distanceMeters = -1.0;
+};
+
+std::string NormalizeOutdoorAuditName(std::string_view name)
+{
+  auto value = strings::ToUtf8(search::NormalizeAndSimplifyString(name));
+  std::erase(value, ' ');
+  return value;
+}
+
+void PrintOutdoorAuditFeature(std::string const & event, std::string const & source, FeatureType & feature,
+                              double distanceMeters = -1.0)
+{
+  OutdoorFeatureAuditRecord record;
+  record.m_event = event;
+  record.m_source = source;
+  record.m_feature = feature.GetID().m_index;
+  record.m_geometry = feature.GetGeomType() == feature::GeomType::Point ? "point"
+                    : feature.GetGeomType() == feature::GeomType::Line  ? "line"
+                                                                        : "area";
+  feature.ForEachName([&](int8_t, std::string_view name) { record.m_names.emplace_back(name); });
+  feature.ForEachType([&](uint32_t type) { record.m_types.push_back(classif().GetReadableObjectName(type)); });
+  auto const position = mercator::ToLatLon(feature::GetCenter(feature, FeatureType::BEST_GEOMETRY));
+  record.m_latitude = position.m_lat;
+  record.m_longitude = position.m_lon;
+  record.m_distanceMeters = distanceMeters;
+  std::string json;
+  TEST(!glz::write_json(record, json), (source, record.m_feature));
+  std::cout << "MIKSHAT_FEATURE_AUDIT " << json << '\n';
+}
+}  // namespace
+
+UNIT_TEST(MikshatOutdoor_ActualFeatureClassificationAudit)
+{
+  classificator::Load();
+  char const * directory = std::getenv("MIKSHAT_SUPPLEMENTARY_MAPS_DIR");
+  TEST(directory && *directory, ("Supply all four actual bundled maps"));
+  std::vector<std::string> paths;
+  for (std::string const name : {"desert-ksa-north", "desert-ksa-south", "desert-kuwait", "desert-qatar"})
+    paths.push_back(std::string(directory) + "/" + name + ".mwm");
+  for (auto const key : {"MIKSHAT_SAUDI_NORTH_MWM_PATH", "MIKSHAT_SAUDI_SOUTH_MWM_PATH"})
+    if (char const * path = std::getenv(key); path && *path)
+      paths.emplace_back(path);
+
+  std::array<std::string, 4> const terms = {NormalizeOutdoorAuditName("خصام"), NormalizeOutdoorAuditName("مشرف"),
+                                            NormalizeOutdoorAuditName("الأمغر"), NormalizeOutdoorAuditName("حشمة")};
+  static ftypes::BaseCheckerEx const sandy(
+      {{"natural", "beach", "sand"}, {"natural", "desert"}, {"natural", "peak"}, {"natural", "hill"}});
+  static ftypes::BaseCheckerEx const protectedAreas(
+      {{"boundary", "national_park"}, {"boundary", "protected_area"}, {"leisure", "nature_reserve"}});
+  static ftypes::BaseCheckerEx const roads({{"highway"}});
+  auto const reportedRoad = mercator::FromLatLon(28.0 + 0.628 / 60.0, 42.0 + 0.426 / 60.0);
+  auto const roadViewport = mercator::RectByCenterXYAndSizeInMeters(reportedRoad, 2000.0);
+  size_t totalFeatures = 0;
+  size_t totalMatches = 0;
+  size_t totalRoads = 0;
+  for (auto const & path : paths)
+  {
+    FeaturesFetcher source;
+    auto file = platform::LocalCountryFile::MakeTemporary(path);
+    file.SyncWithDisk();
+    auto const registered = source.RegisterMap(file);
+    TEST_EQUAL(registered.second, MwmSet::RegResult::Success, (path));
+    FeaturesLoaderGuard loader(source.GetDataSource(), registered.first);
+    auto const count = loader.GetNumFeatures();
+    TEST_GREATER(count, 0, (path));
+    totalFeatures += count;
+    std::map<std::string, size_t> categories;
+    size_t sandySamples = 0;
+    size_t protectedSamples = 0;
+    size_t matches = 0;
+    for (uint32_t index = 0; index < count; ++index)
+    {
+      auto feature = loader.GetFeatureByIndex(index);
+      bool matched = false;
+      feature->ForEachName([&](int8_t, std::string_view name)
+      {
+        auto const normalized = NormalizeOutdoorAuditName(name);
+        matched = matched || std::any_of(terms.begin(), terms.end(),
+                                         [&](auto const & term) { return normalized.find(term) != std::string::npos; });
+      });
+      if (matched)
+      {
+        PrintOutdoorAuditFeature("requested-name", file.GetCountryName(), *feature);
+        ++matches;
+      }
+      if (sandy(*feature))
+      {
+        feature->ForEachType([&](uint32_t type) { ++categories[classif().GetReadableObjectName(type)]; });
+        if (feature->HasName() && sandySamples++ < 3)
+          PrintOutdoorAuditFeature("sandy-sample", file.GetCountryName(), *feature);
+      }
+      if (protectedAreas(*feature) && protectedSamples++ < 3)
+        PrintOutdoorAuditFeature("protected-sample", file.GetCountryName(), *feature);
+    }
+    totalMatches += matches;
+    std::vector<std::pair<double, uint32_t>> closestRoads;
+    source.GetDataSource().ForEachInRectForMWM([&](FeatureType & feature)
+    {
+      if (feature.GetGeomType() != feature::GeomType::Line || !roads(feature))
+        return;
+      double const distance = feature::GetMinDistanceMeters(feature, reportedRoad, FeatureType::BEST_GEOMETRY);
+      if (distance <= 2000.0)
+        closestRoads.emplace_back(distance, feature.GetID().m_index);
+    }, roadViewport, 17, registered.first);
+    std::sort(closestRoads.begin(), closestRoads.end());
+    totalRoads += closestRoads.size();
+    if (closestRoads.size() > 12)
+      closestRoads.resize(12);
+    for (auto const & [distance, index] : closestRoads)
+    {
+      auto feature = loader.GetFeatureByIndex(index);
+      PrintOutdoorAuditFeature("reported-road-nearby", file.GetCountryName(), *feature, distance);
+    }
+    std::string categoryJson;
+    TEST(!glz::write_json(categories, categoryJson), (path));
+    std::cout << "MIKSHAT_FEATURE_AUDIT_SUMMARY {\"source\":\"" << file.GetCountryName() << "\",\"features\":" << count
+              << ",\"requestedNameMatches\":" << matches << ",\"nearbyRoads\":" << closestRoads.size()
+              << ",\"sandyTypes\":" << categoryJson << "}\n";
+  }
+  TEST_GREATER(totalFeatures, 0, ());
+  std::cout << "MIKSHAT_FEATURE_AUDIT_COMPLETE {\"maps\":" << paths.size() << ",\"features\":" << totalFeatures
+            << ",\"requestedNameMatches\":" << totalMatches << ",\"nearbyRoads\":" << totalRoads << "}" << std::endl;
+}
+
 UNIT_TEST(MikshatOverview_SupplementaryOutdoorGeometry)
 {
   classificator::Load();
