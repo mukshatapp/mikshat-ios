@@ -1,0 +1,130 @@
+name: Mikshat offline maps source compilation
+
+'on':
+  push:
+    branches:
+      - feature/offline-maps-search-4.6.19
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mikshat-offline-maps-compile-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios-source:
+    name: Compile iOS app and XCTest sources
+    runs-on: macos-26
+    timeout-minutes: 70
+    env:
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch pinned dependencies
+        run: git submodule update --init --recursive --depth 1 --jobs 8
+      - name: Prepare app resources
+        run: |
+          set -euo pipefail
+          python3 mikshat/prepare_branding.py
+          python3 mikshat/prepare_satellite.py
+      - name: Record the selected SDK and simulator destination
+        run: |
+          set -euo pipefail
+          mkdir -p build/offline-maps-compile
+          xcodebuild -version | tee build/offline-maps-compile/toolchain.txt
+          xcrun --sdk iphonesimulator --show-sdk-version | tee -a build/offline-maps-compile/toolchain.txt
+          swiftc --version | tee -a build/offline-maps-compile/toolchain.txt
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+
+          def simctl(*args):
+              return subprocess.check_output(['xcrun', 'simctl', *args], text=True, timeout=60)
+
+          directory = Path('build/offline-maps-compile')
+          runtimes = json.loads(simctl('list', '--json', 'runtimes'))['runtimes']
+          (directory / 'runtimes.json').write_text(json.dumps(runtimes, indent=2) + '\n')
+          available = [item for item in runtimes if item.get('isAvailable')
+                       and item['identifier'].startswith('com.apple.CoreSimulator.SimRuntime.iOS-')]
+          if not available:
+              raise SystemExit('The selected Xcode has no available iOS simulator runtime.')
+          runtime = max(available, key=lambda item: tuple(int(part) for part in item['version'].split('.')))
+          device_type = 'com.apple.CoreSimulator.SimDeviceType.iPhone-16'
+          types = json.loads(simctl('list', '--json', 'devicetypes'))['devicetypes']
+          if not any(item['identifier'] == device_type for item in types):
+              raise SystemExit('The selected Xcode has no iPhone 16 simulator device type.')
+          devices = json.loads(simctl('list', '--json', 'devices', 'available'))['devices']
+          matching = [item for item in devices.get(runtime['identifier'], [])
+                      if item.get('deviceTypeIdentifier') == device_type]
+          udid = matching[0]['udid'] if matching else simctl(
+              'create', 'Mikshat Source Compile', device_type, runtime['identifier']).strip()
+          selection = dict(device='iPhone 16', udid=udid, runtime=runtime['identifier'],
+                           version=runtime['version'], scope='Compilation only; no native test execution')
+          (directory / 'destination.json').write_text(json.dumps(selection, indent=2) + '\n')
+          with open(os.environ['GITHUB_ENV'], 'a') as stream:
+              stream.write(f'MIKSHAT_COMPILE_DESTINATION={udid}\n')
+          print(json.dumps(selection))
+          PY
+      - name: Verify real Metal compilation with the selected Xcode
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          import sys
+
+          sys.path.insert(0, 'mikshat/tests/update-native')
+          from prepare_metal import functional_check, run
+
+          directory = Path('build/offline-maps-compile/metal')
+          directory.mkdir(parents=True, exist_ok=True)
+          log = directory / 'preflight.log'
+          report = dict(commands=[], functionalChecks=[], passed=False,
+                        scope='Selected runner SDK compatibility; no iOS 27 behavior verification')
+          try:
+              run(['xcrun', '-k'], report, log)
+              report['passed'] = functional_check(directory, report, log, 0)
+              if not report['passed']:
+                  run(['xcodebuild', '-downloadComponent', 'MetalToolchain'], report, log, timeout=180)
+                  run(['xcrun', '-k'], report, log)
+                  report['passed'] = functional_check(directory, report, log, 1, 'afterDownload')
+          finally:
+              (directory / 'summary.json').write_text(json.dumps(report, indent=2) + '\n')
+          if not report['passed']:
+              raise SystemExit('The selected Xcode could not compile and link the Metal probe.')
+          PY
+      - name: Compile the app and all app-hosted XCTest sources
+        timeout-minutes: 55
+        run: |
+          set -euo pipefail
+          xcodebuild build-for-testing \
+            -workspace xcode/omim.xcworkspace \
+            -scheme OMaps \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "id=$MIKSHAT_COMPILE_DESTINATION" \
+            -destination-timeout 120 \
+            -derivedDataPath build/OfflineMapsCompileDerivedData \
+            ARCHS="$(uname -m)" \
+            ONLY_ACTIVE_ARCH=YES \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            2>&1 | tee build/offline-maps-compile/xcodebuild.log
+          test -s build/OfflineMapsCompileDerivedData/Build/Products/Debug-iphonesimulator/OMapsTests.xctest/OMapsTests
+      - name: Preserve source compilation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mikshat-offline-maps-source-compile
+          retention-days: 7
+          if-no-files-found: warn
+          path: build/offline-maps-compile/

@@ -641,9 +641,10 @@ void ApplyAreaFeature::CalculateBuildingOutline(bool calculateNormals, BuildingO
   }
 }
 
-void ApplyAreaFeature::ProcessAreaRules(drule::AreaRule const * areaRule, drule::AreaRule const * hatchingRule,
-                                        std::string_view hatchKey, std::string_view patternKey)
+void ApplyAreaFeature::ProcessAreaRules(Stylist const & stylist, std::string_view hatchKey, std::string_view patternKey)
 {
+  auto const areaRule = stylist.m_areaRule;
+  auto const hatchingRule = stylist.m_hatchingRule;
   ASSERT(areaRule || hatchingRule, ());
   ASSERT(HasGeometry(), ());
 
@@ -652,7 +653,7 @@ void ApplyAreaFeature::ProcessAreaRules(drule::AreaRule const * areaRule, drule:
   if (hatchingRule)
   {
     ASSERT_GREATER_OR_EQUAL(hatchingRule->priority, drule::kBasePriorityFg, (m_f.DebugString()));
-    ProcessRule(*hatchingRule, areaDepth, hatchKey, {});
+    ProcessRule(*hatchingRule, areaDepth, hatchKey, {}, stylist.m_isProtectedAreaHatching);
   }
 
   if (areaRule)
@@ -660,17 +661,18 @@ void ApplyAreaFeature::ProcessAreaRules(drule::AreaRule const * areaRule, drule:
     // Calculate areaDepth for BG-by-size areas only.
     if (areaRule->priority < drule::kBasePriorityBgTop)
       areaDepth = drule::CalcAreaBySizeDepth(m_f);
-    ProcessRule(*areaRule, areaDepth, {}, patternKey);
+    ProcessRule(*areaRule, areaDepth, {}, patternKey, stylist.m_isProtectedAreaFill);
   }
 }
 
 void ApplyAreaFeature::ProcessRule(drule::AreaRule const & areaRule, double areaDepth, std::string_view hatchKey,
-                                   std::string_view patternKey)
+                                   std::string_view patternKey, bool isProtectedAreaFill)
 {
   bool const isHatching = !hatchKey.empty();
 
   AreaViewParams params;
   params.m_depthLayer = m_isMwmBorder ? DepthLayer::MwmBorderLayer : DepthLayer::GeometryLayer;
+  params.m_isProtectedAreaFill = isProtectedAreaFill;
   params.m_tileCenter = m_params.m_tileRect.Center();
   params.m_depth = PriorityToDepth(areaRule.priority, drule::area, areaDepth);
   params.m_color = ToDrapeColor(areaRule.color);

@@ -46,7 +46,7 @@
 @beach: #FCEC7E;
 @barerock: #D9D2BF;
 @scree: #CCC7BA;
-@desert: #EEE5B2;
+@desert: #EBA426;
 
 /*3.2 Vegetation*/
 
@@ -179,7 +179,7 @@
 
 /* 6.3 Place labels */
 
-@city_label: #666666;
+@city_label: #333333;
 @country_label: #8C8C8C;
 @state_label: #8C8C8C;
 @district_label: #7F7F7F;
@@ -212,7 +212,10 @@
 @label_isoline10: #567556;
 
 /* Mikshat outdoor labels and unsealed tracks. */
-@mikshat_wadi_label: #126CB3;
-@mikshat_settlement_label: #B32624;
-@mikshat_dirt_road: #956138;
+@mikshat_wadi_label: #0000FF;
+@mikshat_settlement_label: #BD162C;
+@mikshat_dirt_road: #635730;
 @mikshat_fayda_label: #207440;
+
+@mikshat_protected_fill: #CFB8E8;
+@mikshat_protected_border: #8557AC;

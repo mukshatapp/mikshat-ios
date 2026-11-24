@@ -62,6 +62,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -172,6 +173,10 @@ protected:
   storage::Storage m_storage;
   bool m_enabledDiffs;
 
+  // Supplementary maps are read from immutable app resources, outside downloader storage.
+  // Retain paths after disabling: deregistration can finish after outstanding readers release them.
+  std::set<std::string> m_supplementaryMapPaths;
+
   location::TMyPositionModeChanged m_myPositionListener;
 
   std::unique_ptr<BookmarkManager> m_bmManager;
@@ -234,6 +239,10 @@ public:
 
   /// Registers a local map file in internal indexes.
   std::pair<MwmSet::MwmId, MwmSet::RegResult> RegisterMap(platform::LocalCountryFile const & localFile);
+
+  /// Enables/disables a supplementary Country MWM without deleting its source file.
+  /// Call on the Framework thread. Core World files and downloader countries are rejected.
+  bool SetSupplementaryMapEnabled(platform::LocalCountryFile const & localFile, bool enabled);
 
   /// Shows group or leaf mwm on the map.
   void ShowNode(storage::CountryId const & countryId);

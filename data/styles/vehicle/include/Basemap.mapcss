@@ -154,10 +154,16 @@ area|z12-[natural=bare_rock],
 {fill-color: @barerock;}
 
 /* Next types are hardcoded to have a hatching-style fill, see drape_frontend/stylist.cpp */
-area|z10-[leisure=nature_reserve],
-area|z10-[boundary=national_park],
-area|z10-[boundary=protected_area][protect_class=1],
-{fill-opacity: 0.2; fill-color: @green6;}
+area|z8-17[leisure=nature_reserve],
+area|z8-17[boundary=national_park],
+area|z8-17[boundary=protected_area]
+{fill-color: @mikshat_protected_fill; fill-opacity: 0.3;}
+
+/* The renderer hides only this fill at a metric ruler of 2 km or closer. */
+line|z8-[leisure=nature_reserve],
+line|z8-[boundary=national_park],
+line|z8-[boundary=protected_area]
+{width: 1; color: @mikshat_protected_border;}
 
 area|z10-[landuse=military][military=danger_area],
 {fill-opacity: 1.0; fill-color: @military;}

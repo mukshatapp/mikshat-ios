@@ -271,6 +271,8 @@ void LocalityFinder::LoadVicinity(m2::PointD const & p, bool loadCities, bool lo
     m2::RectD const vrect = m_villages.GetDRect(p);
     m_maps.ForEachInRect(m2::RectD(p, p), [&](MwmSet::MwmId const & id)
     {
+      if (!id.IsAlive() || !id.GetInfo()->IsRegistered())
+        return;
       auto handle = m_dataSource.GetMwmHandleById(id);
       if (!handle.IsAlive())
         return;
@@ -295,6 +297,8 @@ void LocalityFinder::UpdateMaps()
   m_dataSource.GetMwmsInfo(mwmsInfo);
   for (auto const & info : mwmsInfo)
   {
+    if (!info->IsRegistered())
+      continue;
     MwmSet::MwmId id(info);
 
     switch (info->GetType())

@@ -14,10 +14,16 @@
 
 namespace df
 {
+IsProtectedAreaChecker::IsProtectedAreaChecker()
+  : ftypes::BaseCheckerEx(
+        {{"boundary", "national_park"}, {"boundary", "protected_area"}, {"leisure", "nature_reserve"}})
+{}
+
 IsHatchingTerritoryChecker::TwoLevel45::TwoLevel45()
   : ftypes::BaseCheckerEx({{"amenity", "prison"},
                            {"boundary", "aboriginal_lands"},
                            {"boundary", "national_park"},
+                           {"boundary", "protected_area"},
                            {"landuse", "military"},
                            {"leisure", "nature_reserve"}})
 {}
@@ -25,7 +31,6 @@ IsHatchingTerritoryChecker::TwoLevel45::TwoLevel45()
 IsHatchingTerritoryChecker::IsHatchingTerritoryChecker()
 {
   Classificator const & c = classif();
-  m_3level45 = c.GetTypeByPath({"boundary", "protected_area", "1"});
   m_2levelDash = c.GetTypeByPath({"natural", "wetland"});
 }
 
@@ -33,8 +38,6 @@ std::string_view IsHatchingTerritoryChecker::GetHatch(uint32_t type) const
 {
   // Matching with subtypes (see Stylist_IsHatching test).
 
-  if (m_3level45 == ftype::Trunc(type, 3))
-    return dp::k45dHatching;
   if (m_2level45(type))
     return dp::k45dHatching;
 
@@ -155,7 +158,8 @@ void CaptionDescription::Init(FeatureType & f, int8_t deviceLang, int zoomLevel,
   }
 }
 
-void Stylist::ProcessKey(FeatureType & f, drule::Key const & key, drule::RulesHolder const & rules)
+void Stylist::ProcessKey(FeatureType & f, drule::Key const & key, drule::RulesHolder const & rules,
+                         bool isProtectedArea)
 {
   drule::BaseRule const * const dRule = rules.Find(key);
 #ifdef DEBUG
@@ -196,11 +200,13 @@ void Stylist::ProcessKey(FeatureType & f, drule::Key const & key, drule::RulesHo
     {
       ASSERT(!m_hatchingRule, (f.DebugString()));
       m_hatchingRule = dRule->GetArea();
+      m_isProtectedAreaHatching = isProtectedArea;
     }
     else
     {
       ASSERT(!m_areaRule, (f.DebugString()));
       m_areaRule = dRule->GetArea();
+      m_isProtectedAreaFill = isProtectedArea;
     }
     break;
   // TODO(pastk) : check if circle/waymarker support exists still (not used in styles ATM).
@@ -239,6 +245,7 @@ Stylist::Stylist(FeatureType & f, uint8_t zoomLevel, int8_t deviceLang, MapStyle
 
   auto const & hatchingChecker = IsHatchingTerritoryChecker::Instance();
   auto const & areaPatternChecker = IsAreaPatternChecker::Instance();
+  auto const & protectedAreaChecker = IsProtectedAreaChecker::Instance();
   // BG-top style groups give intermittent water drawing priority 20, permanent water 40, and
   // ditch/drain/wastewater 50. A 25-point selection boost places intermittent water between the latter
   // two without changing its drawing depth.
@@ -246,11 +253,18 @@ Stylist::Stylist(FeatureType & f, uint8_t zoomLevel, int8_t deviceLang, MapStyle
   auto const geomType = types.GetGeomType();
 
   drule::KeysT keys;
+  struct AreaRuleSource
+  {
+    size_t m_index;
+    bool m_isProtected;
+    std::string_view m_hatch;
+  };
+  buffer_vector<AreaRuleSource, 4> areaRuleSources;
   for (uint32_t t : types)
   {
     drule::KeysT typeKeys;
     cl.GetObject(t)->GetSuitable(zoomLevel, geomType, typeKeys);
-    bool const hasHatching = hatchingChecker(t);
+    auto const hatch = hatchingChecker.GetHatch(t);
 
     for (auto & k : typeKeys)
     {
@@ -262,8 +276,11 @@ Stylist::Stylist(FeatureType & f, uint8_t zoomLevel, int8_t deviceLang, MapStyle
       if (t == mainOverlayType || (k.m_type != drule::caption && k.m_type != drule::symbol &&
                                    k.m_type != drule::shield && k.m_type != drule::pathtext))
       {
-        if (hasHatching && k.m_type == drule::area)
-          k.m_hatching = true;
+        if (k.m_type == drule::area)
+        {
+          k.m_hatching = !hatch.empty();
+          areaRuleSources.push_back({k.m_index, protectedAreaChecker(t), hatch});
+        }
         keys.push_back(k);
       }
     }
@@ -278,7 +295,17 @@ Stylist::Stylist(FeatureType & f, uint8_t zoomLevel, int8_t deviceLang, MapStyle
   drule::MakeUnique(keys);
 
   for (auto const & key : keys)
-    ProcessKey(f, key, rules);
+  {
+    // Preserve the source of each selected fill: the same feature can also contain water, forest or wetland rules.
+    auto const source = std::find_if(areaRuleSources.begin(), areaRuleSources.end(), [&key](auto const & s)
+    { return s.m_index == key.m_index && (!s.m_hatch.empty()) == key.m_hatching; });
+    ProcessKey(f, key, rules, source != areaRuleSources.end() && source->m_isProtected);
+    if (key.m_type == drule::area && key.m_hatching)
+    {
+      ASSERT(source != areaRuleSources.end(), ());
+      m_hatchingPattern = source->m_hatch;
+    }
+  }
 
   if (m_captionRule || m_pathtextRule)
   {

@@ -34,6 +34,8 @@ final class MikshatCoordinateInputView: UIStackView, UITextFieldDelegate {
     coordinateRows.axis = .vertical
     coordinateRows.spacing = 7
     addArrangedSubview(coordinateRows)
+    var degreeSymbols: [UILabel] = []
+    var minuteSymbols: [UILabel] = []
     for (degrees, minutes, direction, placeholders, keys) in [
       (latDegrees, latMinutes, latitudeDirection, ["00", "00.000"], ["mikshat_lat_degrees", "mikshat_lat_minutes"]),
       (lonDegrees, lonMinutes, longitudeDirection, ["000", "00.000"], ["mikshat_lon_degrees", "mikshat_lon_minutes"]),
@@ -45,6 +47,8 @@ final class MikshatCoordinateInputView: UIStackView, UITextFieldDelegate {
         field.keyboardType = .decimalPad
         field.font = .preferredFont(forTextStyle: .title3)
         field.adjustsFontForContentSizeCategory = true
+        field.adjustsFontSizeToFitWidth = true
+        field.minimumFontSize = 14
         field.textAlignment = .center
         field.accessibilityLabel = L(keys[index])
         field.accessibilityIdentifier = "search.coordinates." + keys[index]
@@ -54,7 +58,14 @@ final class MikshatCoordinateInputView: UIStackView, UITextFieldDelegate {
       direction.selectedSegmentIndex = 0
       direction.accessibilityIdentifier = degrees === latDegrees ? "search.coordinates.latitudeDirection" : "search.coordinates.longitudeDirection"
       direction.widthAnchor.constraint(equalToConstant: 78).isActive = true
-      let row = UIStackView(arrangedSubviews: [direction, degrees, MikshatStyle.label("°", color: MikshatStyle.green), minutes, MikshatStyle.label("′", color: MikshatStyle.green)])
+      let prefix = degrees === latDegrees ? "search.coordinates.latitude" : "search.coordinates.longitude"
+      let degreeSymbol = MikshatStyle.label("°", color: MikshatStyle.green)
+      let minuteSymbol = MikshatStyle.label("′", color: MikshatStyle.green)
+      degreeSymbol.accessibilityIdentifier = prefix + "DegreeSymbol"
+      minuteSymbol.accessibilityIdentifier = prefix + "MinuteSymbol"
+      degreeSymbols.append(degreeSymbol)
+      minuteSymbols.append(minuteSymbol)
+      let row = UIStackView(arrangedSubviews: [direction, degrees, degreeSymbol, minutes, minuteSymbol])
       row.accessibilityIdentifier = degrees === latDegrees ? "search.coordinates.latitudeRow" : "search.coordinates.longitudeRow"
       // Both fields must share an ancestor before activating a constraint between them.
       degrees.widthAnchor.constraint(equalTo: minutes.widthAnchor, multiplier: 0.65).isActive = true
@@ -68,6 +79,15 @@ final class MikshatCoordinateInputView: UIStackView, UITextFieldDelegate {
       rowHeights.append(height)
       coordinateRows.addArrangedSubview(row)
     }
+    // Match columns rather than letting each row's placeholder determine its
+    // own widths. Longitude needs three degree digits, latitude only two.
+    NSLayoutConstraint.activate([
+      latDegrees.widthAnchor.constraint(equalTo: lonDegrees.widthAnchor),
+      latMinutes.widthAnchor.constraint(equalTo: lonMinutes.widthAnchor),
+      degreeSymbols[0].widthAnchor.constraint(equalTo: degreeSymbols[1].widthAnchor),
+      minuteSymbols[0].widthAnchor.constraint(equalTo: minuteSymbols[1].widthAnchor),
+      latDegrees.widthAnchor.constraint(greaterThanOrEqualToConstant: 44),
+    ])
     var config = UIButton.Configuration.filled()
     config.title = L("mikshat_show_map")
     config.baseBackgroundColor = MikshatStyle.green

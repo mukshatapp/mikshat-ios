@@ -60,8 +60,8 @@ public:
   }
 
   // Renderer-only overview: supplement native-zoom IDs with a bounded set of
-  // point landmarks from loaded country maps. World and non-point geometry
-  // keep their original scale-index contract.
+  // point landmarks from loaded country maps and authentic outdoor geometry
+  // from the optional supplementary maps. World retains its native contract.
   void ForEachFeatureIDForRendering(m2::RectD const & rect, std::function<void(FeatureID const &)> const & fn,
                                     int scale, DataSource::StopSearchCallback const & stop = {}) const;
 

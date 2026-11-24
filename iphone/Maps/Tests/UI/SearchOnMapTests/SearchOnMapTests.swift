@@ -1,5 +1,6 @@
 @testable import Organic_Maps__Debug_
 import XCTest
+import CoreLocation
 
 final class SearchOnMapTests: XCTestCase {
   private var presenter: SearchOnMapPresenter!
@@ -8,13 +9,29 @@ final class SearchOnMapTests: XCTestCase {
   private var searchManager: SearchManagerMock.Type!
   private var routePointSelector: RoutePointSelectorMock!
   private var currentState: SearchOnMapState = .searching
+  private var openedHistoryCoordinate: CLLocationCoordinate2D?
+  private var openedHistoryTitle: String?
+  private var previousSavedLocations: Any?
+  private var previousLegacyLocations: Any?
+  private var previousHistoryEnabled = true
 
   override func setUp() {
     super.setUp()
+    previousHistoryEnabled = Settings.searchHistoryEnabled()
+    previousSavedLocations = UserDefaults.standard.object(forKey: MikshatSearchHistoryStore.storageKey)
+    previousLegacyLocations = UserDefaults.standard.object(forKey: "mikshat_search_locations")
+    Settings.setSearchHistoryEnabled(true)
+    MikshatSearchLocations.clear()
+    openedHistoryCoordinate = nil
+    openedHistoryTitle = nil
     searchManager = SearchManagerMock.self
     presenter = SearchOnMapPresenter(shouldHideForRouting: false,
                                      didChangeState: { [weak self] in self?.currentState = $0 })
-    interactor = SearchOnMapInteractor(presenter: presenter, searchManager: searchManager)
+    interactor = SearchOnMapInteractor(presenter: presenter, searchManager: searchManager,
+                                        showHistoryLocation: { [weak self] coordinate, title in
+                                          self?.openedHistoryCoordinate = coordinate
+                                          self?.openedHistoryTitle = title
+                                        })
     view = SearchOnMapViewMock()
     presenter.view = view
   }
@@ -28,6 +45,11 @@ final class SearchOnMapTests: XCTestCase {
     searchManager.updateViewportCallsCount = 0
     searchManager.showResultCallCount = 0
     searchManager.clearCallCount = 0
+    searchManager.searchQueryCallCount = 0
+    searchManager.savedQueries = []
+    Settings.setSearchHistoryEnabled(previousHistoryEnabled)
+    UserDefaults.standard.set(previousSavedLocations, forKey: MikshatSearchHistoryStore.storageKey)
+    UserDefaults.standard.set(previousLegacyLocations, forKey: "mikshat_search_locations")
     routePointSelector = nil
     searchManager = nil
     super.tearDown()
@@ -41,6 +63,59 @@ final class SearchOnMapTests: XCTestCase {
     XCTAssertEqual(view.viewModel.contentState, .historyAndCategory)
     XCTAssertEqual(view.viewModel.searchingText, nil)
     XCTAssertEqual(view.viewModel.isTyping, true)
+  }
+
+  func test_GivenSavedHistoryPoint_WhenSelected_ThenOpensItWithoutSearchingOrUsingAResultIndex() {
+    interactor.handle(.openSearch)
+    let location = MikshatSearchLocation(id: "saved", title: "Same name", subtitle: "Selected region", query: "broad query",
+                                         latitude: 26.2317, longitude: 44.9453)
+    interactor.handle(.didSelect(SearchQuery(historyLocation: location)))
+    XCTAssertEqual(openedHistoryCoordinate?.latitude, location.latitude)
+    XCTAssertEqual(openedHistoryCoordinate?.longitude, location.longitude)
+    XCTAssertEqual(openedHistoryTitle, location.title)
+    XCTAssertEqual(searchManager.searchQueryCallCount, 0)
+    XCTAssertEqual(searchManager.showResultCallCount, 0)
+    XCTAssertTrue(searchManager.savedQueries.isEmpty)
+    XCTAssertEqual(view.closeCallCount, 1)
+    XCTAssertEqual(currentState, .closed)
+    let renderCount = view.renderCallCount
+    searchManager.results = SearchResult.stubResults()
+    XCTAssertEqual(view.renderCallCount, renderCount, "Late search results cannot replace the selected saved point")
+  }
+
+  func test_GivenLegacyHistoryQuery_WhenResultIsChosen_ThenLaterTapOpensThatPointWithoutSearchingAgain() throws {
+    interactor.handle(.openSearch)
+    let result = SearchLocationResultStub()
+    let query = SearchQuery("broad query", source: .history)
+    interactor.handle(.didSelect(query))
+    XCTAssertEqual(searchManager.searchQueryCallCount, 1)
+    XCTAssertTrue(MikshatSearchHistoryStore().locations.isEmpty, "A query alone cannot identify a place")
+    interactor.handle(.didSelectResult(result, withQuery: query))
+    let location = try XCTUnwrap(MikshatSearchHistoryStore().locations.first)
+    XCTAssertEqual(location.title, result.titleText)
+    XCTAssertEqual(location.subtitle, result.addressText)
+    XCTAssertEqual(location.query, query.text)
+    XCTAssertEqual(location.latitude, result.coordinate.latitude)
+    XCTAssertEqual(location.longitude, result.coordinate.longitude)
+    interactor.handle(.didSelect(SearchQuery(historyLocation: location)))
+    XCTAssertEqual(searchManager.searchQueryCallCount, 1)
+    XCTAssertEqual(openedHistoryCoordinate?.latitude, result.coordinate.latitude)
+    XCTAssertEqual(openedHistoryCoordinate?.longitude, result.coordinate.longitude)
+    XCTAssertEqual(openedHistoryTitle, result.titleText)
+  }
+
+  func test_GivenSavedHistoryPointInRoutePicker_WhenSelected_ThenSelectsThatPointWithoutMapSearch() {
+    configureRoutePointSearch()
+    interactor.handle(.openSearch)
+    let location = MikshatSearchLocation(id: "route", title: "Destination", subtitle: "Stored address", query: "query",
+                                         latitude: 25, longitude: 47)
+    interactor.handle(.didSelect(SearchQuery(historyLocation: location)))
+    XCTAssertEqual(routePointSelector.selectedHistoryLocation, location)
+    XCTAssertNil(routePointSelector.selectedSearchResult)
+    XCTAssertNil(openedHistoryCoordinate)
+    XCTAssertEqual(searchManager.searchQueryCallCount, 0)
+    XCTAssertEqual(searchManager.showResultCallCount, 0)
+    XCTAssertEqual(currentState, .closed)
   }
 
   func test_GivenInitialState_WhenSelectCategory_ThenUpdateSearchResultsAndShowMap() {
@@ -343,7 +418,7 @@ final class SearchOnMapTests: XCTestCase {
   func test_GivenRoutePointSearch_WhenRegularResultIsSelected_ThenSelectsRoutePointAndCloses() {
     configureRoutePointSearch()
     interactor.handle(.openSearch)
-    let result = SearchResult()
+    let result = SearchLocationResultStub()
 
     interactor.handle(.didSelectResult(result, withQuery: SearchQuery("cafe", source: .typedText)))
 
@@ -616,6 +691,8 @@ private class SearchManagerMock: SearchManager {
   static var updateViewportCallsCount = 0
   static var showResultCallCount = 0
   static var clearCallCount = 0
+  static var searchQueryCallCount = 0
+  static var savedQueries: [SearchQuery] = []
 
   static func add(_ observer: any MWMSearchObserver) {
     observers.addListener(observer)
@@ -625,9 +702,12 @@ private class SearchManagerMock: SearchManager {
     observers.removeListener(observer)
   }
 
-  static func save(_: SearchQuery) {}
+  static func save(_ query: SearchQuery) { savedQueries.append(query) }
   // Debug commands start no search.
-  static func searchQuery(_ query: SearchQuery) -> Bool { !query.text.hasPrefix("?") }
+  static func searchQuery(_ query: SearchQuery) -> Bool {
+    searchQueryCallCount += 1
+    return !query.text.hasPrefix("?")
+  }
   static func showResult(at _: UInt) {
     showResultCallCount += 1
   }
@@ -647,6 +727,7 @@ private final class RoutePointSelectorMock: RoutePointSelecting {
   var selectCurrentLocationCallCount = 0
   var selectedSearchResult: SearchResult?
   var selectedMapPoint: CGPoint?
+  var selectedHistoryLocation: MikshatSearchLocation?
   var cancelCallCount = 0
 
   func selectCurrentLocation() -> Bool {
@@ -661,6 +742,11 @@ private final class RoutePointSelectorMock: RoutePointSelecting {
 
   func select(mapPoint: CGPoint) -> Bool {
     selectedMapPoint = mapPoint
+    return completeSelection()
+  }
+
+  func select(historyLocation: MikshatSearchLocation) -> Bool {
+    selectedHistoryLocation = historyLocation
     return completeSelection()
   }
 
@@ -680,9 +766,16 @@ private final class RoutePointSelectorMock: RoutePointSelecting {
 private extension SearchResult {
   static func stubResults() -> SearchOnMap.SearchResults {
     SearchOnMap.SearchResults([
-      SearchResult(),
-      SearchResult(),
-      SearchResult(),
+      SearchLocationResultStub(),
+      SearchLocationResultStub(),
+      SearchLocationResultStub(),
     ])
   }
+}
+
+private final class SearchLocationResultStub: SearchResult {
+  override var titleText: String { "Selected place" }
+  override var addressText: String { "Actual region" }
+  override var coordinate: CLLocationCoordinate2D { CLLocationCoordinate2D(latitude: 24.7136, longitude: 46.6753) }
+  override var highlightRanges: [NSValue] { [] }
 }

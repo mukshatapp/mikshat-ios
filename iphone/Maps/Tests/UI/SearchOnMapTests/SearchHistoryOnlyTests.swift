@@ -9,6 +9,7 @@ final class SearchHistoryOnlyTests: XCTestCase {
   private var defaultsSuite: String!
   private var previousHistoryEnabled = true
   private var previousLocations: Any?
+  private var previousSavedLocations: Any?
 
   override func setUpWithError() throws {
     try super.setUpWithError()
@@ -16,6 +17,8 @@ final class SearchHistoryOnlyTests: XCTestCase {
     defaults = try XCTUnwrap(UserDefaults(suiteName: defaultsSuite))
     previousHistoryEnabled = Settings.searchHistoryEnabled()
     previousLocations = UserDefaults.standard.object(forKey: "mikshat_search_locations")
+    previousSavedLocations = UserDefaults.standard.object(forKey: MikshatSearchHistoryStore.storageKey)
+    MikshatSearchLocations.clear()
     Settings.setSearchHistoryEnabled(true)
     HistoryOnlyFrameworkStub.queries = []
     HistoryOnlyFrameworkStub.categoryRequests = 0
@@ -28,6 +31,11 @@ final class SearchHistoryOnlyTests: XCTestCase {
       UserDefaults.standard.set(previousLocations, forKey: "mikshat_search_locations")
     } else {
       UserDefaults.standard.removeObject(forKey: "mikshat_search_locations")
+    }
+    if let previousSavedLocations {
+      UserDefaults.standard.set(previousSavedLocations, forKey: MikshatSearchHistoryStore.storageKey)
+    } else {
+      UserDefaults.standard.removeObject(forKey: MikshatSearchHistoryStore.storageKey)
     }
     defaults.removePersistentDomain(forName: defaultsSuite)
     defaults = nil
@@ -77,8 +85,105 @@ final class SearchHistoryOnlyTests: XCTestCase {
     XCTAssertEqual(target.longitude, coordinate.longitude)
 
     history.tableView(table, didSelectRowAt: IndexPath(row: 0, section: 0))
-    XCTAssertEqual(delegate.query?.text, savedQuery + " ")
+    XCTAssertEqual(delegate.query?.text, savedQuery)
     XCTAssertEqual(delegate.query?.source, .history)
+    let saved = try XCTUnwrap(delegate.query?.historyLocation)
+    XCTAssertEqual(saved.latitude, coordinate.latitude)
+    XCTAssertEqual(saved.longitude, coordinate.longitude)
+  }
+
+  func test_SameNameLocationsKeepTheirOwnCoordinatesAndSurviveReload() throws {
+    let name = "العقلة"
+    HistoryOnlyFrameworkStub.queries = [name]
+    let first = CLLocationCoordinate2D(latitude: 24.7136, longitude: 46.6753)
+    let second = CLLocationCoordinate2D(latitude: 26.2317, longitude: 44.9453)
+    MikshatSearchLocations.rememberLocation(first, title: name, subtitle: "Region one", query: name)
+    MikshatSearchLocations.rememberLocation(second, title: name, subtitle: "Region two", query: name)
+    // A new controller reads persisted records, not the last text-query result.
+    let controller = makeController()
+    let delegate = HistoryOnlyDelegateSpy()
+    controller.delegate = delegate
+    let history = try historyController(in: controller)
+    let table = try historyTable(in: history)
+    XCTAssertEqual(table.numberOfRows(inSection: 0), 3)
+    for (rowIndex, coordinate) in [second, first].enumerated() {
+      let index = IndexPath(row: rowIndex, section: 0)
+      let row = try XCTUnwrap(table.dataSource?.tableView(table, cellForRowAt: index))
+      XCTAssertEqual(row.textLabel?.text, name)
+      XCTAssertNotNil(row.detailTextLabel?.text)
+      history.tableView(table, didSelectRowAt: index)
+      let location = try XCTUnwrap(delegate.query?.historyLocation)
+      XCTAssertEqual(location.latitude, coordinate.latitude)
+      XCTAssertEqual(location.longitude, coordinate.longitude)
+    }
+  }
+
+  func test_LegacyNameShowsResolutionHintWhileKnownCoordinatesOpenDirectly() throws {
+    HistoryOnlyFrameworkStub.queries = ["Old ambiguous name", "24.7136, 46.6753"]
+    let controller = makeController()
+    let delegate = HistoryOnlyDelegateSpy()
+    controller.delegate = delegate
+    let history = try historyController(in: controller)
+    let table = try historyTable(in: history)
+    let unresolvedRow = try XCTUnwrap(table.dataSource?.tableView(table, cellForRowAt: IndexPath(row: 0, section: 0)))
+    XCTAssertEqual(unresolvedRow.detailTextLabel?.text, L("mikshat_history_resolve_location"))
+    history.tableView(table, didSelectRowAt: IndexPath(row: 0, section: 0))
+    XCTAssertNil(delegate.query?.historyLocation)
+    XCTAssertEqual(delegate.query?.text, "Old ambiguous name ")
+    history.tableView(table, didSelectRowAt: IndexPath(row: 1, section: 0))
+    let location = try XCTUnwrap(delegate.query?.historyLocation)
+    XCTAssertEqual(location.latitude, 24.7136)
+    XCTAssertEqual(location.longitude, 46.6753)
+  }
+
+  func test_LocationStoreRestoresNamesAndDistinctPointsAndPromotesTheSamePoint() throws {
+    let first = MikshatSearchLocation(id: "one", title: "Same name", subtitle: "First region", query: "query",
+                                      latitude: 25, longitude: 47)
+    let second = MikshatSearchLocation(id: "two", title: "Same name", subtitle: "Second region", query: "query",
+                                       latitude: 26, longitude: 48)
+    let store = MikshatSearchHistoryStore(defaults: defaults)
+    store.remember(first)
+    store.remember(second)
+    let restored = MikshatSearchHistoryStore(defaults: defaults)
+    XCTAssertEqual(restored.locations, [second, first])
+    restored.remember(MikshatSearchLocation(id: "new-id", title: "Updated title", subtitle: "First region", query: "new query",
+                                            latitude: 25, longitude: 47))
+    XCTAssertEqual(restored.locations.count, 2)
+    XCTAssertEqual(restored.locations.first?.id, "one")
+    XCTAssertEqual(restored.locations.first?.title, "Updated title")
+    XCTAssertEqual(restored.locations.last, second)
+  }
+
+  func test_CorruptAndOutOfRangeLocationsDoNotOpenAnInventedPoint() throws {
+    let store = MikshatSearchHistoryStore(defaults: defaults)
+    defaults.set(Data("invalid JSON".utf8), forKey: MikshatSearchHistoryStore.storageKey)
+    XCTAssertTrue(store.locations.isEmpty)
+    let invalid = MikshatSearchLocation(id: "invalid", title: "Wrong point", subtitle: "", query: "",
+                                        latitude: 100, longitude: 47)
+    defaults.set(try JSONEncoder().encode([invalid]), forKey: MikshatSearchHistoryStore.storageKey)
+    XCTAssertTrue(store.locations.isEmpty)
+    store.remember(invalid)
+    XCTAssertTrue(store.locations.isEmpty)
+  }
+
+  func test_DisabledHistoryDoesNotSaveSelectedLocations() {
+    Settings.setSearchHistoryEnabled(false)
+    MikshatSearchLocations.rememberLocation(CLLocationCoordinate2D(latitude: 25, longitude: 47),
+                                           title: "Private location", subtitle: "", query: "Private query")
+    XCTAssertTrue(MikshatSearchLocations.entries(queries: ["Private query"]).isEmpty)
+    XCTAssertNil(UserDefaults.standard.data(forKey: MikshatSearchHistoryStore.storageKey))
+  }
+
+  @MainActor
+  func test_CoreHistorySelectionShowsTheStoredPointAndTitle() throws {
+    let coordinate = CLLocationCoordinate2D(latitude: 26.2317, longitude: 44.9453)
+    MWMSearchFrameworkHelper.showHistoryLocation(coordinate, title: "Stored history point")
+    defer { FrameworkHelper.deactivateMapSelection() }
+    XCTAssertTrue(PlacePageData.hasData)
+    let data = PlacePageData(localizationProvider: OpeinigHoursLocalization())
+    XCTAssertEqual(data.locationCoordinate.latitude, coordinate.latitude, accuracy: 0.000001)
+    XCTAssertEqual(data.locationCoordinate.longitude, coordinate.longitude, accuracy: 0.000001)
+    XCTAssertEqual(data.previewData.title, "Stored history point")
   }
 
   func test_RotatedHistoryAccessoryKeepsFixedGeometryThroughTableLayoutAndReuse() throws {
@@ -189,7 +294,8 @@ final class SearchHistoryOnlyTests: XCTestCase {
   func test_ClearHistoryStillClearsQueriesAndSavedDirectionTargets() throws {
     let query = "Point to clear"
     HistoryOnlyFrameworkStub.queries = [query]
-    MikshatSearchLocations.remember(CLLocationCoordinate2D(latitude: 25, longitude: 47), query: query)
+    MikshatSearchLocations.rememberLocation(CLLocationCoordinate2D(latitude: 25, longitude: 47),
+                                           title: query, subtitle: "", query: query)
     let controller = makeController()
     let history = try historyController(in: controller)
     let table = try historyTable(in: history)
@@ -197,6 +303,7 @@ final class SearchHistoryOnlyTests: XCTestCase {
     XCTAssertEqual(HistoryOnlyFrameworkStub.clearRequests, 1)
     XCTAssertEqual(table.numberOfRows(inSection: 0), 0)
     XCTAssertNil(MikshatSearchLocations.coordinate(for: query))
+    XCTAssertNil(UserDefaults.standard.object(forKey: MikshatSearchHistoryStore.storageKey))
   }
 
   func test_PresentationInsetAndVerticalScrollingReachTheSearchSheet() throws {

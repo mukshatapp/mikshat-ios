@@ -793,6 +793,8 @@ void Processor::SearchPostcode()
   auto const normQuery = NormalizeAndSimplifyString(query);
   for (auto const & info : infos)
   {
+    if (!info->IsRegistered())
+      continue;
     auto handle = m_dataSource.GetMwmHandleById(MwmSet::MwmId(info));
     if (!handle.IsAlive())
       continue;
@@ -975,6 +977,8 @@ void Processor::EmitResultsFromMwms(std::vector<std::shared_ptr<MwmInfo>> const 
 
   for (auto const & info : infos)
   {
+    if (!info->IsRegistered())
+      continue;
     auto guard = std::make_unique<FeaturesLoaderGuard>(m_dataSource, MwmSet::MwmId(info));
 
     fn(*guard, [&](std::unique_ptr<FeatureType> ft)

@@ -121,6 +121,9 @@ void TestSameRules(df::Stylist const & actual, df::Stylist const & expected)
   TEST_EQUAL(actual.m_pathtextRule, expected.m_pathtextRule, ());
   TEST_EQUAL(actual.m_shieldRule, expected.m_shieldRule, ());
   TEST_EQUAL(actual.m_areaRule, expected.m_areaRule, ());
+  TEST_EQUAL(actual.m_isProtectedAreaFill, expected.m_isProtectedAreaFill, ());
+  TEST_EQUAL(actual.m_isProtectedAreaHatching, expected.m_isProtectedAreaHatching, ());
+  TEST_EQUAL(actual.m_hatchingPattern, expected.m_hatchingPattern, ());
   TEST_EQUAL(actual.m_hatchingRule, expected.m_hatchingRule, ());
   TEST(std::equal(actual.m_lineRules.begin(), actual.m_lineRules.end(), expected.m_lineRules.begin(),
                   expected.m_lineRules.end()),
@@ -202,14 +205,78 @@ UNIT_TEST(Stylist_IsHatching)
   auto const & checker = df::IsHatchingTerritoryChecker::Instance();
 
   TEST(checker(cl.GetTypeByPath({"boundary", "protected_area", "1"})), ());
-  TEST(!checker(cl.GetTypeByPath({"boundary", "protected_area", "2"})), ());
-  TEST(!checker(cl.GetTypeByPath({"boundary", "protected_area"})), ());
+  TEST(checker(cl.GetTypeByPath({"boundary", "protected_area", "2"})), ());
+  TEST(checker(cl.GetTypeByPath({"boundary", "protected_area"})), ());
 
   TEST(checker(cl.GetTypeByPath({"boundary", "national_park"})), ());
 
   TEST(checker(cl.GetTypeByPath({"landuse", "military", "danger_area"})), ());
 
   TEST(checker(cl.GetTypeByPath({"amenity", "prison"})), ());
+}
+
+UNIT_TEST(Stylist_ProtectedAreaClassification)
+{
+  classificator::Load();
+  auto const & cl = classif();
+  auto const & checker = df::IsProtectedAreaChecker::Instance();
+  TEST(checker(cl.GetTypeByPath({"boundary", "national_park"})), ());
+  TEST(checker(cl.GetTypeByPath({"leisure", "nature_reserve"})), ());
+  TEST(checker(cl.GetTypeByPath({"boundary", "protected_area"})), ());
+  for (auto const protectClass : {"1", "2", "3", "4", "5", "6"})
+  {
+    TEST(checker(cl.GetTypeByPath({"boundary", "protected_area", protectClass})), (protectClass));
+    TEST_EQUAL(df::IsHatchingTerritoryChecker::Instance().GetHatch(
+                   cl.GetTypeByPath({"boundary", "protected_area", protectClass})),
+               dp::k45dHatching, (protectClass));
+  }
+
+  for (auto const & path : {base::StringIL{"natural", "water"},
+                            {"natural", "water", "intermittent"},
+                            {"natural", "wetland"},
+                            {"waterway", "river"},
+                            {"landuse", "forest"},
+                            {"landuse", "military"},
+                            {"amenity", "prison"},
+                            {"boundary", "aboriginal_lands"}})
+    TEST(!checker(cl.GetTypeByPath(path)), (path));
+}
+
+UNIT_CLASS_TEST(StyleSnapshotFixture, ProtectedAreaFillRuleProvenance)
+{
+  for (auto const style : kStyles)
+  {
+    auto const & cl = classif(style);
+    auto const protected1 = cl.GetTypeByPath({"boundary", "protected_area", "1"});
+    auto const protected2 = cl.GetTypeByPath({"boundary", "protected_area", "2"});
+    auto const wetland = cl.GetTypeByPath({"natural", "wetland"});
+    for (auto const protectedType :
+         {protected1, protected2, cl.GetTypeByPath({"boundary", "protected_area"}),
+          cl.GetTypeByPath({"boundary", "protected_area", "3"}), cl.GetTypeByPath({"boundary", "protected_area", "4"}),
+          cl.GetTypeByPath({"boundary", "protected_area", "5"}), cl.GetTypeByPath({"boundary", "protected_area", "6"}),
+          cl.GetTypeByPath({"boundary", "national_park"}), cl.GetTypeByPath({"leisure", "nature_reserve"})})
+      for (auto const base : {cl.GetTypeByPath({"natural", "water"}), cl.GetTypeByPath({"landuse", "forest"})})
+      {
+        auto feature = FeatureType::CreateFromMapObject(WaterArea({protectedType, base}));
+        df::Stylist const stylist(*feature, 14, StringUtf8Multilang::kEnglishCode, style);
+        TEST(stylist.m_areaRule != nullptr && stylist.m_hatchingRule != nullptr, (style));
+        TEST(!stylist.m_isProtectedAreaFill,
+             ("Water/forest must remain visible when protected hatching disappears", style));
+        TEST(stylist.m_isProtectedAreaHatching, (style));
+        TEST_EQUAL(stylist.m_hatchingPattern, dp::k45dHatching, (style));
+      }
+
+    auto feature = FeatureType::CreateFromMapObject(WaterArea({protected2, wetland}));
+    df::Stylist const stylist(*feature, 14, StringUtf8Multilang::kEnglishCode, style);
+    auto wetlandFeature = FeatureType::CreateFromMapObject(WaterArea({wetland}));
+    df::Stylist const wetlandStyle(*wetlandFeature, 14, StringUtf8Multilang::kEnglishCode, style);
+    TEST(stylist.m_hatchingRule != nullptr, (style));
+    TEST_EQUAL(stylist.m_hatchingRule, wetlandStyle.m_hatchingRule, (style));
+    TEST_EQUAL(stylist.m_hatchingPattern, dp::kDashHatching, (style));
+    TEST(!stylist.m_isProtectedAreaFill, (style));
+    TEST(!stylist.m_isProtectedAreaHatching,
+         ("Wetland hatching must remain visible when protected fill disappears", style));
+  }
 }
 
 UNIT_TEST(Stylist_IsAreaPattern)

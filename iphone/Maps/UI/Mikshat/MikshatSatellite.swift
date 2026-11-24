@@ -31,9 +31,10 @@ final class MikshatSatelliteController {
       topConstraint!,
       button.widthAnchor.constraint(equalToConstant: 48), button.heightAnchor.constraint(equalToConstant: 48),
     ])
-    button.addAction(UIAction { [weak self] _ in self?.toggle() }, for: .touchUpInside)
+    button.showsMenuAsPrimaryAction = true
+    button.accessibilityIdentifier = "map.layers"
     self.button = button
-    button.isEnabled = false
+    MikshatSupplementaryMaps.shared.restoreSelection()
     refreshButton()
     loadSource()
   }
@@ -58,17 +59,11 @@ final class MikshatSatelliteController {
         self.isLoading = false
         if let value, value.minZoom == 0, value.maxZoom == 20, Settings.isWellFormedBackgroundTilesURL(value.url) {
           self.source = value
-          self.button?.isEnabled = true
           self.apply(self.enabled)
-        } else { self.button?.isEnabled = false }
+        }
         self.refreshButton()
       }
     }
-  }
-
-  private func toggle() {
-    guard source != nil else { return }
-    apply(!enabled)
   }
 
   private func apply(_ value: Bool) {
@@ -81,10 +76,43 @@ final class MikshatSatelliteController {
   }
 
   private func refreshButton() {
-    button?.backgroundColor = enabled ? UIColor(red: 0.82, green: 0.94, blue: 0.85, alpha: 1) : .white
+    let maps = MikshatSupplementaryMaps.shared
+    let anyEnabled = enabled || !maps.enabledIDs.isEmpty
+    button?.backgroundColor = anyEnabled ? UIColor(red: 0.82, green: 0.94, blue: 0.85, alpha: 1) : .white
     button?.setImage(UIImage(systemName: enabled ? "globe.europe.africa.fill" : "globe"), for: .normal)
-    button?.accessibilityLabel = L(enabled ? "mikshat_satellite_disable" : "mikshat_satellite_enable")
-    button?.accessibilityValue = L(enabled ? "on" : "off")
-    button?.accessibilityTraits = enabled ? [.button, .selected] : .button
+    button?.accessibilityLabel = L("mikshat_map_layers")
+    button?.accessibilityValue = L(anyEnabled ? "on" : "off")
+    button?.accessibilityTraits = anyEnabled ? [.button, .selected] : .button
+
+    let satellite = UIAction(title: L(enabled ? "mikshat_satellite_disable" : "mikshat_satellite_enable"),
+                             image: UIImage(systemName: "globe.europe.africa"),
+                             attributes: source == nil ? [.disabled] : [],
+                             state: enabled ? .on : .off) { [weak self] _ in
+      guard let self else { return }
+      self.apply(!self.enabled)
+    }
+    let offlineMaps = MikshatSupplementaryMaps.catalog.map { map in
+      UIAction(title: L(map.titleKey), state: maps.enabledIDs.contains(map.id) ? .on : .off) { [weak self] _ in
+        if !maps.setEnabled(!maps.enabledIDs.contains(map.id), id: map.id) {
+          self?.showMapError()
+        }
+        self?.refreshButton()
+      }
+    }
+    button?.menu = UIMenu(title: L("mikshat_map_layers"), children: [
+      satellite,
+      UIMenu(title: L("mikshat_supplementary_maps"), image: UIImage(systemName: "map"), children: offlineMaps),
+    ])
+  }
+
+  private func showMapError() {
+    DispatchQueue.main.async { [weak self] in
+      var presenter = self?.button?.window?.rootViewController
+      while let presented = presenter?.presentedViewController { presenter = presented }
+      let alert = UIAlertController(title: L("mikshat_supplementary_maps"),
+                                    message: L("mikshat_supplementary_map_unavailable"), preferredStyle: .alert)
+      alert.addAction(UIAlertAction(title: L("ok"), style: .default))
+      presenter?.present(alert, animated: true)
+    }
   }
 }

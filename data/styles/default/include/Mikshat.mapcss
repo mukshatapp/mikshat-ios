@@ -50,10 +50,12 @@ line[waterway][tunnel]
 /* Tracks identify the mapped unsealed-road class. Do not recolor paved
  * residential/service roads merely because they are minor roads.
  */
-line|z10-13[highway=track][!tunnel]
+line|z9-13[highway=track][!tunnel]
 {color: @track; width: 0.8; opacity: 0.9; dashes: 5,3;}
 line|z14-15[highway=track][!tunnel]
 {width: 1.1; dashes: 6,2.5;}
+line|z9-14[highway=track][!tunnel]
+{text: name; text-position: line; font-size: 10; text-color: @mikshat_dirt_road; text-halo-color: @label_halo_light; text-halo-radius: 1; text-halo-opacity: 0.9;}
 
 /* Small icons are spaced at overview scales. Existing overlay priorities
  * still resolve collisions; names become available on closer inspection.
@@ -118,17 +120,23 @@ area|z14-[natural=grassland]
  * Test the stored feature name at runtime, leaving other localities intact.
  */
 node|z9-[place=locality][named_fayda],
-area|z9-[place=locality][named_fayda]
+area|z9-[place=locality][named_fayda],
+node|z9-[natural=wetland][named_fayda],
+area|z9-[natural=wetland][named_fayda]
 {text: name; text-position: center; font-size: 12; text-color: @mikshat_fayda_label; text-halo-color: @label_halo_light; text-halo-radius: 1; text-halo-opacity: 0.9;}
 node|z14-[place=locality][named_fayda],
-area|z14-[place=locality][named_fayda]
+area|z14-[place=locality][named_fayda],
+node|z14-[natural=wetland][named_fayda],
+area|z14-[natural=wetland][named_fayda]
 {font-size: 13;}
 
 /* Kothic needs the complementary branch to retain the original locality
  * captions at their normal scales when the runtime predicate is false.
  */
 node|z9-[place=locality][!named_fayda],
-area|z9-[place=locality][!named_fayda]
+area|z9-[place=locality][!named_fayda],
+node|z9-[natural=wetland][!named_fayda],
+area|z9-[natural=wetland][!named_fayda]
 {}
 
 /* Surface metadata distinguishes genuinely unpaved motor roads from paved

@@ -157,32 +157,133 @@ class ProbePlanTests(unittest.TestCase):
 
 
 class ProductionGateTests(unittest.TestCase):
-    def phases(self):
-        return [dict(phase="scene.attach.end", language="ar", direction="RTL"),
+    def phases(self, language="ar"):
+        return [dict(phase="scene.attach.end", language=language, direction="RTL" if language == "ar" else "LTR"),
                 dict(phase="verification.previewInsets.observed", insetsLayoutMarginsFromSafeArea=False,
                      diagnosticHookEnabled=False, runtimeProbeFlags=[]),
                 *[dict(phase="rotation.end", cycle=cycle, orientation=orientation)
                   for cycle, orientation in rotation_diagnostic.ROTATIONS],
                 dict(phase="test.completed")]
 
-    def evaluate(self, directory, phases, log=None):
+    def log(self, language="ar", family="phone"):
+        events = ["MIKSHAT_FEATURE_LAYOUT_PROFILE " + json.dumps({
+            "language": language, "direction": "RTL" if language == "ar" else "LTR",
+            "idiom": "pad" if family == "tablet" else "phone", "productionVerification": True,
+            "runtimeProbeFlags": []})]
+        cases = rotation_diagnostic.selected_cases(True, family)
+        for name, methods in cases.items():
+            for method in methods:
+                case = f"-[OMapsTests.{name} {method}]"
+                events += [f"Test Case '{case}' started.", f"Test Case '{case}' passed (1.0 seconds)."]
+        count = sum(len(methods) for methods in cases.values())
+        events += [f"Executed {count} tests, with 0 failures in 24.0 seconds", "** TEST EXECUTE SUCCEEDED **"]
+        return "\n".join(events) + "\n"
+
+    def evaluate(self, directory, phases, log=None, language="ar", profile="phone-ar", family="phone"):
         samples = directory / "native-samples"
         samples.mkdir(exist_ok=True)
         (samples / "phases-seen.jsonl").write_text("".join(json.dumps(item) + "\n" for item in phases))
         if log is None:
-            case = "-[OMapsTests.MikshatMapSceneLayoutTests " + rotation_diagnostic.CASE + "]"
-            log = (f"Test Case '{case}' started.\nTest Case '{case}' passed (1.0 seconds).\n"
-                   "Executed 1 test, with 0 failures in 1.0 seconds\n** TEST EXECUTE SUCCEEDED **\n")
+            log = self.log(language, family)
         (directory / "xcodebuild-test.log").write_text(log)
-        return rotation_diagnostic.evaluate_mode("automatic", directory, 0, False, production=True)
+        return rotation_diagnostic.evaluate_mode("automatic", directory, 0, False, production=True,
+                                                 language=language, profile=profile, family=family)
 
     def test_source_layout_and_all_twelve_rotations_pass_without_claiming_physical_proof(self):
         with tempfile.TemporaryDirectory() as temp:
             report = self.evaluate(Path(temp), self.phases())
         self.assertTrue(report["productionLayoutSimulatorVerified"])
         self.assertTrue(report["productionEvidence"]["rotationPatternMatched"])
-        self.assertEqual(rotation_diagnostic.classify([report], production=True), "productionLayoutSimulatorPassed")
+        self.assertEqual(rotation_diagnostic.classify([report], production=True), "infrastructureFailed")
         self.assertEqual(rotation_diagnostic.classify([report]), "infrastructureFailed")
+        profiles = []
+        with tempfile.TemporaryDirectory() as temp:
+            for profile in rotation_diagnostic.PRODUCTION_PROFILES:
+                directory = Path(temp) / profile["id"]
+                directory.mkdir()
+                phases = self.phases(profile["language"]) if profile["family"] == "phone" else []
+                profiles.append(self.evaluate(directory, phases, language=profile["language"],
+                                              profile=profile["id"], family=profile["family"]))
+        self.assertEqual(rotation_diagnostic.classify(profiles, production=True), "productionLayoutSimulatorPassed")
+        profiles[-1]["profile"] = "phone-ar"
+        self.assertEqual(rotation_diagnostic.classify(profiles, production=True), "infrastructureFailed")
+
+    def test_exact_feature_cases_are_required_even_when_class_totals_match(self):
+        original = "testEveryBundledMapCanActivateDeactivateAndReactivateWithoutDeletingItsFile"
+        with tempfile.TemporaryDirectory() as temp:
+            report = self.evaluate(Path(temp), self.phases(), self.log().replace(original, "testUnrelatedMapCase"))
+        self.assertFalse(report["passed"])
+        self.assertEqual(report["nativeExecution"]["casesStarted"], 24)
+        self.assertEqual(report["nativeExecution"]["missingCases"], ["MikshatSupplementaryMapsTests." + original])
+        self.assertEqual(report["nativeExecution"]["unexpectedCases"], ["MikshatSupplementaryMapsTests.testUnrelatedMapCase"])
+
+    def test_wrong_language_or_direction_cannot_satisfy_english_profile(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            for phases in (self.phases(), [dict(item, direction="RTL") if item["phase"] == "scene.attach.end"
+                                          else item for item in self.phases("en")]):
+                report = self.evaluate(directory, phases, language="en", profile="phone-en")
+                self.assertFalse(report["localeConfirmed"])
+                self.assertFalse(report["passed"])
+
+    def test_skipped_feature_case_cannot_be_hidden_by_rotation_success(self):
+        log = self.log().replace("passed (1.0 seconds).", "skipped (1.0 seconds).", 1)
+        with tempfile.TemporaryDirectory() as temp:
+            report = self.evaluate(Path(temp), self.phases(), log)
+        self.assertFalse(report["passed"])
+
+    def test_production_filters_select_all_24_declared_methods_and_no_probe_case(self):
+        filters = rotation_diagnostic.testing_filters(True)
+        self.assertEqual(len(filters), 24)
+        self.assertEqual(len(set(filters)), 24)
+        self.assertEqual(rotation_diagnostic.testing_filters(False), [
+            "-only-testing:OMapsTests/MikshatMapSceneLayoutTests/" + rotation_diagnostic.CASE])
+        files = {
+            "MikshatMapSceneLayoutTests": "MikshatResponsivePresentationTests.swift",
+            "MikshatResponsivePresentationTests": "MikshatResponsivePresentationTests.swift",
+            "MikshatResponsivePlaceCoordinatesTests": "MikshatResponsiveUITests.swift",
+            "SearchHistoryOnlyTests": "SearchHistoryOnlyTests.swift",
+            "SearchOnMapTests": "SearchOnMapTests.swift",
+        }
+        for name, methods in rotation_diagnostic.PRODUCTION_CASES.items():
+            path = (rotation_diagnostic.ROOT / "iphone/Maps/Tests/Core/Storage/MikshatSupplementaryMapsTests.swift"
+                    if name == "MikshatSupplementaryMapsTests" else rotation_diagnostic.ROOT /
+                    "iphone/Maps/Tests/UI/SearchOnMapTests" / files[name])
+            source = path.read_text()
+            for method in methods:
+                self.assertIn("func " + method + "(", source)
+
+    def test_tablets_require_23_component_cases_and_actual_locale_without_claiming_scene_rotation(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            report = self.evaluate(directory, [], language="en", profile="tablet-en", family="tablet")
+            self.assertTrue(report["passed"])
+            self.assertEqual(report["nativeExecution"]["expectedTotal"], 23)
+            self.assertFalse(report["productionEvidence"]["phoneSceneRotationRequired"])
+            self.assertIsNone(report["productionEvidence"]["rotationPatternMatched"])
+            for changes in ({"language": "ar"}, {"direction": "RTL"}, {"idiom": "phone"},
+                            {"productionVerification": False}, {"runtimeProbeFlags": ["-MikshatRotationDiagnostics"]}):
+                log = self.log("en", "tablet")
+                marker = json.loads(log.splitlines()[0].split(" ", 1)[1])
+                marker.update(changes)
+                log = "MIKSHAT_FEATURE_LAYOUT_PROFILE " + json.dumps(marker) + "\n" + log.split("\n", 1)[1]
+                report = self.evaluate(directory, [], log, language="en", profile="tablet-en", family="tablet")
+                self.assertFalse(report["passed"], changes)
+            no_marker = self.log("en", "tablet").split("\n", 1)[1]
+            self.assertFalse(self.evaluate(directory, [], no_marker, language="en", profile="tablet-en",
+                                           family="tablet")["passed"])
+        filters = rotation_diagnostic.testing_filters(True, "tablet")
+        self.assertEqual(len(filters), 23)
+        self.assertFalse(any(rotation_diagnostic.CASE in item for item in filters))
+
+    def test_installed_phone_and_tablet_types_are_required(self):
+        available = [{"identifier": "com.apple.CoreSimulator.SimDeviceType.iPhone-16", "name": "iPhone 16"},
+                     {"identifier": "com.apple.CoreSimulator.SimDeviceType.iPad-Pro-13-inch-M4-8GB",
+                      "name": "iPad Pro 13-inch (M4) (8GB)"}]
+        self.assertEqual(rotation_diagnostic.device_type("phone", available), available[0]["identifier"])
+        self.assertEqual(rotation_diagnostic.device_type("tablet", available), available[1]["identifier"])
+        with self.assertRaises(RuntimeError):
+            rotation_diagnostic.device_type("tablet", available[:1])
 
     def test_probe_contamination_missing_rotation_or_terminal_cannot_pass(self):
         variations = []

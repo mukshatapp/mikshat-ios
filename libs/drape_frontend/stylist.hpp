@@ -14,6 +14,14 @@ class FeatureType;
 namespace df
 {
 
+class IsProtectedAreaChecker : public ftypes::BaseCheckerEx
+{
+  IsProtectedAreaChecker();
+
+public:
+  DECLARE_CHECKER_INSTANCE(IsProtectedAreaChecker);
+};
+
 class IsHatchingTerritoryChecker
 {
   IsHatchingTerritoryChecker();
@@ -36,7 +44,6 @@ private:
   {
     TwoLevel45();
   } m_2level45;
-  uint32_t m_3level45;
 
   uint32_t m_2levelDash;  // dash hatch
 };
@@ -111,6 +118,9 @@ public:
   drule::ShieldRule const * m_shieldRule = nullptr;
   drule::AreaRule const * m_areaRule = nullptr;
   drule::AreaRule const * m_hatchingRule = nullptr;
+  bool m_isProtectedAreaFill = false;
+  bool m_isProtectedAreaHatching = false;
+  std::string_view m_hatchingPattern;
 
   using LineRulesT = buffer_vector<drule::LineRule const *, 4>;
   LineRulesT m_lineRules;
@@ -123,7 +133,7 @@ public:
   Stylist(FeatureType & f, uint8_t zoomLevel, int8_t deviceLang, MapStyle style);
 
 private:
-  void ProcessKey(FeatureType & f, drule::Key const & key, drule::RulesHolder const & rules);
+  void ProcessKey(FeatureType & f, drule::Key const & key, drule::RulesHolder const & rules, bool isProtectedArea);
 };
 
 }  // namespace df

@@ -200,6 +200,64 @@ std::pair<MwmSet::MwmId, MwmSet::RegResult> Framework::RegisterMap(LocalCountryF
   return res;
 }
 
+bool Framework::SetSupplementaryMapEnabled(LocalCountryFile const & localFile, bool enabled)
+{
+  CHECK_THREAD_CHECKER(m_storage.GetThreadChecker(), ());
+  auto const & name = localFile.GetCountryName();
+  if (localFile.IsInBundle() || name == "World" || name == "WorldCoasts" || m_storage.IsNode(name))
+    return false;
+
+  auto const path = localFile.GetPath(MapFileType::Map);
+  auto const id = GetDataSource().GetMwmIdByCountryFile(localFile.GetCountryFile());
+  if (id.IsAlive() && id.GetInfo()->GetLocalFile().GetDirectory() != localFile.GetDirectory())
+    return false;
+
+  if (enabled)
+  {
+    if (IsCountryLoadedByName(name))
+      return m_supplementaryMapPaths.contains(path);
+
+    try
+    {
+      MwmValue const value(localFile);
+      if (value.GetHeader().GetType() != feature::DataHeader::MapType::Country)
+        return false;
+
+      LocalCountryFile file(localFile.GetDirectory(), localFile.GetCountryFile(), value.GetMwmVersion().GetVersion());
+      file.SyncWithDisk();
+      if (!file.OnDisk(MapFileType::Map))
+        return false;
+
+      m_supplementaryMapPaths.insert(path);
+      auto const result = RegisterMap(file);
+      if (!result.first.IsAlive() || !result.first.GetInfo()->IsRegistered())
+        return false;
+    }
+    catch (RootException const & e)
+    {
+      LOG(LWARNING, ("Cannot enable supplementary map", name, e.what()));
+      return false;
+    }
+  }
+  else
+  {
+    // Do not let this API deregister an unrelated custom map with the same name.
+    if (!m_supplementaryMapPaths.contains(path))
+      return !id.IsAlive();
+    if (!IsCountryLoadedByName(name))
+      return true;
+
+    if (id.IsAlive() && HasPlacePageInfo() && GetCurrentPlacePageInfo().GetID().m_mwmId == id)
+      DeactivateMapSelection();
+    GetSearchAPI().CancelAllSearches();
+    m_featuresFetcher.DeregisterMap(localFile.GetCountryFile());
+  }
+
+  ClearAllCaches();
+  InvalidateRect(id.IsAlive() ? id.GetInfo()->m_bordersRect : mercator::Bounds::FullRect());
+  return IsCountryLoadedByName(name) == enabled;
+}
+
 void Framework::OnLocationError(TLocationError /*error*/)
 {
   m_trafficManager.UpdateMyPosition(TrafficManager::MyPosition());
@@ -521,7 +579,8 @@ void Framework::OnMapDeregistered(platform::LocalCountryFile const & localFile)
     m_trafficManager.OnMwmDeregistered(localFile);
     m_descriptionsLoader->OnMwmDeregistered(localFile);
 
-    m_storage.DeleteCustomCountryVersion(localFile);
+    if (!m_supplementaryMapPaths.contains(localFile.GetPath(MapFileType::Map)))
+      m_storage.DeleteCustomCountryVersion(localFile);
   };
 
   // Call action on thread in which the framework was created

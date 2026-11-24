@@ -2,16 +2,21 @@ final class SearchOnMapInteractor: NSObject {
   private let presenter: SearchOnMapPresenter
   private let searchManager: SearchManager.Type
   private let routePointSelector: RoutePointSelecting?
+  private let showHistoryLocation: (CLLocationCoordinate2D, String) -> Void
   private weak var mapViewController: MapViewController?
   private var isUpdatesDisabled = false
 
   init(presenter: SearchOnMapPresenter,
        searchManager: SearchManager.Type = Search.self,
        routePointSelector: RoutePointSelecting? = nil,
-       mapViewController: MapViewController? = nil) {
+       mapViewController: MapViewController? = nil,
+       showHistoryLocation: @escaping (CLLocationCoordinate2D, String) -> Void = {
+         MWMSearchFrameworkHelper.showHistoryLocation($0, title: $1)
+       }) {
     self.presenter = presenter
     self.searchManager = searchManager
     self.routePointSelector = routePointSelector
+    self.showHistoryLocation = showHistoryLocation
     self.mapViewController = mapViewController
     super.init()
     searchManager.add(self)
@@ -129,6 +134,19 @@ final class SearchOnMapInteractor: NSObject {
   }
 
   private func processSelectedText(_ query: SearchQuery) -> SearchOnMap.Response {
+    if query.source == .history, let location = query.historyLocation {
+      guard location.isValid else { return .none }
+      if let routePointSelector, routePointSelector.isActive {
+        guard routePointSelector.select(historyLocation: location) else { return .none }
+        MikshatSearchLocations.markVisited(location)
+        return closeSearch()
+      }
+      MikshatSearchLocations.markVisited(location)
+      prepareToCloseSearch()
+      presenter.close()
+      showHistoryLocation(location.coordinate, location.title)
+      return .none
+    }
     isUpdatesDisabled = false
     if query.source != .history {
       searchManager.save(query)
@@ -140,7 +158,8 @@ final class SearchOnMapInteractor: NSObject {
     switch result.itemType {
     case .regular:
       searchManager.save(query)
-      MikshatSearchLocations.remember(result.coordinate, query: query.text)
+      MikshatSearchLocations.rememberLocation(result.coordinate, title: result.titleText,
+                                             subtitle: result.addressText, query: query.text)
       if let routePointSelector, routePointSelector.isActive {
         guard routePointSelector.select(searchResult: result) else { return .none }
         return closeSearch()

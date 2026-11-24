@@ -224,7 +224,8 @@ void DataSource::ForEachInIntervals(ReaderCallback const & fn, covering::Coverin
 
   for (auto const & info : mwms)
   {
-    if (info->m_minScale <= scale && scale <= info->m_maxScale && rect.IsIntersect(info->m_bordersRect))
+    if (info->IsRegistered() && info->m_minScale <= scale && scale <= info->m_maxScale &&
+        rect.IsIntersect(info->m_bordersRect))
     {
       MwmId const mwmId(info);
       switch (info->GetType())

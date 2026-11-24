@@ -474,6 +474,8 @@ Geocoder::ExtendedMwmInfos Geocoder::OrderCountries(bool inViewport, std::vector
   res.m_infos.reserve(infos.size());
   for (auto const & info : infos)
   {
+    if (!info->IsRegistered())
+      continue;
     ExtendedMwmInfos::ExtendedMwmInfo ei;
     ei.m_info = info;
 
@@ -867,6 +869,8 @@ void Geocoder::ForEachCountry(ExtendedMwmInfos const & extendedInfos, Fn && fn)
   for (size_t i = 0; i < extendedInfos.m_infos.size(); ++i)
   {
     auto const & info = extendedInfos.m_infos[i].m_info;
+    if (!info->IsRegistered())
+      continue;
     if (info->GetType() != MwmInfo::COUNTRY && info->GetType() != MwmInfo::WORLD)
       continue;
     if (info->GetType() == MwmInfo::COUNTRY && m_params.m_mode == Mode::Downloader)

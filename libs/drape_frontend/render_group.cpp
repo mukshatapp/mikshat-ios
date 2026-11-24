@@ -159,6 +159,19 @@ bool RenderGroupComparator::operator()(drape_ptr<RenderGroup> const & l, drape_p
     if (lDepth != rDepth)
       return lDepth < rDepth;
 
+    // Batch-only extension flags must not move area fills across shader programs: translucent geometry
+    // writes depth even at transparent fragments, so the existing program order affects overlapping fills.
+    if (!(lState.GetBlending() == rState.GetBlending()))
+      return lState.GetBlending() < rState.GetBlending();
+    auto const lProgram = lState.GetProgram<gpu::Program>();
+    auto const rProgram = rState.GetProgram<gpu::Program>();
+    if (lProgram != rProgram)
+      return lProgram < rProgram;
+    auto const lProgram3d = lState.GetProgram3d<gpu::Program>();
+    auto const rProgram3d = rState.GetProgram3d<gpu::Program>();
+    if (lProgram3d != rProgram3d)
+      return lProgram3d < rProgram3d;
+
     return lState < rState;
   }
   return rCanBeDeleted;

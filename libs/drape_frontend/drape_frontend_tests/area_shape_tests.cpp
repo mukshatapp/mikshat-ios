@@ -1,11 +1,13 @@
 #include "testing/testing.hpp"
 
 #include "drape_frontend/area_shape.hpp"
+#include "drape_frontend/render_group.hpp"
 #include "drape_frontend/render_state_extension.hpp"
 
 #include "shaders/programs.hpp"
 
 #include <cmath>
+#include <set>
 #include <string>
 
 namespace
@@ -89,4 +91,36 @@ UNIT_TEST(AreaPatterns_SolidFillsDrawBeforeTranslucentGeometry)
           gpu::Program::CapJoin, gpu::Program::HatchingArea, gpu::Program::HatchingAreaDash})
       TEST(state(fill) < state(overlay),
            (std::string{DebugPrint(fill)}, "must sort before", std::string{DebugPrint(overlay)}));
+}
+
+UNIT_TEST(ProtectedAreaFill_SeparateBatchesPreserveProgramOrder)
+{
+  using namespace df;
+  auto const regular = CreateRenderState(gpu::Program::HatchingArea, DepthLayer::GeometryLayer);
+  auto const protectedFill = CreateRenderState(gpu::Program::HatchingArea, DepthLayer::GeometryLayer, true);
+  TEST(!IsProtectedAreaFill(regular), ());
+  TEST(IsProtectedAreaFill(protectedFill), ());
+  TEST_EQUAL(GetDepthLayer(protectedFill), DepthLayer::GeometryLayer, ());
+  TEST(regular != protectedFill, ());
+  // The batcher uses an ordered map: equality alone would not prevent the two fills being batched together.
+  TEST_EQUAL((std::set<dp::RenderState>{regular, protectedFill}).size(), 2, ());
+
+  RenderGroupComparator compare;
+  TileKey const tile(0, 0, 14);
+  auto const group = [&tile](gpu::Program program, bool isProtected = false)
+  { return make_unique_dp<RenderGroup>(CreateRenderState(program, DepthLayer::GeometryLayer, isProtected), tile); };
+  for (auto const fill :
+       {gpu::Program::Area, gpu::Program::AreaStipple, gpu::Program::AreaSpeckle, gpu::Program::AreaGrid})
+    for (auto const overlay : {gpu::Program::Line, gpu::Program::DashedLine, gpu::Program::TransparentArea,
+                               gpu::Program::HatchingArea, gpu::Program::HatchingAreaDash})
+    {
+      auto const protectedGroup = group(fill, true);
+      auto const overlayGroup = group(overlay);
+      TEST(compare(protectedGroup, overlayGroup), (std::string{DebugPrint(fill)}, std::string{DebugPrint(overlay)}));
+      TEST(!compare(overlayGroup, protectedGroup), ());
+    }
+  // Protected hatching retains its original position before the wetland hatch as well.
+  auto const protectedGroup = group(gpu::Program::HatchingArea, true);
+  auto const wetlandGroup = group(gpu::Program::HatchingAreaDash);
+  TEST(compare(protectedGroup, wetlandGroup), ());
 }

@@ -4,6 +4,7 @@
 
 #include "indexer/classificator_loader.hpp"
 #include "indexer/ftypes_matcher.hpp"
+#include "indexer/mikshat_map_visibility.hpp"
 
 #include "base/assert.hpp"
 #include "base/logging.hpp"
@@ -40,11 +41,21 @@ void FeaturesFetcher::ForEachFeatureIDForRendering(m2::RectD const & rect,
   auto const cancelled = [&] { return stop && stop(); };
   if (cancelled())
     return;
-  // Keep the ordinary stream path allocation-free at every other zoom and
-  // for non-tile-sized requests such as whole-world/search diagnostics.
-  bool const overview = scale == 9 || scale == 10;
+  // Keep ordinary queries streaming, including detail zooms when no optional
+  // map intersects the tile and non-tile-sized diagnostics/search requests.
+  bool const pointOverview = scale == 9 || scale == 10;
+  bool const overview = scale >= 9 && scale <= 14;
   double const maxSpan = overview ? mercator::Bounds::kRangeX / (1u << (scale - 1)) : 0.0;
-  if (!overview || !rect.IsValid() || rect.SizeX() > maxSpan || rect.SizeY() > maxSpan)
+  bool const tileOverview = overview && rect.IsValid() && rect.SizeX() <= maxSpan && rect.SizeY() <= maxSpan;
+  std::vector<std::shared_ptr<MwmInfo>> maps;
+  if (tileOverview)
+    m_dataSource.GetMwmsInfo(maps);
+  bool const hasSupplementary = std::any_of(maps.begin(), maps.end(), [&](auto const & info)
+  {
+    return info->IsRegistered() && feature::IsMikshatSupplementaryMap(info->GetCountryName()) &&
+           rect.IsIntersect(info->m_bordersRect);
+  });
+  if (!tileOverview || (!pointOverview && !hasSupplementary))
   {
     ForEachFeatureID(rect, [&](FeatureID const & id)
     {
@@ -60,24 +71,38 @@ void FeaturesFetcher::ForEachFeatureIDForRendering(m2::RectD const & rect,
   std::sort(ids.begin(), ids.end());
   ids.erase(std::unique(ids.begin(), ids.end()), ids.end());
 
-  // A tile-sized query at the 20 km ruler's native draw zooms only. Do not
+  // Tile-sized queries from the 20 km ruler through detail zooms. Do not
   // turn a whole-world, navigation, or search request into a high-detail scan.
   {
-    size_t constexpr maxCountries = 4;
-    size_t constexpr maxInspected = 16384;
+    size_t constexpr maxCountries = 8;
+    size_t constexpr maxInspected = 32768;
     size_t constexpr maxInspectedPerCountry = maxInspected / maxCountries;
     size_t constexpr maxAdded = 512;
     size_t inspected = 0;
     size_t countries = 0;
-    std::set<FeatureID> extra;
-    auto const finished = [&] { return cancelled() || inspected >= maxInspected || extra.size() >= maxAdded; };
-    std::vector<std::shared_ptr<MwmInfo>> maps;
-    m_dataSource.GetMwmsInfo(maps);
+    size_t const pointLimit = hasSupplementary ? maxAdded / 2 : maxAdded;
+    size_t const geometryLimit = maxAdded - pointLimit;
+    std::set<FeatureID> extraPoints;
+    std::set<FeatureID> extraGeometry;
+    auto const finished = [&]
+    {
+      return cancelled() || inspected >= maxInspected ||
+             (extraPoints.size() >= pointLimit && extraGeometry.size() >= geometryLimit);
+    };
+    // A user-selected supplementary map gets its own turn before the ordinary
+    // country landmark pass, so dense official POIs cannot exhaust its budget.
+    std::stable_sort(maps.begin(), maps.end(), [](auto const & lhs, auto const & rhs)
+    {
+      return feature::IsMikshatSupplementaryMap(lhs->GetCountryName()) >
+             feature::IsMikshatSupplementaryMap(rhs->GetCountryName());
+    });
     for (auto const & info : maps)
     {
       if (finished() || countries >= maxCountries)
         break;
-      if (info->GetType() != MwmInfo::COUNTRY || !rect.IsIntersect(info->m_bordersRect))
+      bool const supplementary = feature::IsMikshatSupplementaryMap(info->GetCountryName());
+      if (!info->IsRegistered() || info->GetType() != MwmInfo::COUNTRY || !rect.IsIntersect(info->m_bordersRect) ||
+          (!pointOverview && !supplementary))
         continue;
       ++countries;
       size_t countryInspected = 0;
@@ -86,14 +111,21 @@ void FeaturesFetcher::ForEachFeatureIDForRendering(m2::RectD const & rect,
       {
         ++inspected;
         ++countryInspected;
-        if (!IsOverviewPoint(feature) || !rect.IsPointInside(feature.GetCenter()))
-          return;
         auto const & id = feature.GetID();
-        if (!std::binary_search(ids.begin(), ids.end(), id))
-          extra.insert(id);
+        if (std::binary_search(ids.begin(), ids.end(), id))
+          return;
+        if (extraPoints.size() < pointLimit && IsOverviewPoint(feature) && rect.IsPointInside(feature.GetCenter()))
+          extraPoints.insert(id);
+        else if (supplementary && extraGeometry.size() < geometryLimit && feature::IsMikshatOverviewGeometry(feature))
+        {
+          feature.ResetGeometry();
+          if (rect.IsIntersect(feature.GetLimitRect(FeatureType::BEST_GEOMETRY)))
+            extraGeometry.insert(id);
+        }
       }, rect, info->m_maxScale, MwmSet::MwmId(info), countryFinished, covering::Spiral);
     }
-    ids.insert(ids.end(), extra.begin(), extra.end());
+    ids.insert(ids.end(), extraPoints.begin(), extraPoints.end());
+    ids.insert(ids.end(), extraGeometry.begin(), extraGeometry.end());
     // TileInfo requires each MWM's IDs to be contiguous even before its own
     // sorting pass; supplements cannot revisit an earlier country group.
     std::sort(ids.begin(), ids.end());

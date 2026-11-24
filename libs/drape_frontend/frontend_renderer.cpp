@@ -1616,8 +1616,13 @@ void FrontendRenderer::Render2dLayer(ScreenBase const & modelView)
 
   CHECK(m_context != nullptr, ());
   DEBUG_LABEL(m_context, "2D Layer");
+  bool const showProtectedAreaFills = IsProtectedAreaFillVisible(modelView);
   for (drape_ptr<RenderGroup> const & group : layer2d.m_renderGroups)
+  {
+    if (!showProtectedAreaFills && IsProtectedAreaFill(group->GetState()))
+      continue;
     RenderSingleGroup(m_context, modelView, make_ref(group));
+  }
 }
 
 void FrontendRenderer::PreRender3dLayer(ScreenBase const & modelView)

@@ -1,0 +1,26 @@
+[
+  {
+    "file": "desert-ksa-north.mwm",
+    "size": 23388958,
+    "crc32": "788522bd",
+    "sha256": "d814a7c8d254549c8b907e299d1942e2fed540c20ffb07a6bf77bba98ab191ff"
+  },
+  {
+    "file": "desert-ksa-south.mwm",
+    "size": 15725867,
+    "crc32": "c0ef7fb8",
+    "sha256": "7bff3499849da597cd865f8e6a422c46df4bbf85ffeb5571b5eaeddb3294dff4"
+  },
+  {
+    "file": "desert-kuwait.mwm",
+    "size": 44321,
+    "crc32": "7403322a",
+    "sha256": "d81dea67f0133b7ab3832ed0b613f77043cc22726886f62f536b1af533bc604c"
+  },
+  {
+    "file": "desert-qatar.mwm",
+    "size": 37005,
+    "crc32": "32ee97c6",
+    "sha256": "21d233b2b9168adab29c98a809d0bd5fb65d722469718f12445440106cbe9f16"
+  }
+]

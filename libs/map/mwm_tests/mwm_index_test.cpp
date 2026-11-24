@@ -6,6 +6,7 @@
 #include "indexer/classificator_loader.hpp"
 #include "indexer/feature_algo.hpp"
 #include "indexer/ftypes_matcher.hpp"
+#include "indexer/mikshat_map_visibility.hpp"
 #include "indexer/scales.hpp"
 
 #include <algorithm>
@@ -273,4 +274,100 @@ UNIT_TEST(MikshatOverview_SaudiIndexedPoints)
   }
 }
 #endif  // MIKSHAT_SAUDI_OVERVIEW_TESTS
+
+#ifdef MIKSHAT_SUPPLEMENTARY_OVERVIEW_TESTS
+UNIT_TEST(MikshatOverview_SupplementaryOutdoorGeometry)
+{
+  classificator::Load();
+  char const * directory = std::getenv("MIKSHAT_SUPPLEMENTARY_MAPS_DIR");
+  TEST(directory && *directory, ("Supply the four actual bundled supplementary maps"));
+  FeaturesFetcher source;
+  size_t checkedLines = 0;
+  size_t checkedAreas = 0;
+  size_t checkedWadis = 0;
+  size_t checkedTracks = 0;
+  static ftypes::BaseCheckerEx const wadis({{"waterway", "river"}, {"waterway", "stream"}});
+  static ftypes::BaseCheckerEx const tracks({{"highway", "track"}});
+  for (std::string const name : {"desert-ksa-north", "desert-ksa-south", "desert-kuwait", "desert-qatar"})
+  {
+    auto file = platform::LocalCountryFile::MakeTemporary(std::string(directory) + "/" + name + ".mwm");
+    file.SyncWithDisk();
+    auto const registered = source.RegisterMap(file);
+    TEST_EQUAL(registered.second, MwmSet::RegResult::Success, (name));
+    FeaturesLoaderGuard loader(source.GetDataSource(), registered.first);
+    std::vector<uint32_t> samples;
+    std::array<bool, 3> found = {};
+    for (uint32_t i = 0; i < loader.GetNumFeatures(); ++i)
+    {
+      auto f = loader.GetFeatureByIndex(i);
+      if (!feature::IsMikshatOverviewGeometry(*f))
+        continue;
+      bool const line = f->GetGeomType() == feature::GeomType::Line;
+      if (line && !wadis(*f) && !tracks(*f))
+        continue;
+      size_t const kind = line ? (wadis(*f) ? 0 : 1) : 2;
+      if (found[kind])
+        continue;
+      samples.push_back(i);
+      found[kind] = true;
+      if (std::all_of(found.begin(), found.end(), [](bool value) { return value; }))
+        break;
+    }
+    for (uint32_t const index : samples)
+    {
+      auto original = loader.GetFeatureByIndex(index);
+      auto const expectedRect = original->GetLimitRect(FeatureType::BEST_GEOMETRY);
+      bool const line = original->GetGeomType() == feature::GeomType::Line;
+      auto center = expectedRect.Center();
+      if (line)
+        center = original->GetPoint(0);
+      else
+      {
+        bool first = true;
+        original->ForEachTriangle([&](auto const & a, auto const &, auto const &)
+        {
+          if (first)
+            center = a;
+          first = false;
+        }, FeatureType::BEST_GEOMETRY);
+      }
+      auto const rect = mercator::RectByCenterXYAndSizeInMeters(center, 20000.0);
+      for (int const scale : {9, 10})
+      {
+        auto const ids = ReadOverviewIds(source, rect, scale, true);
+        TEST(std::binary_search(ids.begin(), ids.end(), original->GetID()), (name, index, scale));
+        auto rendered = loader.GetFeatureByIndex(index);
+        feature::PrepareMikshatOverviewGeometry(*rendered, scale);
+        TEST_EQUAL(rendered->GetLimitRect(scale), expectedRect,
+                   ("Overview must preserve the file's authentic geometry", name, index, scale));
+        if (line)
+          TEST_GREATER(rendered->GetPointsCount(), 1, (name, index, scale));
+        else
+          TEST_GREATER(rendered->GetTrgVerticesCount(scale), 0, (name, index, scale));
+      }
+      // At the overview/detail seam the reader must still expose the same
+      // authentic shape, while z15 resumes the map's native index contract.
+      auto detail = loader.GetFeatureByIndex(index);
+      feature::PrepareMikshatOverviewGeometry(*detail, 14);
+      TEST_EQUAL(detail->GetLimitRect(14), expectedRect, (name, index));
+      auto nativeDetail = loader.GetFeatureByIndex(index);
+      TEST(!nativeDetail->IsEmptyGeometry(15), ("Native geometry must exist after the supplement ends", name, index));
+      if (line)
+      {
+        TEST_GREATER(nativeDetail->GetPointsCount(), 1, (name, index));
+        (wadis(*original) ? checkedWadis : checkedTracks)++;
+      }
+      auto const nativeIds = ReadOverviewIds(source, rect, 15, false);
+      TEST(std::binary_search(nativeIds.begin(), nativeIds.end(), original->GetID()),
+           ("Native index must take over at detail zoom 15", name, index));
+      (line ? checkedLines : checkedAreas)++;
+    }
+    std::cout << "MIKSHAT_SUPPLEMENTARY_OVERVIEW " << name << " samples=" << samples.size() << '\n';
+  }
+  TEST_GREATER(checkedLines, 0, ("Actual reference map line geometry must be exercised"));
+  TEST_GREATER(checkedWadis, 0, ("Actual wadis must be shown in the reference map overview"));
+  TEST_GREATER(checkedTracks, 0, ("Actual dirt tracks must be shown in the reference map overview"));
+  std::cout << "MIKSHAT_SUPPLEMENTARY_OVERVIEW lines=" << checkedLines << " areas=" << checkedAreas << std::endl;
+}
+#endif  // MIKSHAT_SUPPLEMENTARY_OVERVIEW_TESTS
 }  // namespace mwm_index_test

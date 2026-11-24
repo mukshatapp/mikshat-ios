@@ -47248,3 +47248,51 @@ comment = Localized iOS app and Live Activity extension display name.
 tags = apple-infoplist
 en = Mikshat
 ar = مكشات
+
+[mikshat_history_resolve_location]
+comment = Mikshat offline map layers and exact search history
+tags = apple-maps
+en = Choose a result to save its location
+ar = اختر نتيجة لتثبيت الموقع في السجل
+
+[mikshat_map_layers]
+comment = Mikshat offline map layers and exact search history
+tags = apple-maps
+en = Map layers
+ar = طبقات الخريطة
+
+[mikshat_supplementary_maps]
+comment = Mikshat offline map layers and exact search history
+tags = apple-maps
+en = Additional maps
+ar = خرائط إضافية
+
+[mikshat_map_ksa_north]
+comment = Mikshat offline map layers and exact search history
+tags = apple-maps
+en = Northern Saudi Arabia
+ar = شمال السعودية
+
+[mikshat_map_ksa_south]
+comment = Mikshat offline map layers and exact search history
+tags = apple-maps
+en = Southern Saudi Arabia
+ar = جنوب السعودية
+
+[mikshat_map_kuwait]
+comment = Mikshat offline map layers and exact search history
+tags = apple-maps
+en = Kuwait
+ar = الكويت
+
+[mikshat_map_qatar]
+comment = Mikshat offline map layers and exact search history
+tags = apple-maps
+en = Qatar
+ar = قطر
+
+[mikshat_supplementary_map_unavailable]
+comment = Mikshat offline map layers and exact search history
+tags = apple-maps
+en = This map could not be activated.
+ar = تعذّر تفعيل هذه الخريطة.

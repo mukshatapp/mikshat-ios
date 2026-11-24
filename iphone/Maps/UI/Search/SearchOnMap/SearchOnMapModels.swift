@@ -3,11 +3,20 @@ final class SearchQuery: NSObject {
   let text: String
   let locale: String
   let source: SearchTextSource
+  @nonobjc let historyLocation: MikshatSearchLocation?
 
   init(_ text: String, locale: String? = nil, source: SearchTextSource) {
     self.text = text
     self.locale = locale ?? AppInfo.shared().languageId
     self.source = source
+    self.historyLocation = nil
+  }
+
+  @nonobjc init(historyLocation: MikshatSearchLocation) {
+    self.text = historyLocation.title
+    self.locale = AppInfo.shared().languageId
+    self.source = .history
+    self.historyLocation = historyLocation
   }
 }
 

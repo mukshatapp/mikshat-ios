@@ -1424,31 +1424,6 @@ final class MikshatDirectionIndicator: UIView {
   }
 }
 
-// Supplemental coordinates for native query history; no changes to saved queries or user bookmarks.
-enum MikshatSearchLocations {
-  private static let key = "mikshat_search_locations"
-  static func remember(_ coordinate: CLLocationCoordinate2D, query: String) {
-    guard Settings.searchHistoryEnabled(), CLLocationCoordinate2DIsValid(coordinate) else { return }
-    let queries = MWMSearchFrameworkHelper.lastSearchQueries()
-    var values = UserDefaults.standard.dictionary(forKey: key) as? [String: [Double]] ?? [:]
-    values = values.filter { queries.contains($0.key) }
-    let historyQuery = queries.first { $0.trimmingCharacters(in: .whitespacesAndNewlines) == query.trimmingCharacters(in: .whitespacesAndNewlines) } ?? query
-    values[historyQuery] = [coordinate.latitude, coordinate.longitude]
-    UserDefaults.standard.set(values, forKey: key)
-  }
-  static func coordinate(for query: String) -> CLLocationCoordinate2D? {
-    guard Settings.searchHistoryEnabled() else { return nil }
-    guard let pair = (UserDefaults.standard.dictionary(forKey: key) as? [String: [Double]])?[query], pair.count == 2 else {
-      guard let parsed = MikshatNavigationMath.parseDecimalPair(query) else { return nil }
-      return CLLocationCoordinate2D(latitude: parsed.latitude, longitude: parsed.longitude)
-    }
-    let result = CLLocationCoordinate2D(latitude: pair[0], longitude: pair[1])
-    return CLLocationCoordinate2DIsValid(result) ? result : nil
-  }
-  static func clear() { UserDefaults.standard.removeObject(forKey: key) }
-}
-
-
 final class MikshatCoordinateRow: UIStackView {
   init(text: String, format: String? = nil, copy: @escaping () -> Void) {
     super.init(frame: .zero)

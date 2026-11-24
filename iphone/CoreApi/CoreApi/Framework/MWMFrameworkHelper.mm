@@ -102,6 +102,22 @@ static Framework::ProductsPopupCloseReason ConvertProductPopupCloseReasonToCore(
   return IsFrameworkDestroyed();
 }
 
++ (BOOL)setSupplementaryMap:(NSString *)mapName enabled:(BOOL)enabled
+{
+  NSAssert(NSThread.isMainThread, @"Map activation must run on the Framework thread");
+  static NSSet<NSString *> * const names =
+      [NSSet setWithArray:@[@"desert-ksa-north", @"desert-ksa-south", @"desert-kuwait", @"desert-qatar"]];
+  if (![names containsObject:mapName] || IsFrameworkDestroyed())
+    return NO;
+
+  NSURL * url = [NSBundle.mainBundle URLForResource:mapName withExtension:@"mwm" subdirectory:@"SupplementaryMaps"];
+  if (!url)
+    return NO;
+
+  auto const file = platform::LocalCountryFile::MakeTemporary(url.path.UTF8String);
+  return GetFramework().SetSupplementaryMapEnabled(file, enabled);
+}
+
 + (MWMMarkID)invalidBookmarkId
 {
   return kml::kInvalidMarkId;

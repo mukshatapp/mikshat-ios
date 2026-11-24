@@ -6,7 +6,14 @@ protocol RoutePointSelecting: AnyObject {
   func selectCurrentLocation() -> Bool
   func select(searchResult: SearchResult) -> Bool
   func select(mapPoint: CGPoint) -> Bool
+  func select(historyLocation: MikshatSearchLocation) -> Bool
   func cancel()
+}
+
+extension RoutePointSelecting {
+  func select(historyLocation: MikshatSearchLocation) -> Bool {
+    select(mapPoint: MWMSearchFrameworkHelper.mercatorPoint(for: historyLocation.coordinate))
+  }
 }
 
 final class RoutePointSearchSelection: RoutePointSelecting {
@@ -34,6 +41,11 @@ final class RoutePointSearchSelection: RoutePointSelecting {
     select(point: mapPoint,
            title: FrameworkHelper.address(at: mapPoint),
            subtitle: nil)
+  }
+
+  func select(historyLocation: MikshatSearchLocation) -> Bool {
+    select(point: MWMSearchFrameworkHelper.mercatorPoint(for: historyLocation.coordinate),
+           title: historyLocation.title, subtitle: historyLocation.subtitle)
   }
 
   func cancel() {

@@ -88,7 +88,7 @@ void AreaShape::DrawArea(ref_ptr<dp::GraphicsContext> context, ref_ptr<dp::Batch
     vertexes.emplace_back(ToShapeVertex3(vertex), uv);
 
   auto const areaProgram = m_params.m_color.GetAlpha() == 255 ? gpu::Program::Area : gpu::Program::TransparentArea;
-  auto state = CreateRenderState(areaProgram, DepthLayer::GeometryLayer);
+  auto state = CreateRenderState(areaProgram, DepthLayer::GeometryLayer, m_params.m_isProtectedAreaFill);
   state.SetDepthTestEnabled(m_params.m_depthTestEnabled);
   state.SetColorTexture(texture);
 
@@ -165,7 +165,7 @@ void AreaShape::DrawPatternArea(ref_ptr<dp::GraphicsContext> context, ref_ptr<dp
   }
 
   // The pattern is computed analytically in the fragment shader (no mask texture, hence no mipmaps).
-  auto state = CreateRenderState(PatternProgram(patternKey), DepthLayer::GeometryLayer);
+  auto state = CreateRenderState(PatternProgram(patternKey), DepthLayer::GeometryLayer, m_params.m_isProtectedAreaFill);
   state.SetDepthTestEnabled(m_params.m_depthTestEnabled);
   state.SetColorTexture(texture);
 

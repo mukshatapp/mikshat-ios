@@ -182,3 +182,6 @@
 @mikshat_settlement_label: #FF8D86;
 @mikshat_dirt_road: #C79A66;
 @mikshat_fayda_label: #7AD49A;
+
+@mikshat_protected_fill: #6E528A;
+@mikshat_protected_border: #BE97DF;

@@ -33,7 +33,7 @@ natural-water-river                                 # area z1- (also has caption
 waterway-dock                                       # area z1-
 === 40
 
-organicapp-mwm_border                               # area z1-7
+organicapp-mwm_border                               # WARNING: no style defined (the type will be not included into map data)
 === 30
 
 landuse-basin-intermittent                          # area z12-

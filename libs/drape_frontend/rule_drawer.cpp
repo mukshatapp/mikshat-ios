@@ -10,6 +10,7 @@
 #include "indexer/feature_algo.hpp"
 #include "indexer/feature_visibility.hpp"
 #include "indexer/map_style_reader.hpp"
+#include "indexer/mikshat_map_visibility.hpp"
 
 #include "geometry/clipping.hpp"
 #include "geometry/mercator.hpp"
@@ -303,11 +304,11 @@ void RuleDrawer::ProcessAreaAndPointStyle(FeatureType & f, Stylist const & s)
     {
       std::string_view hatchKey;
       if (s.m_hatchingRule)
-        hatchKey = m_isHatching.GetHatch(types);
+        hatchKey = s.m_hatchingPattern;
       std::string_view patternKey;
       if (s.m_areaRule)
         patternKey = m_isAreaPattern.GetPattern(types);
-      apply.ProcessAreaRules(s.m_areaRule, s.m_hatchingRule, hatchKey, patternKey);
+      apply.ProcessAreaRules(s, hatchKey, patternKey);
     }
   }
 
@@ -444,6 +445,7 @@ void RuleDrawer::operator()(FeatureType & f)
 
   // FeatureType::GetLimitRect call invokes full geometry reading and decoding.
   // That's why this code follows after all lightweight return options.
+  feature::PrepareMikshatOverviewGeometry(f, m_zoomLevel);
   if (!m_applyParams.m_tileRect.IsIntersect(f.GetLimitRect(m_zoomLevel)))
     return;
 

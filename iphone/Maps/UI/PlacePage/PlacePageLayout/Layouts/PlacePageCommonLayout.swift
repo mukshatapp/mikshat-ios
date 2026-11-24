@@ -39,14 +39,6 @@ class PlacePageCommonLayout: NSObject, IPlacePageLayout {
     return PlacePageExpandableDetailsSectionBuilder.buildOSMDescriptionSection(osmDescription)
   }()
 
-  private lazy var wikiDescriptionViewController: UIViewController? = {
-    guard let wikiDescriptionHtml = placePageData.wikiDescriptionHtml else { return nil }
-    let showLinkButton = placePageData.infoData?.wikipedia != nil
-    return PlacePageExpandableDetailsSectionBuilder.buildWikipediaSection(wikiDescriptionHtml,
-                                                                          showLinkButton: showLinkButton,
-                                                                          delegate: interactor)
-  }()
-
   private lazy var editBookmarkViewController: PlacePageExpandableDetailsSectionViewController = {
     let vc = PlacePageExpandableDetailsSectionBuilder.buildEditBookmarkAndTrackSection(data: nil, delegate: interactor)
     vc.view.isHidden = true
@@ -119,10 +111,6 @@ class PlacePageCommonLayout: NSObject, IPlacePageLayout {
 
     if let osmDescriptionViewController {
       viewControllers.append(osmDescriptionViewController)
-    }
-
-    if let wikiDescriptionViewController {
-      viewControllers.append(wikiDescriptionViewController)
     }
 
     if placePageData.infoData != nil {

@@ -717,6 +717,10 @@
 		A46170000000000000000001 /* MWMSettingsDefaultsTests.mm in Sources */ = {isa = PBXBuildFile; fileRef = A46170000000000000000002 /* MWMSettingsDefaultsTests.mm */; };
 		A46170000000000000000004 /* MikshatLocalizationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A46170000000000000000005 /* MikshatLocalizationTests.swift */; };
 		A46170000000000000000007 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 34F73F5F1E082FF700AC1FD6 /* InfoPlist.strings */; };
+		810B8AECC8C78FE64501460E /* MikshatSearchHistory.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8984F20284205435E332A4A /* MikshatSearchHistory.swift */; };
+		66B8E47CF9C2DF46E0B129E6 /* MikshatSupplementaryMaps.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67A12C541D3316A49E57E37E /* MikshatSupplementaryMaps.swift */; };
+		C924A14196D49D01DD0CAE97 /* MikshatSupplementaryMapsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BD40FE757ED7BB438BB24FF /* MikshatSupplementaryMapsTests.swift */; };
+		DAEC955DEED4CFBD34D8C70A /* SupplementaryMaps in Resources */ = {isa = PBXBuildFile; fileRef = 06446BE46D95907C6A97BBBB /* SupplementaryMaps */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -1707,6 +1711,10 @@
 		158DC7D97CBFA9A1680367F1 /* MikshatSubscriptionEntitlementTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MikshatSubscriptionEntitlementTests.swift; path = Tests/UI/Subscriptions/MikshatSubscriptionEntitlementTests.swift; sourceTree = SOURCE_ROOT; };
 		A46170000000000000000002 /* MWMSettingsDefaultsTests.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = MWMSettingsDefaultsTests.mm; sourceTree = "<group>"; };
 		A46170000000000000000005 /* MikshatLocalizationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MikshatLocalizationTests.swift; sourceTree = "<group>"; };
+		F8984F20284205435E332A4A /* MikshatSearchHistory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MikshatSearchHistory.swift; path = UI/Search/Tabs/HistoryTab/MikshatSearchHistory.swift; sourceTree = SOURCE_ROOT; };
+		67A12C541D3316A49E57E37E /* MikshatSupplementaryMaps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MikshatSupplementaryMaps.swift; path = UI/Mikshat/MikshatSupplementaryMaps.swift; sourceTree = SOURCE_ROOT; };
+		1BD40FE757ED7BB438BB24FF /* MikshatSupplementaryMapsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MikshatSupplementaryMapsTests.swift; path = Tests/Core/Storage/MikshatSupplementaryMapsTests.swift; sourceTree = SOURCE_ROOT; };
+		06446BE46D95907C6A97BBBB /* SupplementaryMaps */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SupplementaryMaps; path = Resources/Mikshat/SupplementaryMaps; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -2124,6 +2132,9 @@
 		ED82C2922F90127F00FA103D /* SupportingFiles */ = {
 			isa = PBXGroup;
 			children = (
+				06446BE46D95907C6A97BBBB /* SupplementaryMaps */,
+				67A12C541D3316A49E57E37E /* MikshatSupplementaryMaps.swift */,
+				F8984F20284205435E332A4A /* MikshatSearchHistory.swift */,
 				8D1107310486CEB800E47090 /* OMaps.plist */,
 				ED0B1C302BC2951F00FB8EDD /* PrivacyInfo.xcprivacy */,
 				ED82BCAE2F900F8200FA103D /* Bridging-Header.h */,
@@ -4114,6 +4125,7 @@
 		EE07D322E9A58648728E9F48 /* MikshatFeatureTests */ = {
 			isa = PBXGroup;
 			children = (
+				1BD40FE757ED7BB438BB24FF /* MikshatSupplementaryMapsTests.swift */,
 				ECE76EF25BEFF62E98FDE2A5 /* MikshatWeatherViewTests.swift */,
 				1067C686AC3C81E430216275 /* SearchHistoryOnlyTests.swift */,
 				A61400200000000000000002 /* MikshatResponsivePresentationTests.swift */,
@@ -4316,6 +4328,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DAEC955DEED4CFBD34D8C70A /* SupplementaryMaps in Resources */,
 				ED2506E22F83F86D00945FC4 /* Colors.xcassets in Resources */,
 				165953742CB1D85500CFED7C /* fonts in Resources */,
 				165953942CB44B5600CFED7C /* symbols in Resources */,
@@ -4458,6 +4471,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				66B8E47CF9C2DF46E0B129E6 /* MikshatSupplementaryMaps.swift in Sources */,
+				810B8AECC8C78FE64501460E /* MikshatSearchHistory.swift in Sources */,
 				ED82BCB22F900F8200FA103D /* main.mm in Sources */,
 				ED2D74662D1435A600660FBF /* LiveActivityManager.swift in Sources */,
 				ED2D74652D14357F00660FBF /* TrackRecordingLiveActivityAttributes.swift in Sources */,
@@ -4971,6 +4986,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				C924A14196D49D01DD0CAE97 /* MikshatSupplementaryMapsTests.swift in Sources */,
 				A46170000000000000000001 /* MWMSettingsDefaultsTests.mm in Sources */,
 				A46170000000000000000004 /* MikshatLocalizationTests.swift in Sources */,
 				A13811000000000000000002 /* TransportTransitWrappingTests.swift in Sources */,
@@ -5178,7 +5194,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 4.6.18;
+				MARKETING_VERSION = 4.6.19;
 				OTHER_SWIFT_FLAGS = "$(inherited)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.mikshat.maps.debug;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -5199,7 +5215,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 4.6.18;
+				MARKETING_VERSION = 4.6.19;
 				OTHER_SWIFT_FLAGS = "$(inherited)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.mikshat.maps;
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -5254,7 +5270,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 4.6.18;
+				MARKETING_VERSION = 4.6.19;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mikshat.maps.debug.widgetextension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -5283,7 +5299,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 4.6.18;
+				MARKETING_VERSION = 4.6.19;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mikshat.maps.widgetextension;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";

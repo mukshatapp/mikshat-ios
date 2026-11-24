@@ -14,6 +14,8 @@ public:
 
   void Update(ScreenBase const & screen);
   static bool IsVisible(ScreenBase const & screen);
+  // Selected metric ruler distance in metres, independent of the user's measurement units.
+  static double GetMetricRulerDistance(ScreenBase const & screen);
   void Invalidate();
 
   static float GetRulerHalfHeight();

@@ -67,8 +67,14 @@ extension SearchTabViewController: UIScrollViewDelegate {
 
 extension SearchTabViewController: SearchHistoryViewControllerDelegate {
   func searchHistoryViewController(_: SearchHistoryViewController,
-                                   didSelect query: String) {
-    let query = SearchQuery(query.trimmingCharacters(in: .whitespacesAndNewlines) + " ", source: .history)
+                                   didSelect entry: MikshatSearchHistoryEntry) {
+    let query: SearchQuery
+    switch entry {
+    case .location(let location):
+      query = SearchQuery(historyLocation: location)
+    case .unresolvedQuery(let text):
+      query = SearchQuery(text.trimmingCharacters(in: .whitespacesAndNewlines) + " ", source: .history)
+    }
     delegate?.searchTabController(self, didSearch: query)
   }
 }

@@ -60,6 +60,8 @@ NS_SWIFT_NAME(FrameworkHelper)
 + (void)createFramework;
 /// Returns YES after the C++ Framework was destroyed during app termination.
 + (BOOL)isFrameworkDestroyed;
+/// Activates one of the four bundled offline supplementary maps.
++ (BOOL)setSupplementaryMap:(NSString *)mapName enabled:(BOOL)enabled NS_SWIFT_NAME(setSupplementaryMap(_:enabled:));
 + (MWMMarkID)invalidBookmarkId;
 + (MWMMarkGroupID)invalidCategoryId;
 + (void)zoomMap:(MWMZoomMode)mode;

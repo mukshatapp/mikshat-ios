@@ -1,11 +1,11 @@
 protocol SearchHistoryViewControllerDelegate: UIScrollViewDelegate {
   func searchHistoryViewController(_ viewController: SearchHistoryViewController,
-                                   didSelect query: String)
+                                   didSelect entry: MikshatSearchHistoryEntry)
 }
 
 final class SearchHistoryViewController: MWMViewController {
   private weak var delegate: SearchHistoryViewControllerDelegate?
-  private var lastQueries: [String] = []
+  private var entries: [MikshatSearchHistoryEntry] = []
   private let frameworkHelper: MWMSearchFrameworkHelper.Type
   private let emptyHistoryView = PlaceholderView(title: L("search_history_title"),
                                                  subtitle: L("search_history_text"))
@@ -48,6 +48,8 @@ final class SearchHistoryViewController: MWMViewController {
     tableView.delegate = self
     tableView.dataSource = self
     tableView.tableFooterView = UIView(frame: CGRect(x: 0, y: 0, width: 400, height: 1))
+    tableView.rowHeight = UITableView.automaticDimension
+    tableView.estimatedRowHeight = 60
 
     view.addSubview(tableView)
     tableView.translatesAutoresizingMaskIntoConstraints = false
@@ -89,23 +91,26 @@ final class SearchHistoryViewController: MWMViewController {
 
   func reload() {
     guard isViewLoaded else { return }
-    lastQueries = Settings.searchHistoryEnabled() ? frameworkHelper.lastSearchQueries() : []
-    showEmptyHistoryView(lastQueries.isEmpty ? true : false)
+    entries = MikshatSearchLocations.entries(queries: frameworkHelper.lastSearchQueries())
+    showEmptyHistoryView(entries.isEmpty)
     tableView.reloadData()
   }
 }
 
 extension SearchHistoryViewController: UITableViewDataSource {
   func tableView(_: UITableView, numberOfRowsInSection _: Int) -> Int {
-    lastQueries.isEmpty ? 0 : lastQueries.count + 1
+    entries.isEmpty ? 0 : entries.count + 1
   }
 
   func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
     let cell = tableView.dequeueReusableCell(cell: SearchHistoryCell.self, indexPath: indexPath)
-    if indexPath.row == lastQueries.count {
+    if indexPath.row == entries.count {
       cell.configure(for: .clear)
     } else {
-      cell.configure(for: .query(lastQueries[indexPath.row]))
+      switch entries[indexPath.row] {
+      case .location(let location): cell.configure(for: .location(location))
+      case .unresolvedQuery(let query): cell.configure(for: .query(query))
+      }
     }
     return cell
   }
@@ -113,11 +118,11 @@ extension SearchHistoryViewController: UITableViewDataSource {
 
 extension SearchHistoryViewController: UITableViewDelegate {
   func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-    if indexPath.row == lastQueries.count {
+    if indexPath.row == entries.count {
       clearSearchHistory()
     } else {
-      let query = lastQueries[indexPath.row]
-      delegate?.searchHistoryViewController(self, didSelect: query)
+      guard entries.indices.contains(indexPath.row) else { return }
+      delegate?.searchHistoryViewController(self, didSelect: entries[indexPath.row])
     }
     tableView.deselectRow(at: indexPath, animated: true)
   }

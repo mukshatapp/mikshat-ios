@@ -42,10 +42,12 @@ void ForEachOfTypesInRect(DataSource const & dataSource, std::vector<uint32_t> c
 
   for (auto const & info : infos)
   {
-    if (!pivot.IsIntersect(info->m_bordersRect))
+    if (!info->IsRegistered() || !pivot.IsIntersect(info->m_bordersRect))
       continue;
 
     auto handle = dataSource.GetMwmHandleById(MwmSet::MwmId(info));
+    if (!handle.IsAlive())
+      continue;
     auto & value = *handle.GetValue();
     if (!value.HasSearchIndex())
       continue;

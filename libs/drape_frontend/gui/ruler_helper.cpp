@@ -60,6 +60,19 @@ double Identity(double val)
 {
   return val;
 }
+
+double GetMinimumRulerDistance(ScreenBase const & screen)
+{
+  m2::PointD const pivot = screen.PixelRect().Center();
+  double const minPxWidth = kMinPixelWidth * df::VisualParams::Instance().GetVisualScale();
+  return mercator::DistanceOnEarth(screen.PtoG(pivot - m2::PointD(minPxWidth, 0)), screen.PtoG(pivot));
+}
+
+UnitValue const * FindRulerRange(UnitValue const * values, int count, double value)
+{
+  return std::upper_bound(values, values + count, value,
+                          [](double distance, UnitValue const & range) { return distance < range.m_i; });
+}
 }  // namespace
 
 RulerHelper::RulerHelper()
@@ -79,7 +92,7 @@ void RulerHelper::Update(ScreenBase const & screen)
   m2::PointD const pt1 = screen.PtoG(pivot);
   m2::PointD pt0 = screen.PtoG(pivot - m2::PointD(minPxWidth, 0));
 
-  double const metersDiff = CalcMetersDiff(mercator::DistanceOnEarth(pt0, pt1));
+  double const metersDiff = CalcMetersDiff(GetMinimumRulerDistance(screen));
   ASSERT_GREATER(metersDiff, 0, ());
 
   if (metersDiff > kMaxMetersWidth)
@@ -104,6 +117,17 @@ bool RulerHelper::IsVisible(ScreenBase const & screen)
 {
   DrapeGui & gui = DrapeGui::Instance();
   return !gui.IsCopyrightActive() && df::GetDrawTileScale(screen) >= kVisibleRulerBottomScale;
+}
+
+// static
+double RulerHelper::GetMetricRulerDistance(ScreenBase const & screen)
+{
+  auto const range = FindRulerRange(g_arrMeters, ARRAY_SIZE(g_arrMeters), GetMinimumRulerDistance(screen));
+  if (range == std::begin(g_arrMeters))
+    return kMinMetersWidth - 1.0;
+  if (range == std::end(g_arrMeters))
+    return kMaxMetersWidth + 1.0;
+  return range->m_i;
 }
 
 void RulerHelper::Invalidate()
@@ -181,15 +205,15 @@ double RulerHelper::CalcMetersDiff(double value)
 
   int prevUnitRange = m_rangeIndex;
   double result = 0.0;
-  double v = conversionFn(value);
-  if (arrU[0].m_i > v)
+  auto const range = FindRulerRange(arrU, count, conversionFn(value));
+  if (range == arrU)
   {
     m_rangeIndex = kMinUnitValue;
     // TODO: "< X" ruler text seems to be never used.
     m_rulerText = std::string("< ") + arrU[0].m_s;
     result = kMinMetersWidth - 1.0;
   }
-  else if (arrU[count - 1].m_i <= v)
+  else if (range == arrU + count)
   {
     m_rangeIndex = kMaxUnitValue;
     m_rulerText = std::string("> ") + arrU[count - 1].m_s;
@@ -197,16 +221,9 @@ double RulerHelper::CalcMetersDiff(double value)
   }
   else
   {
-    for (int i = 0; i < count; ++i)
-    {
-      if (arrU[i].m_i > v)
-      {
-        m_rangeIndex = i;
-        result = arrU[i].m_i / conversionFn(1.0);
-        m_rulerText = arrU[i].m_s;
-        break;
-      }
-    }
+    m_rangeIndex = static_cast<int>(range - arrU);
+    result = range->m_i / conversionFn(1.0);
+    m_rulerText = range->m_s;
   }
 
   if (m_rangeIndex != prevUnitRange)

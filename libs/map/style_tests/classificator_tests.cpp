@@ -449,11 +449,11 @@ UNIT_TEST(Classificator_MikshatOutdoorLabels)
 {
   styles::RunForEveryMapStyle([](MapStyle style)
   {
-    uint32_t const settlementColor = MapStyleIsDark(style) ? 0xFF8D86 : 0xB32624;
-    uint32_t const wadiColor = MapStyleIsDark(style) ? 0x68BFFF : 0x126CB3;
+    uint32_t const settlementColor = MapStyleIsDark(style) ? 0xFF8D86 : 0xBD162C;
+    uint32_t const wadiColor = MapStyleIsDark(style) ? 0x68BFFF : 0x0000FF;
     for (auto const & path : vector<base::StringIL>{{"place", "village"}, {"place", "hamlet"}})
     {
-      for (int const zoom : {10, 13, 17})
+      for (int const zoom : {9, 10, 13, 17})
       {
         auto const * rule = GetMikshatRule(path, zoom, GeomType::Point, drule::caption);
         TEST(rule && rule->GetCaption() && rule->GetCaption()->primary, (style, path, zoom));
@@ -479,7 +479,7 @@ UNIT_TEST(Classificator_MikshatOutdoorLabels)
                                                     {"waterway", "stream"},
                                                     {"waterway", "stream", "intermittent"}})
     {
-      for (int const zoom : {10, 13, 17})
+      for (int const zoom : {9, 10, 13, 17})
       {
         auto const * rule = GetMikshatRule(path, zoom, GeomType::Line, drule::pathtext);
         TEST(rule && rule->GetPathtext() && rule->GetPathtext()->primary, (style, path, zoom));
@@ -520,8 +520,11 @@ UNIT_TEST(Classificator_MikshatResourcesAndTracks)
       }
     }
 
-    uint32_t const trackColor = MapStyleIsDark(style) ? 0xC79A66 : 0x956138;
-    for (int const zoom : {10, 14, 17})
+    auto const * trackName = GetMikshatRule({"highway", "track"}, 9, GeomType::Line, drule::pathtext);
+    TEST(trackName && trackName->GetPathtext() && trackName->GetPathtext()->primary, (style));
+
+    uint32_t const trackColor = MapStyleIsDark(style) ? 0xC79A66 : 0x635730;
+    for (int const zoom : {9, 10, 14, 17})
     {
       drule::KeysT keys;
       GetDrawRule({classif().GetTypeByPath({"highway", "track"})}, zoom, GeomType::Line, keys);
@@ -536,6 +539,36 @@ UNIT_TEST(Classificator_MikshatResourcesAndTracks)
         }
       }
       TEST(hasDirtTrack, (style, zoom));
+    }
+  });
+}
+
+UNIT_TEST(Classificator_MikshatLandAndProtectedPalette)
+{
+  styles::RunForEveryMapStyle([](MapStyle style)
+  {
+    // The removed country-coverage overlay must not tint any land or water.
+    TEST(!GetMikshatRule({"organicapp", "mwm_border"}, 5, GeomType::Area, drule::area), (style));
+    if (!MapStyleIsDark(style))
+    {
+      auto const * sand = GetMikshatRule({"natural", "desert"}, 15, GeomType::Area, drule::area);
+      TEST(sand && sand->GetArea(), (style));
+      TEST_EQUAL(sand->GetArea()->color & 0xFFFFFF, 0xEBA426, ("Actual shipped 4.6.16 sand", style));
+    }
+    uint32_t const fillColor = MapStyleIsDark(style) ? 0x6E528A : 0xCFB8E8;
+    uint32_t const borderColor = MapStyleIsDark(style) ? 0xBE97DF : 0x8557AC;
+    for (auto const & path : vector<base::StringIL>{{"boundary", "national_park"},
+                                                    {"boundary", "protected_area"},
+                                                    {"boundary", "protected_area", "1"},
+                                                    {"boundary", "protected_area", "6"},
+                                                    {"leisure", "nature_reserve"}})
+    {
+      auto const * fill = GetMikshatRule(path, 9, GeomType::Area, drule::area);
+      TEST(fill && fill->GetArea(), (style, path));
+      TEST_EQUAL(fill->GetArea()->color & 0xFFFFFF, fillColor, (style, path));
+      auto const * border = GetMikshatRule(path, 15, GeomType::Line, drule::line);
+      TEST(border && border->GetLine(), (style, path));
+      TEST_EQUAL(border->GetLine()->color & 0xFFFFFF, borderColor, (style, path));
     }
   });
 }

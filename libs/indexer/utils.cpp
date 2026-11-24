@@ -7,7 +7,7 @@ MwmSet::MwmHandle FindWorld(DataSource const & dataSource, std::vector<std::shar
   MwmSet::MwmHandle handle;
   for (auto const & info : infos)
   {
-    if (info->GetType() == MwmInfo::WORLD)
+    if (info->IsRegistered() && info->GetType() == MwmInfo::WORLD)
     {
       handle = dataSource.GetMwmHandleById(MwmSet::MwmId(info));
       break;

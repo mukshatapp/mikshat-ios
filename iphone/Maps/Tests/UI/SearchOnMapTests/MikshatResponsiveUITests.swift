@@ -257,6 +257,11 @@ final class MikshatResponsivePlaceCoordinatesTests: XCTestCase {
           host.resize(size)
           let weather = try responsiveElement("placePage.weather", in: info.view, as: InfoItemView.self)
           XCTAssertTrue(info.stackView.arrangedSubviews.last === weather)
+          let information = info.stackView.arrangedSubviews.compactMap { $0 as? InfoItemView }
+          XCTAssertEqual(information.count, 2, "The normal website and weather remain; Wikipedia/source rows are hidden")
+          XCTAssertTrue(information.contains { $0.textLabel.text == "example.com" })
+          XCTAssertFalse(information.contains { $0.textLabel.text == L("read_in_wikipedia") })
+          XCTAssertFalse(information.contains { $0.textLabel.text == L("wikimedia_commons") })
           XCTAssertTrue(responsiveDescendants(info.view).filter { $0 is MikshatCoordinateRow || $0 is PlacePageCoordinatesView }.isEmpty)
           XCTAssertGreaterThanOrEqual(weather.bounds.height, 44)
           XCTAssertEqual(weather.frame.maxY, info.view.bounds.maxY, accuracy: 1)
@@ -849,6 +854,9 @@ private final class ResponsivePlaceInfoData: PlacePageInfoData {
   override var latitude: Double { responsiveSelectedPoint.latitude }
   override var longitude: Double { responsiveSelectedPoint.longitude }
   override var phones: [PlacePagePhone] { [] }
+  override var website: String? { "https://example.com" }
+  override var wikipedia: String? { "https://en.wikipedia.org/wiki/Riyadh" }
+  override var wikimediaCommons: String? { "https://commons.wikimedia.org/wiki/Category:Riyadh" }
 }
 
 private final class ResponsivePlacePreviewData: PlacePagePreviewData {

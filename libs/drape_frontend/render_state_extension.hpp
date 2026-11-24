@@ -7,6 +7,8 @@
 
 #include <cstdint>
 
+class ScreenBase;
+
 namespace df
 {
 enum class DepthLayer : uint8_t
@@ -33,19 +35,24 @@ enum class DepthLayer : uint8_t
 class RenderStateExtension : public dp::BaseRenderStateExtension
 {
 public:
-  explicit RenderStateExtension(DepthLayer depthLayer);
+  explicit RenderStateExtension(DepthLayer depthLayer, bool isProtectedAreaFill = false);
 
   bool Less(ref_ptr<dp::BaseRenderStateExtension> other) const override;
   bool Equal(ref_ptr<dp::BaseRenderStateExtension> other) const override;
 
   DepthLayer GetDepthLayer() const { return m_depthLayer; }
+  bool IsProtectedAreaFill() const { return m_isProtectedAreaFill; }
 
 private:
   DepthLayer const m_depthLayer;
+  bool const m_isProtectedAreaFill;
 };
 
 extern DepthLayer GetDepthLayer(dp::RenderState const & state);
-extern dp::RenderState CreateRenderState(gpu::Program program, DepthLayer depthLayer);
+extern bool IsProtectedAreaFill(dp::RenderState const & state);
+// Fills disappear at the 2 km metric ruler and closer; boundary lines remain ordinary geometry.
+extern bool IsProtectedAreaFillVisible(ScreenBase const & screen);
+extern dp::RenderState CreateRenderState(gpu::Program program, DepthLayer depthLayer, bool isProtectedAreaFill = false);
 
 inline std::string DebugPrint(DepthLayer layer)
 {

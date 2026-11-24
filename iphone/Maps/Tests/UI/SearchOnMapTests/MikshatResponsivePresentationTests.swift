@@ -9,10 +9,27 @@ final class MikshatResponsivePresentationTests: XCTestCase {
   func testSearchSheetAndNativeHeaderStayCenteredWhenTheContainerRotates() throws {
     let map = try XCTUnwrap(MapViewController.shared())
     map.loadViewIfNeeded()
-    for (name, portrait) in presentationViewports {
+    let isRightToLeft = Bundle.main.preferredLocalizations.first?.hasPrefix("ar") == true
+    for (index, viewport) in presentationViewports.enumerated() {
+      let (name, portrait) = viewport
       let search = SearchOnMapViewController()
-      let host = PresentationUIKitHost(search, size: portrait)
+      let host = PresentationUIKitHost(search, size: portrait, isRightToLeft: isRightToLeft)
       defer { host.close() }
+      if index == 0 {
+        let arguments = ProcessInfo.processInfo.arguments
+        let runtimeProbeFlags = ["-MikshatTitleInsetsNever", "-MikshatRequireRenderer", "-MikshatFixedTitleHeight",
+                                 "-MikshatPreviewInsetsNever", "-MikshatRotationDiagnostics"]
+          .filter { arguments.contains($0) }
+        let profile: [String: Any] = [
+          "language": Bundle.main.preferredLocalizations.first ?? "",
+          "direction": search.view.effectiveUserInterfaceLayoutDirection == .rightToLeft ? "RTL" : "LTR",
+          "idiom": search.traitCollection.userInterfaceIdiom == .pad ? "pad" : "phone",
+          "productionVerification": arguments.contains("-MikshatVerifyProductionRotation"),
+          "runtimeProbeFlags": runtimeProbeFlags,
+        ]
+        let data = try JSONSerialization.data(withJSONObject: profile, options: [.sortedKeys])
+        print("MIKSHAT_FEATURE_LAYOUT_PROFILE " + (try XCTUnwrap(String(data: data, encoding: .utf8))))
+      }
       var model = SearchOnMap.ViewModel.initial
       model.isTyping = false
       model.contentState = .results(.empty)
@@ -67,6 +84,7 @@ final class MikshatResponsivePresentationTests: XCTestCase {
           XCTAssertGreaterThan(field.bounds.width, 0)
           assertHorizontallyContained(field.convert(field.bounds, to: header), in: header.bounds)
         }
+        try assertCoordinateInputColumns(in: header)
         try attachPresentationScreenshot(host.container.view, name: "search-\(name)-\(orientation)")
       }
     }
@@ -1128,6 +1146,41 @@ private let presentationViewports: [(String, CGSize)] = [
 ]
 
 @MainActor
+private func assertCoordinateInputColumns(in root: UIView) throws {
+  let input = try presentationElement("search.coordinateInput", in: root)
+  let latitudeRow = try presentationElement("search.coordinates.latitudeRow", in: input)
+  let longitudeRow = try presentationElement("search.coordinates.longitudeRow", in: input)
+  let latitudeDegrees = try XCTUnwrap(try presentationElement("search.coordinates.mikshat_lat_degrees", in: input) as? UITextField)
+  let longitudeDegrees = try XCTUnwrap(try presentationElement("search.coordinates.mikshat_lon_degrees", in: input) as? UITextField)
+  let latitudeMinutes = try XCTUnwrap(try presentationElement("search.coordinates.mikshat_lat_minutes", in: input) as? UITextField)
+  let longitudeMinutes = try XCTUnwrap(try presentationElement("search.coordinates.mikshat_lon_minutes", in: input) as? UITextField)
+  latitudeDegrees.text = "90"
+  longitudeDegrees.text = "180"
+  latitudeMinutes.text = "00.000"
+  longitudeMinutes.text = "00.000"
+  input.layoutIfNeeded()
+  let pairs: [(UIView, UIView)] = [
+    (try presentationElement("search.coordinates.latitudeDirection", in: input),
+     try presentationElement("search.coordinates.longitudeDirection", in: input)),
+    (latitudeDegrees, longitudeDegrees),
+    (try presentationElement("search.coordinates.latitudeDegreeSymbol", in: input),
+     try presentationElement("search.coordinates.longitudeDegreeSymbol", in: input)),
+    (latitudeMinutes, longitudeMinutes),
+    (try presentationElement("search.coordinates.latitudeMinuteSymbol", in: input),
+     try presentationElement("search.coordinates.longitudeMinuteSymbol", in: input)),
+  ]
+  for (latitude, longitude) in pairs {
+    let first = latitude.convert(latitude.bounds, to: latitudeRow)
+    let second = longitude.convert(longitude.bounds, to: longitudeRow)
+    XCTAssertEqual(first.minX, second.minX, accuracy: 1, "Latitude and longitude must use the same column positions")
+    XCTAssertEqual(first.width, second.width, accuracy: 1)
+    XCTAssertGreaterThan(first.width, 0)
+  }
+  XCTAssertGreaterThanOrEqual(longitudeDegrees.bounds.width, 44)
+  XCTAssertFalse(input.hasAmbiguousLayout)
+}
+
+@MainActor
 private func presentationDescendants(_ root: UIView) -> [UIView] {
   [root] + root.subviews.flatMap { presentationDescendants($0) }
 }
@@ -1151,9 +1204,11 @@ private final class PresentationUIKitHost {
   let container = UIViewController()
   let controller: UIViewController
   private let canvas = UIViewController()
+  private let isRightToLeft: Bool
 
-  init(_ controller: UIViewController, size: CGSize) {
+  init(_ controller: UIViewController, size: CGSize, isRightToLeft: Bool = true) {
     self.controller = controller
+    self.isRightToLeft = isRightToLeft
     let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
       .filter { $0.session.role == .windowApplication && $0.activationState != .background && $0.activationState != .unattached }
     if let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first {
@@ -1181,7 +1236,7 @@ private final class PresentationUIKitHost {
     container.addChild(controller)
     controller.view.frame = container.view.bounds
     controller.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-    controller.view.semanticContentAttribute = .forceRightToLeft
+    controller.view.semanticContentAttribute = isRightToLeft ? .forceRightToLeft : .forceLeftToRight
     container.view.addSubview(controller.view)
     controller.didMove(toParent: container)
     window.rootViewController = canvas
@@ -1192,7 +1247,8 @@ private final class PresentationUIKitHost {
   func resize(_ size: CGSize) {
     window.frame = CGRect(origin: .zero, size: ResponsiveFixtureViewport.canvasSize(for: size))
     container.setOverrideTraitCollection(UITraitCollection(traitsFrom: [
-      UITraitCollection(layoutDirection: .rightToLeft), UITraitCollection(preferredContentSizeCategory: .large),
+      UITraitCollection(layoutDirection: isRightToLeft ? .rightToLeft : .leftToRight),
+      UITraitCollection(preferredContentSizeCategory: .large),
       UITraitCollection(horizontalSizeClass: size.width >= 600 ? .regular : .compact),
       UITraitCollection(verticalSizeClass: size.height < 500 ? .compact : .regular),
     ]), forChild: controller)

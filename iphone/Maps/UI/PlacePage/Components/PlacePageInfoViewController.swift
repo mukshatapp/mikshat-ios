@@ -134,13 +134,6 @@ class PlacePageInfoViewController: UIViewController {
     createLinkItem(placePageInfoData.websiteMenu,
                    displayed: L("website_menu"),
                    icon: UIImage(resource: .icPlacepageWebsiteMenu)) { $0.didPressWebsiteMenu() }
-    createLinkItem(placePageInfoData.wikipedia,
-                   displayed: L("read_in_wikipedia"),
-                   icon: UIImage(resource: .icPlacepageWiki)) { $0.didPressWikipedia() }
-    createLinkItem(placePageInfoData.wikimediaCommons,
-                   displayed: L("wikimedia_commons"),
-                   icon: UIImage(resource: .icPlacepageWikimediaCommons)) { $0.didPressWikimediaCommons() }
-
     if let wifi = placePageInfoData.wifiAvailable {
       createInfoItem(wifi, icon: UIImage(resource: .icPlacepageWifi))
     }
