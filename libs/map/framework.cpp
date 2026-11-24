@@ -1,3 +1,4 @@
+#include "drape_frontend/direct_guide_presentation.hpp"
 #include "map/framework.hpp"
 #include "base/assert.hpp"
 #include "map/benchmark_tools.hpp"
@@ -4073,6 +4074,9 @@ std::vector<MwmSet::MwmId> Framework::GetMwmsByRect(m2::RectD const & rect, bool
 // RoutingManager::Delegate
 void Framework::OnRouteFollow(routing::RouterType type)
 {
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  df::g_mukshatDirectGuide.store(type == routing::RouterType::Ruler, std::memory_order_relaxed);
+#endif
   CHECK(m_drapeEngine, ());
 
   bool const isPedestrianRoute = type == RouterType::Pedestrian;

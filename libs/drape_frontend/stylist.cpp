@@ -1,4 +1,5 @@
 #include "drape_frontend/stylist.hpp"
+#include "drape_frontend/protected_area_presentation.hpp"
 
 #include "indexer/classificator.hpp"
 #include "indexer/classificator_loader.hpp"
@@ -31,6 +32,13 @@ IsHatchingTerritoryChecker::IsHatchingTerritoryChecker()
 
 std::string_view IsHatchingTerritoryChecker::GetHatch(uint32_t type) const
 {
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  static ftypes::BaseCheckerEx const reserves({{"boundary", "national_park"},
+                                               {"boundary", "protected_area"},
+                                               {"leisure", "nature_reserve"}});
+  if (reserves(type))
+    return kProtectedAreaFillOverlay;
+#endif
   // Matching with subtypes (see Stylist_IsHatching test).
 
   if (m_3level45 == ftype::Trunc(type, 3))

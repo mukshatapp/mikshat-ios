@@ -1,3 +1,4 @@
+#include "drape_frontend/direct_guide_presentation.hpp"
 #include "routing_manager.hpp"
 
 #include "map/road_warning_spans.hpp"
@@ -1063,6 +1064,9 @@ void RoutingManager::ResetRoutingSession()
 
 void RoutingManager::CloseRouting(bool removeRoutePoints)
 {
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  df::g_mukshatDirectGuide.store(false, std::memory_order_relaxed);
+#endif
   m_extrapolator.Enable(false);
   // Hide preview.
   HidePreviewSegments();
@@ -1593,6 +1597,30 @@ void RoutingManager::BuildRoute(uint32_t timeoutSec)
   CHECK_THREAD_CHECKER(m_threadChecker, ("BuildRoute"));
   CHECK(m_numMwmIDs, ("Initialize routing before building a route"));
   CHECK(!IsFollowingTrack(), ("Select a regular routing mode before BuildRoute"));
+
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  // Live direct guidance only moves the origin of the same two-point route.
+  // RebuildRoute retains following and the current viewport; BuildRoute/CloseRouting do not.
+  if (m_currentRouterType == RouterType::Ruler && m_routingSession.IsFollowing())
+  {
+    auto const points = GetRoutePoints();
+    if (points.size() == 2 && !points.front().m_isMyPosition &&
+        points.back().m_position.EqualDxDy(m_routingSession.GetEndPoint(), mercator::kPointEqualityEps) &&
+        !points.front().m_position.EqualDxDy(points.back().m_position, mercator::kPointEqualityEps))
+    {
+      m_routingSession.RebuildRoute(points.front().m_position,
+                                    [this](RoutesResult const & result, RouterResultCode code)
+      {
+        if (code == RouterResultCode::NoError)
+          OnRebuildRouteReady(result, code);
+        else
+          CallRouteBuilded(code, storage::CountriesSet());
+      }, nullptr /* needMoreMapsCallback */, nullptr /* removeRouteCallback */, timeoutSec,
+                                    SessionState::RouteRebuilding, false /* adjustToPrevRoute */);
+      return;
+    }
+  }
+#endif
 
   // Retire the previous build before notifying observers, including on validation failures.
   CloseRouting(false /* remove route points */);

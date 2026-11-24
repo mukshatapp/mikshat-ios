@@ -3,6 +3,7 @@
 #include "drape_frontend/animation/arrow_animation.hpp"
 #include "drape_frontend/animation_system.hpp"
 #include "drape_frontend/drape_notifier.hpp"
+#include "drape_frontend/direct_guide_presentation.hpp"
 #include "drape_frontend/screen_animations.hpp"
 #include "drape_frontend/screen_operations.hpp"
 #include "drape_frontend/user_event_stream.hpp"
@@ -793,7 +794,13 @@ m2::PointD MyPositionController::GetRotationPixelCenter() const
 
 m2::PointD MyPositionController::GetRoutingRotationPixelCenter() const
 {
-  return {m_visiblePixelRect.Center().x, m_visiblePixelRect.maxY() - m_positionRoutingOffsetY};
+  double y = m_visiblePixelRect.maxY() - m_positionRoutingOffsetY;
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  y = DirectGuideAnchorY(y, m_visiblePixelRect.minY(), m_visiblePixelRect.maxY(), GetVisualScale(),
+                         m_pixelRect.SizeY() > m_pixelRect.SizeX(),
+                         m_isInRouting && g_mukshatDirectGuide.load(std::memory_order_relaxed));
+#endif
+  return {m_visiblePixelRect.Center().x, y};
 }
 
 void MyPositionController::UpdateRoutingOffsetY(bool useDefault, int offsetY)

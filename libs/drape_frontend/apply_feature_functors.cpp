@@ -1,4 +1,5 @@
 #include "drape_frontend/apply_feature_functors.hpp"
+#include "drape_frontend/protected_area_presentation.hpp"
 #include "drape_frontend/apply_feature_params.hpp"
 
 #include "drape_frontend/area_shape.hpp"
@@ -654,7 +655,8 @@ void ApplyAreaFeature::ProcessAreaRules(drule::AreaRule const * areaRule, drule:
 
   if (hatchingRule)
   {
-    ASSERT_GREATER_OR_EQUAL(hatchingRule->priority, drule::kBasePriorityFg, (m_f.DebugString()));
+    ASSERT(hatchingRule->priority >= drule::kBasePriorityFg || hatchKey == kProtectedAreaFillOverlay,
+           (m_f.DebugString()));
     ProcessRule(*hatchingRule, areaDepth, hatchKey, {});
   }
 
@@ -687,6 +689,10 @@ void ApplyAreaFeature::ProcessRule(drule::AreaRule const & areaRule, double area
   params.m_posZ = m_posZ;
   // Hatch and solid-fill patterns are mutually exclusive here (one key is always empty).
   params.m_areaPattern = hatchKey.empty() ? patternKey : hatchKey;
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  if (hatchKey == kProtectedAreaFillOverlay)
+    params.m_areaPattern = {};
+#endif
   params.m_baseGtoPScale = m_params.m_currentScaleGtoP;
 
   BuildingOutline outline;

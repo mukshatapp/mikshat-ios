@@ -31,6 +31,8 @@ jobs:
         run: |
           g++ -std=c++23 -I libs tools/mukshat/motion_timing_test.cpp -o /tmp/motion-timing-test
           /tmp/motion-timing-test
+          g++ -std=c++23 -I libs tools/mukshat/direct_guide_anchor_test.cpp -o /tmp/direct-guide-anchor-test
+          /tmp/direct-guide-anchor-test
       - name: Verify all preserved JNI declarations
         run: python3 tools/mukshat/verify_jni_contract.py
       - name: Build native engine for the preserved Mukshat SDK
