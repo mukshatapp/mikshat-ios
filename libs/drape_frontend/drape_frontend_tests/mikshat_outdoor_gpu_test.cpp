@@ -296,10 +296,10 @@ UNIT_CLASS_TEST(OutdoorGpuFixture, MikshatOutdoorGPU_ActualDirtAndWadi20km)
     {
       auto const params = ParamsFor(screen, f);
       feature::PrepareMikshatOverviewGeometry(*feature, df::GetDrawTileScale(screen));
-      df::ApplyLineFeatureGeometry apply(params, *feature, {});
-      apply.BuildGeometry(df::GetDrawTileScale(screen), false);
+      df::ApplyLineFeatureGeometry apply(params, *feature, {}, false /* isIsoline */);
+      apply.BuildGeometry(df::GetDrawTileScale(screen));
       TEST(apply.HasGeometry(), (index));
-      apply.ProcessLineRules(style.m_lineRules, false);
+      apply.ProcessLineRules(style.m_lineRules);
     });
     auto const & image = fixture.GetLastImage();
     auto const predicate = dirt ? IsBrown : IsBlue;
