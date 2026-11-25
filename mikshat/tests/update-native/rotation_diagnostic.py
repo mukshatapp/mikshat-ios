@@ -117,6 +117,40 @@ def output(args):
     return subprocess.check_output(args, text=True, timeout=30).strip()
 
 
+def install_app(udid, app, directory):
+    """Retry one timed-out install before any XCTest can modify this profile."""
+    report = {"udid": udid, "installed": False, "commands": []}
+
+    def checked(args, timeout):
+        entry = {"command": args, "timeoutSeconds": timeout}
+        report["commands"].append(entry)
+        try:
+            result = command(args, capture_output=True, timeout=timeout)
+            entry.update(exitStatus=result.returncode, stdout=captured_text(result.stdout),
+                         stderr=captured_text(result.stderr))
+        except (OSError, subprocess.SubprocessError) as error:
+            entry.update(error=str(error), timedOut=isinstance(error, subprocess.TimeoutExpired),
+                         stdout=captured_text(getattr(error, "output", None)),
+                         stderr=captured_text(getattr(error, "stderr", None)))
+            raise
+
+    try:
+        for attempt in range(2):
+            try:
+                checked(["xcrun", "simctl", "install", udid, str(app)], 120)
+                report["installed"] = True
+                return
+            except subprocess.TimeoutExpired:
+                if attempt:
+                    raise
+                print("Simulator install timed out; rebooting " + udid + " for one bounded retry", flush=True)
+                checked(["xcrun", "simctl", "shutdown", udid], 30)
+                checked(["xcrun", "simctl", "boot", udid], 60)
+                checked(["xcrun", "simctl", "bootstatus", udid, "-b"], 180)
+    finally:
+        (directory / "simulator-install.json").write_text(json.dumps(report, indent=2) + "\n")
+
+
 def patch_plan(original, mode, production=False, *, language=None, region=None):
     if mode not in MODES or (production and mode != "automatic"):
         raise ValueError("Unknown layout diagnostic mode")
@@ -485,7 +519,7 @@ def main():
             if index != 0:
                 command(["xcrun", "simctl", "boot", udid])
                 command(["xcrun", "simctl", "bootstatus", udid, "-b"], timeout=180)
-            command(["xcrun", "simctl", "install", udid, str(apps[0])])
+            install_app(udid, apps[0], directory)
             command(["xcrun", "simctl", "privacy", udid, "grant", "location", BUNDLE])
             command(["xcrun", "simctl", "location", udid, "set", "26.2317333333,44.9453"])
             plan_path = products / ("MikshatTitleInsets-" + run["id"] + ".xctestrun")
