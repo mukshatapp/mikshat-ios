@@ -3710,234 +3710,432 @@ type boundary-administrative-4
     line width=1.2 color=#4D73726B/#4D666666 join=round cap=round dash=[1.8,0.9] priority=90
 type boundary-national_park
   z8
-    line width=1 color=#00888C38/#0047491D join=bevel cap=butt priority=20
-    area color=#00888C38/#0047491D priority=20
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     caption primary[height=10 color=#003A7921/#002B4918] priority=6700
   z9
-    line width=1 color=#00888C38/#0047491D join=bevel cap=butt priority=20
-    area color=#00888C38/#0047491D priority=20
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     caption primary[height=10 color=#003A7921/#002B4918] priority=6700
   z10
-    line width=1 color=#00888C38/#0047491D join=bevel cap=butt priority=20
-    area color=#CC888C38/#CC47491D priority=20
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
   z11
-    line width=1 color=#00888C38/#0047491D join=bevel cap=butt priority=20
-    area color=#CC888C38/#CC47491D priority=20
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=20
   z12
-    line width=1 color=#00888C38/#0047491D join=bevel cap=butt priority=20
-    area color=#CC888C38/#CC47491D priority=20
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=12
     caption primary[height=10 color=#003A7921/#002B4918 stroke=#33FFFFFF/#33060600 dy=1 optional] priority=-3300
   z13
-    line width=1 color=#00888C38/#0047491D join=round cap=butt priority=20
-    area color=#CC888C38/#CC47491D priority=20
+    line width=1.5 color=#007E3FB2/#00B388E8 join=round cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=12
     caption primary[height=10 color=#003A7921/#002B4918 stroke=#33FFFFFF/#33060600 dy=1 optional] priority=-3300
   z14
-    line width=1 color=#00888C38/#0047491D join=round cap=butt priority=20
-    area color=#CC888C38/#CC47491D priority=20
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=12
     caption primary[height=10 color=#003A7921/#002B4918 stroke=#33FFFFFF/#33060600 dy=1 optional] priority=-3300
   z15
-    line width=1 color=#00888C38/#0047491D join=round cap=butt priority=20
-    area color=#CC888C38/#CC47491D priority=20
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-m priority=6700
     caption primary[height=11 color=#003A7921/#002B4918 stroke=#1AFFFFFF/#1A060600 dy=1 optional] priority=-3300
   z16
-    line width=1 color=#00888C38/#0047491D join=round cap=round priority=20
-    area color=#CC888C38/#CC47491D priority=20
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-m priority=6700
     caption primary[height=11 color=#003A7921/#002B4918 stroke=#1AFFFFFF/#1A060600 dy=1 optional] priority=-3300
   z17
-    line width=1 color=#00888C38/#0047491D join=round cap=round priority=20
-    area color=#CC888C38/#CC47491D priority=20
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-m priority=6700
     caption primary[height=11 color=#003A7921/#002B4918 stroke=#1AFFFFFF/#1A060600 dy=1 optional] priority=-3300
   z18
-    line width=1 color=#00888C38/#0047491D join=round cap=round priority=20
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
   z19
-    line width=1 color=#00888C38/#0047491D join=round cap=round priority=20
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
   z20
-    line width=1 color=#00888C38/#0047491D join=round cap=round priority=20
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
 type boundary-protected_area
+  z8
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
+  z9
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
+  z10
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
   z11
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=20
   z12
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=12
     caption primary[height=10 color=#003A7921/#002B4918 stroke=#33FFFFFF/#33060600 dy=1 optional] priority=-3300
   z13
+    line width=1.5 color=#007E3FB2/#00B388E8 join=round cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=12
     caption primary[height=10 color=#003A7921/#002B4918 stroke=#33FFFFFF/#33060600 dy=1 optional] priority=-3300
   z14
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=12
     caption primary[height=10 color=#003A7921/#002B4918 stroke=#33FFFFFF/#33060600 dy=1 optional] priority=-3300
   z15
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-m priority=6700
     caption primary[height=11 color=#003A7921/#002B4918 stroke=#1AFFFFFF/#1A060600 dy=1 optional] priority=-3300
   z16
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-m priority=6700
     caption primary[height=11 color=#003A7921/#002B4918 stroke=#1AFFFFFF/#1A060600 dy=1 optional] priority=-3300
   z17
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-m priority=6700
     caption primary[height=11 color=#003A7921/#002B4918 stroke=#1AFFFFFF/#1A060600 dy=1 optional] priority=-3300
+  z18
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
+  z19
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
+  z20
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
 type boundary-protected_area-1
   z8
-    line width=1 color=#00888C38/#0047491D join=bevel cap=butt priority=20
-    area color=#00888C38/#0047491D priority=20
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     caption primary[height=10 color=#003A7921/#002B4918] priority=6700
   z9
-    line width=1 color=#00888C38/#0047491D join=bevel cap=butt priority=20
-    area color=#00888C38/#0047491D priority=20
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     caption primary[height=10 color=#003A7921/#002B4918] priority=6700
   z10
-    line width=1 color=#00888C38/#0047491D join=bevel cap=butt priority=20
-    area color=#CC888C38/#CC47491D priority=20
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
   z11
-    line width=1 color=#00888C38/#0047491D join=bevel cap=butt priority=20
-    area color=#CC888C38/#CC47491D priority=20
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=20
   z12
-    line width=1 color=#00888C38/#0047491D join=bevel cap=butt priority=20
-    area color=#CC888C38/#CC47491D priority=20
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=12
     caption primary[height=10 color=#003A7921/#002B4918 stroke=#33FFFFFF/#33060600 dy=1 optional] priority=-3300
   z13
-    line width=1 color=#00888C38/#0047491D join=round cap=butt priority=20
-    area color=#CC888C38/#CC47491D priority=20
+    line width=1.5 color=#007E3FB2/#00B388E8 join=round cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=12
     caption primary[height=10 color=#003A7921/#002B4918 stroke=#33FFFFFF/#33060600 dy=1 optional] priority=-3300
   z14
-    line width=1 color=#00888C38/#0047491D join=round cap=butt priority=20
-    area color=#CC888C38/#CC47491D priority=20
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=12
     caption primary[height=10 color=#003A7921/#002B4918 stroke=#33FFFFFF/#33060600 dy=1 optional] priority=-3300
   z15
-    line width=1 color=#00888C38/#0047491D join=round cap=butt priority=20
-    area color=#CC888C38/#CC47491D priority=20
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-m priority=6700
     caption primary[height=11 color=#003A7921/#002B4918 stroke=#1AFFFFFF/#1A060600 dy=1 optional] priority=-3300
   z16
-    line width=1 color=#00888C38/#0047491D join=round cap=round priority=20
-    area color=#CC888C38/#CC47491D priority=20
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-m priority=6700
     caption primary[height=11 color=#003A7921/#002B4918 stroke=#1AFFFFFF/#1A060600 dy=1 optional] priority=-3300
   z17
-    line width=1 color=#00888C38/#0047491D join=round cap=round priority=20
-    area color=#CC888C38/#CC47491D priority=20
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-m priority=6700
     caption primary[height=11 color=#003A7921/#002B4918 stroke=#1AFFFFFF/#1A060600 dy=1 optional] priority=-3300
   z18
-    line width=1 color=#00888C38/#0047491D join=round cap=round priority=20
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
   z19
-    line width=1 color=#00888C38/#0047491D join=round cap=round priority=20
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
   z20
-    line width=1 color=#00888C38/#0047491D join=round cap=round priority=20
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
 type boundary-protected_area-2
+  z8
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
+  z9
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
+  z10
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
   z11
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=20
   z12
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=12
     caption primary[height=10 color=#003A7921/#002B4918 stroke=#33FFFFFF/#33060600 dy=1 optional] priority=-3300
   z13
+    line width=1.5 color=#007E3FB2/#00B388E8 join=round cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=12
     caption primary[height=10 color=#003A7921/#002B4918 stroke=#33FFFFFF/#33060600 dy=1 optional] priority=-3300
   z14
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=12
     caption primary[height=10 color=#003A7921/#002B4918 stroke=#33FFFFFF/#33060600 dy=1 optional] priority=-3300
   z15
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-m priority=6700
     caption primary[height=11 color=#003A7921/#002B4918 stroke=#1AFFFFFF/#1A060600 dy=1 optional] priority=-3300
   z16
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-m priority=6700
     caption primary[height=11 color=#003A7921/#002B4918 stroke=#1AFFFFFF/#1A060600 dy=1 optional] priority=-3300
   z17
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-m priority=6700
     caption primary[height=11 color=#003A7921/#002B4918 stroke=#1AFFFFFF/#1A060600 dy=1 optional] priority=-3300
+  z18
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
+  z19
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
+  z20
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
 type boundary-protected_area-3
+  z8
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
+  z9
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
+  z10
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
   z11
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=20
   z12
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=12
     caption primary[height=10 color=#003A7921/#002B4918 stroke=#33FFFFFF/#33060600 dy=1 optional] priority=-3300
   z13
+    line width=1.5 color=#007E3FB2/#00B388E8 join=round cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=12
     caption primary[height=10 color=#003A7921/#002B4918 stroke=#33FFFFFF/#33060600 dy=1 optional] priority=-3300
   z14
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=12
     caption primary[height=10 color=#003A7921/#002B4918 stroke=#33FFFFFF/#33060600 dy=1 optional] priority=-3300
   z15
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-m priority=6700
     caption primary[height=11 color=#003A7921/#002B4918 stroke=#1AFFFFFF/#1A060600 dy=1 optional] priority=-3300
   z16
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-m priority=6700
     caption primary[height=11 color=#003A7921/#002B4918 stroke=#1AFFFFFF/#1A060600 dy=1 optional] priority=-3300
   z17
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-m priority=6700
     caption primary[height=11 color=#003A7921/#002B4918 stroke=#1AFFFFFF/#1A060600 dy=1 optional] priority=-3300
+  z18
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
+  z19
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
+  z20
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
 type boundary-protected_area-4
+  z8
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
+  z9
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
+  z10
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
   z11
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=20
   z12
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=12
     caption primary[height=10 color=#003A7921/#002B4918 stroke=#33FFFFFF/#33060600 dy=1 optional] priority=-3300
   z13
+    line width=1.5 color=#007E3FB2/#00B388E8 join=round cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=12
     caption primary[height=10 color=#003A7921/#002B4918 stroke=#33FFFFFF/#33060600 dy=1 optional] priority=-3300
   z14
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=12
     caption primary[height=10 color=#003A7921/#002B4918 stroke=#33FFFFFF/#33060600 dy=1 optional] priority=-3300
   z15
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-m priority=6700
     caption primary[height=11 color=#003A7921/#002B4918 stroke=#1AFFFFFF/#1A060600 dy=1 optional] priority=-3300
   z16
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-m priority=6700
     caption primary[height=11 color=#003A7921/#002B4918 stroke=#1AFFFFFF/#1A060600 dy=1 optional] priority=-3300
   z17
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-m priority=6700
     caption primary[height=11 color=#003A7921/#002B4918 stroke=#1AFFFFFF/#1A060600 dy=1 optional] priority=-3300
+  z18
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
+  z19
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
+  z20
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
 type boundary-protected_area-5
+  z8
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
+  z9
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
+  z10
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
   z11
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=20
   z12
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=12
     caption primary[height=10 color=#003A7921/#002B4918 stroke=#33FFFFFF/#33060600 dy=1 optional] priority=-3300
   z13
+    line width=1.5 color=#007E3FB2/#00B388E8 join=round cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=12
     caption primary[height=10 color=#003A7921/#002B4918 stroke=#33FFFFFF/#33060600 dy=1 optional] priority=-3300
   z14
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=12
     caption primary[height=10 color=#003A7921/#002B4918 stroke=#33FFFFFF/#33060600 dy=1 optional] priority=-3300
   z15
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-m priority=6700
     caption primary[height=11 color=#003A7921/#002B4918 stroke=#1AFFFFFF/#1A060600 dy=1 optional] priority=-3300
   z16
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-m priority=6700
     caption primary[height=11 color=#003A7921/#002B4918 stroke=#1AFFFFFF/#1A060600 dy=1 optional] priority=-3300
   z17
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-m priority=6700
     caption primary[height=11 color=#003A7921/#002B4918 stroke=#1AFFFFFF/#1A060600 dy=1 optional] priority=-3300
+  z18
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
+  z19
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
+  z20
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
 type boundary-protected_area-6
+  z8
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
+  z9
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
+  z10
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
   z11
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=20
   z12
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=12
     caption primary[height=10 color=#003A7921/#002B4918 stroke=#33FFFFFF/#33060600 dy=1 optional] priority=-3300
   z13
+    line width=1.5 color=#007E3FB2/#00B388E8 join=round cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=12
     caption primary[height=10 color=#003A7921/#002B4918 stroke=#33FFFFFF/#33060600 dy=1 optional] priority=-3300
   z14
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=12
     caption primary[height=10 color=#003A7921/#002B4918 stroke=#33FFFFFF/#33060600 dy=1 optional] priority=-3300
   z15
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-m priority=6700
     caption primary[height=11 color=#003A7921/#002B4918 stroke=#1AFFFFFF/#1A060600 dy=1 optional] priority=-3300
   z16
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-m priority=6700
     caption primary[height=11 color=#003A7921/#002B4918 stroke=#1AFFFFFF/#1A060600 dy=1 optional] priority=-3300
   z17
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-m priority=6700
     caption primary[height=11 color=#003A7921/#002B4918 stroke=#1AFFFFFF/#1A060600 dy=1 optional] priority=-3300
+  z18
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
+  z19
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
+  z20
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
 type building
   z14
     area color=#80C9C8BB/#803B3B3B priority=130
@@ -9915,39 +10113,58 @@ type leisure-miniature_golf
     caption primary[height=10 color=#00444444/#00A6A6A6 dy=1 optional] priority=-8200
 type leisure-nature_reserve
   z8
-    area color=#00888C38/#0047491D priority=20
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
   z9
-    area color=#00888C38/#0047491D priority=20
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     caption primary[height=10 color=#003A7921/#002B4918] priority=6700
   z10
-    area color=#CC888C38/#CC47491D priority=20
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
   z11
-    area color=#CC888C38/#CC47491D priority=20
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=20
   z12
-    area color=#CC888C38/#CC47491D priority=20
+    line width=1.5 color=#007E3FB2/#00B388E8 join=bevel cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=12
     caption primary[height=10 color=#003A7921/#002B4918 stroke=#33FFFFFF/#33060600 dy=1 optional] priority=-3300
   z13
-    area color=#CC888C38/#CC47491D priority=20
+    line width=1.5 color=#007E3FB2/#00B388E8 join=round cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=1.5 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=12
     caption primary[height=10 color=#003A7921/#002B4918 stroke=#33FFFFFF/#33060600 dy=1 optional] priority=-3300
   z14
-    area color=#CC888C38/#CC47491D priority=20
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-s priority=6700 min_distance=12
     caption primary[height=10 color=#003A7921/#002B4918 stroke=#33FFFFFF/#33060600 dy=1 optional] priority=-3300
   z15
-    area color=#CC888C38/#CC47491D priority=20
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=butt priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-m priority=6700
     caption primary[height=11 color=#003A7921/#002B4918 stroke=#1AFFFFFF/#1A060600 dy=1 optional] priority=-3300
   z16
-    area color=#CC888C38/#CC47491D priority=20
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-m priority=6700
     caption primary[height=11 color=#003A7921/#002B4918 stroke=#1AFFFFFF/#1A060600 dy=1 optional] priority=-3300
   z17
-    area color=#CC888C38/#CC47491D priority=20
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
     symbol name=nparkf-outline-m priority=6700
     caption primary[height=11 color=#003A7921/#002B4918 stroke=#1AFFFFFF/#1A060600 dy=1 optional] priority=-3300
+  z18
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
+  z19
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
+  z20
+    line width=2 color=#007E3FB2/#00B388E8 join=round cap=round priority=20
+    area color=#CC7E3FB2/#CCB388E8 border[width=2 color=#007E3FB2/#00B388E8 join=round cap=round] priority=20
 type leisure-outdoor_seating
   z18
     symbol name=outdoor_seating-m priority=450
@@ -11101,33 +11318,39 @@ type natural-beach-gravel
     area color=#00FCEC7E/#0028281A priority=-1970
     caption primary[height=10 color=#00444444/#00A6A6A6 dy=1] priority=3250
 type natural-beach-sand
+  z7
+    area color=#00EBA426/#0028281A priority=-1970
+  z8
+    area color=#00EBA426/#0028281A priority=-1970
+  z9
+    area color=#00EBA426/#0028281A priority=-1970
   z10
-    area color=#00FCEC7E/#0028281A priority=-1970
+    area color=#00EBA426/#0028281A priority=-1970
   z11
-    area color=#00FCEC7E/#0028281A priority=-1970
+    area color=#00EBA426/#0028281A priority=-1970
   z12
-    area color=#00FCEC7E/#0028281A priority=-1970
+    area color=#00EBA426/#0028281A priority=-1970
   z13
-    area color=#00FCEC7E/#0028281A priority=-1970
+    area color=#00EBA426/#0028281A priority=-1970
   z14
-    area color=#00FCEC7E/#0028281A priority=-1970
+    area color=#00EBA426/#0028281A priority=-1970
   z15
-    area color=#00FCEC7E/#0028281A priority=-1970
+    area color=#00EBA426/#0028281A priority=-1970
     caption primary[height=10 color=#00444444/#00A6A6A6] priority=3250
   z16
-    area color=#00FCEC7E/#0028281A priority=-1970
+    area color=#00EBA426/#0028281A priority=-1970
     caption primary[height=10 color=#00444444/#00A6A6A6 dy=1] priority=3250
   z17
-    area color=#00FCEC7E/#0028281A priority=-1970
+    area color=#00EBA426/#0028281A priority=-1970
     caption primary[height=10 color=#00444444/#00A6A6A6 dy=1] priority=3250
   z18
-    area color=#00FCEC7E/#0028281A priority=-1970
+    area color=#00EBA426/#0028281A priority=-1970
     caption primary[height=10 color=#00444444/#00A6A6A6 dy=1] priority=3250
   z19
-    area color=#00FCEC7E/#0028281A priority=-1970
+    area color=#00EBA426/#0028281A priority=-1970
     caption primary[height=10 color=#00444444/#00A6A6A6 dy=1] priority=3250
   z20
-    area color=#00FCEC7E/#0028281A priority=-1970
+    area color=#00EBA426/#0028281A priority=-1970
     caption primary[height=10 color=#00444444/#00A6A6A6 dy=1] priority=3250
 type natural-cape
   z14
@@ -11226,51 +11449,51 @@ type natural-coastline
     area color=#008BD3E0/#00003636 priority=-1990
 type natural-desert
   z1
-    area color=#00EEE5B2/#00191007 priority=-1970
+    area color=#00EBA426/#00191007 priority=-1970
   z2
-    area color=#00EEE5B2/#00191007 priority=-1970
+    area color=#00EBA426/#00191007 priority=-1970
   z3
-    area color=#00EEE5B2/#00191007 priority=-1970
+    area color=#00EBA426/#00191007 priority=-1970
   z4
-    area color=#00EEE5B2/#00191007 priority=-1970
+    area color=#00EBA426/#00191007 priority=-1970
   z5
-    area color=#00EEE5B2/#00191007 priority=-1970
+    area color=#00EBA426/#00191007 priority=-1970
   z6
-    area color=#00EEE5B2/#00191007 priority=-1970
+    area color=#00EBA426/#00191007 priority=-1970
   z7
-    area color=#00EEE5B2/#00191007 priority=-1970
+    area color=#00EBA426/#00191007 priority=-1970
   z8
-    area color=#00EEE5B2/#00191007 priority=-1970
+    area color=#00EBA426/#00191007 priority=-1970
   z9
-    area color=#00EEE5B2/#00191007 priority=-1970
+    area color=#00EBA426/#00191007 priority=-1970
   z10
-    area color=#00EEE5B2/#00191007 priority=-1970
+    area color=#00EBA426/#00191007 priority=-1970
   z11
-    area color=#00EEE5B2/#00191007 priority=-1970
+    area color=#00EBA426/#00191007 priority=-1970
   z12
-    area color=#00EEE5B2/#00191007 priority=-1970
+    area color=#00EBA426/#00191007 priority=-1970
   z13
-    area color=#00EEE5B2/#00191007 priority=-1970
+    area color=#00EBA426/#00191007 priority=-1970
   z14
-    area color=#00EEE5B2/#00191007 priority=-1970
+    area color=#00EBA426/#00191007 priority=-1970
     caption primary[height=10 color=#00444444/#00A6A6A6] priority=3250
   z15
-    area color=#00EEE5B2/#00191007 priority=-1970
+    area color=#00EBA426/#00191007 priority=-1970
     caption primary[height=10 color=#00444444/#00A6A6A6] priority=3250
   z16
-    area color=#00EEE5B2/#00191007 priority=-1970
+    area color=#00EBA426/#00191007 priority=-1970
     caption primary[height=10 color=#00444444/#00A6A6A6] priority=3250
   z17
-    area color=#00EEE5B2/#00191007 priority=-1970
+    area color=#00EBA426/#00191007 priority=-1970
     caption primary[height=10 color=#00444444/#00A6A6A6] priority=3250
   z18
-    area color=#00EEE5B2/#00191007 priority=-1970
+    area color=#00EBA426/#00191007 priority=-1970
     caption primary[height=10 color=#00444444/#00A6A6A6] priority=3250
   z19
-    area color=#00EEE5B2/#00191007 priority=-1970
+    area color=#00EBA426/#00191007 priority=-1970
     caption primary[height=10 color=#00444444/#00A6A6A6] priority=3250
   z20
-    area color=#00EEE5B2/#00191007 priority=-1970
+    area color=#00EBA426/#00191007 priority=-1970
     caption primary[height=10 color=#00444444/#00A6A6A6] priority=3250
 type natural-earth_bank
   z14
