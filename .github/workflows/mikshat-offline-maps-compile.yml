@@ -5,6 +5,7 @@ name: Mikshat offline maps native validation
     branches:
       - feature/offline-maps-search-4.6.19
       - feature/automatic-outdoor-map-styling-4.6.20
+      - fix/organic-maps-routing-4.6.21
   workflow_dispatch:
 
 permissions:
@@ -55,6 +56,13 @@ jobs:
           python3 mikshat/tests/update-native/rotation_diagnostic.py \
             --production build/offline-maps-compile/feature-verification \
             2>&1 | tee build/offline-maps-compile/native-driver.log
+      - name: Require both Go To entries with actual Saudi maps and active Metal
+        timeout-minutes: 14
+        run: |
+          set -euo pipefail
+          python3 mikshat/tests/update-native/vehicle_routing.py \
+            --products build/RotationDiagnosticDerivedData/Build/Products \
+            --output-dir build/offline-maps-compile/vehicle-routing
       - name: Preserve native iOS verification evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -123,9 +131,11 @@ jobs:
           directory = Path('build/offline-map-core-fixtures')
           north = renderer.prepare_fixture(directory)
           south = renderer.prepare_fixture(directory, fixture_info=renderer.SOUTH_FIXTURE)
+          qatar = renderer.prepare_fixture(directory, fixture_info=renderer.QATAR_FIXTURE)
           with open(os.environ['GITHUB_ENV'], 'a') as stream:
               stream.write('MIKSHAT_SAUDI_NORTH_MWM_PATH=' + str(north) + '\n')
               stream.write('MIKSHAT_SAUDI_SOUTH_MWM_PATH=' + str(south) + '\n')
+              stream.write('MIKSHAT_QATAR_MWM_PATH=' + str(qatar) + '\n')
           PY
       - name: Configure and build the focused native suites
         run: |
@@ -133,11 +143,12 @@ jobs:
           cmake -S . -B build/offline-map-core -G Ninja \
             -DCMAKE_BUILD_TYPE=Debug -DSKIP_QT_GUI=ON -DBUILD_TESTING=ON \
             -DBUILD_DEV_SANDBOX=OFF -DBUILD_OPENGL_TESTS=OFF -DCMAKE_UNITY_BUILD=ON \
+            -DMIKSHAT_SAUDI_OVERVIEW_TESTS=ON \
             -DCMAKE_C_FLAGS=-g1 '-DCMAKE_CXX_FLAGS=-g1 -DMIKSHAT_SUPPLEMENTARY_OVERVIEW_TESTS' \
             -DUSE_CCACHE=ON -DPython3_EXECUTABLE=/usr/bin/python3 \
             2>&1 | tee build/offline-map-core-evidence/configure.log
           cmake --build build/offline-map-core --parallel 3 \
-            --target map_tests mwm_tests style_tests drape_frontend_tests \
+            --target map_tests mwm_tests style_tests drape_frontend_tests routing_tests storage_tests \
             2>&1 | tee build/offline-map-core-evidence/build.log
       - name: Require every selected compiled native case to execute and pass
         run: |
@@ -153,6 +164,16 @@ jobs:
           runner = importlib.util.module_from_spec(spec)
           spec.loader.exec_module(runner)
           cases = {
+              'routing_tests': [
+                  'SupplementaryRoutingTest_RoadCandidatesExcludeDisplayMapsBeforeCountryLookup',
+                  'SupplementaryRoutingTest_ProjectionExcludesCloserDisplayRoadBeforeCountryLookup',
+                  'SupplementaryRoutingTest_MissingRoutingMapReturnsNoRoadsWithoutCountryLookup',
+                  'SupplementaryRoutingTest_UnrestrictedReaderKeepsCustomMaps',
+              ],
+              'storage_tests': [
+                  'MapFilesDownloader_CompatibilityHeaders',
+                  'MapFilesDownloader_OfficialSources',
+              ],
               'map_tests': [
                   'Framework_SupplementaryMapCanToggleWithOutstandingReaderWithoutDeletingSource',
                   'Framework_SupplementaryMapsCannotReplaceCoreWorldOrDownloaderCountries',
@@ -161,6 +182,7 @@ jobs:
               ],
               'mwm_tests': [
                   'ForEachFeatureID_WorldGeometryScaleContract',
+                  'MikshatOfficialMaps_CurrentReleaseCountriesAndWorld',
                   'MikshatOverview_PreservesWorldAndCancellation',
                   'MikshatOverview_SupplementaryOutdoorGeometry',
                   'MikshatOutdoor_ActualLocalitiesAndReportedTrack',

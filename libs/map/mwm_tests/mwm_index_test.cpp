@@ -13,6 +13,8 @@
 #include "indexer/search_string_utils.hpp"
 #include "indexer/transliteration_loader.hpp"
 
+#include "platform/map_compatibility.hpp"
+
 #include <glaze/json.hpp>
 
 #include <algorithm>
@@ -21,6 +23,7 @@
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <map>
 #include <string>
 #include <vector>
@@ -158,6 +161,62 @@ std::vector<FeatureID> ReadOverviewIds(FeaturesFetcher const & source, m2::RectD
   TEST(std::adjacent_find(ids.begin(), ids.end()) == ids.end(), ("Renderer IDs must remain unique"));
   return ids;
 }
+
+std::string NormalizeOutdoorName(std::string_view name)
+{
+  auto value = strings::ToUtf8(search::NormalizeAndSimplifyString(name));
+  std::erase(value, ' ');
+  return value;
+}
+
+// Country releases renumber features. Identify real fixtures by their stored
+// location, category and name instead of reusing a previous release's index.
+uint32_t FindNamedFeature(FeaturesFetcher const & source, MwmSet::MwmId const & map, std::string_view name,
+                          ms::LatLon const & location, uint32_t type, feature::GeomType geometry,
+                          double radiusMeters = 1000.0)
+{
+  auto const center = mercator::FromLatLon(location);
+  auto const rect = mercator::RectByCenterXYAndSizeInMeters(center, radiusMeters);
+  auto const expectedName = NormalizeOutdoorName(name);
+  std::vector<uint32_t> matches;
+  source.GetDataSource().ForEachInRectForMWM([&](FeatureType & candidate)
+  {
+    if (candidate.GetGeomType() != geometry || !feature::TypesHolder(candidate).Has(type) ||
+        mercator::DistanceOnEarth(feature::GetCenter(candidate), center) > radiusMeters)
+      return;
+    bool named = false;
+    candidate.ForEachName([&](int8_t, std::string_view value)
+    { named = named || NormalizeOutdoorName(value) == expectedName; });
+    if (named)
+      matches.push_back(candidate.GetID().m_index);
+  }, rect, scales::GetUpperScale(), map);
+  std::sort(matches.begin(), matches.end());
+  matches.erase(std::unique(matches.begin(), matches.end()), matches.end());
+  TEST_EQUAL(matches.size(), 1, ("Require one actual named fixture in its recorded region", name, location));
+  return matches.front();
+}
+
+uint32_t FindReportedTrack(FeaturesFetcher const & source, MwmSet::MwmId const & map)
+{
+  auto const center = mercator::FromLatLon(28.0 + 0.628 / 60.0, 42.0 + 0.426 / 60.0);
+  auto const rect = mercator::RectByCenterXYAndSizeInMeters(center, 100.0);
+  auto const trackType = classif().GetTypeByPath({"highway", "track"});
+  uint32_t index = std::numeric_limits<uint32_t>::max();
+  double nearest = 50.0;
+  source.GetDataSource().ForEachInRectForMWM([&](FeatureType & candidate)
+  {
+    if (candidate.GetGeomType() != feature::GeomType::Line || !feature::TypesHolder(candidate).Has(trackType))
+      return;
+    double const distance = feature::GetMinDistanceMeters(candidate, center, FeatureType::BEST_GEOMETRY);
+    if (distance < nearest)
+    {
+      nearest = distance;
+      index = candidate.GetID().m_index;
+    }
+  }, rect, scales::GetUpperScale(), map);
+  TEST_NOT_EQUAL(index, std::numeric_limits<uint32_t>::max(), ("The user's actual track must remain within 50 m"));
+  return index;
+}
 }  // namespace
 
 UNIT_TEST(MikshatOverview_PreservesWorldAndCancellation)
@@ -193,6 +252,65 @@ UNIT_TEST(MikshatOverview_PreservesWorldAndCancellation)
 }
 
 #ifdef MIKSHAT_SAUDI_OVERVIEW_TESTS
+UNIT_TEST(MikshatOfficialMaps_CurrentReleaseCountriesAndWorld)
+{
+  classificator::Load();
+  std::array<char const *, 3> const keys = {"MIKSHAT_SAUDI_NORTH_MWM_PATH", "MIKSHAT_SAUDI_SOUTH_MWM_PATH",
+                                            "MIKSHAT_QATAR_MWM_PATH"};
+  std::array<std::string, 3> const countries = {"Saudi Arabia_North", "Saudi Arabia_South", "Qatar"};
+  std::array<std::string, 5> paths;
+  for (size_t i = 0; i < keys.size(); ++i)
+  {
+    char const * path = std::getenv(keys[i]);
+    TEST(path && *path, ("All three independently verified current official country fixtures are required", keys[i]));
+    paths[i] = path;
+  }
+  paths[3] = "World";
+  paths[4] = "WorldCoasts";
+
+  for (size_t i = 0; i < paths.size(); ++i)
+  {
+    FeaturesFetcher source;
+    auto file = i < countries.size() ? platform::LocalCountryFile::MakeTemporary(paths[i])
+                                     : platform::LocalCountryFile::MakeForTesting(paths[i]);
+    file.SyncWithDisk();
+    auto const registered = source.RegisterMap(file);
+    TEST_EQUAL(registered.second, MwmSet::RegResult::Success, (paths[i]));
+    auto const info = registered.first.GetInfo();
+    TEST_EQUAL(info->m_version.GetFormat(), version::Format::lastFormat, (paths[i]));
+    TEST_EQUAL(info->m_version.GetVersion(), platform::map_compatibility::kDataVersion, (paths[i]));
+    if (i < countries.size())
+    {
+      TEST_EQUAL(info->GetCountryName(), countries[i], ("Saudi Arabia uses the official named country maps"));
+      TEST_EQUAL(info->GetType(), MwmInfo::COUNTRY, ());
+      FeaturesLoaderGuard loader(source.GetDataSource(), registered.first);
+      TEST(loader.GetContainer().IsExist(SEARCH_INDEX_FILE_TAG), (countries[i]));
+      TEST(loader.GetContainer().IsExist(ROUTING_FILE_TAG), (countries[i]));
+    }
+    else
+      TEST_EQUAL(info->GetType(), i == 3 ? MwmInfo::WORLD : MwmInfo::COASTS, (paths[i]));
+
+    size_t inspected = 0;
+    int const scale = i < countries.size() ? scales::GetUpperScale() : scales::GetUpperWorldScale();
+    source.GetDataSource().ForEachInRectForMWM([&](FeatureType & candidate)
+    {
+      TEST(!candidate.IsEmptyGeometry(scale), (paths[i], candidate.GetID()));
+      size_t types = 0;
+      candidate.ForEachType([&](uint32_t type)
+      {
+        TEST(!classif().GetReadableObjectName(type).empty(), (paths[i], candidate.GetID()));
+        ++types;
+      });
+      TEST_GREATER(types, 0, (paths[i], candidate.GetID()));
+      ++inspected;
+    }, mercator::Bounds::FullRect(), scale, registered.first, [&] { return inspected >= 200; });
+    TEST_EQUAL(inspected, 200,
+               ("Each real map must exercise native spatial decoding with the current classifier", paths[i]));
+    std::cout << "MIKSHAT_OFFICIAL_RELEASE {\"country\":\"" << info->GetCountryName()
+              << "\",\"dataVersion\":" << info->m_version.GetVersion() << ",\"decodedFeatures\":" << inspected << "}\n";
+  }
+}
+
 UNIT_TEST(MikshatOverview_SaudiIndexedPoints)
 {
   classificator::Load();
@@ -250,7 +368,9 @@ UNIT_TEST(MikshatOverview_SaudiIndexedPoints)
   // The supplied reference pin is approximately 6.1 km north of this
   // authentic South-map locality. Preserve its stored OSM position.
   FeaturesLoaderGuard loader(source.GetDataSource(), south.first);
-  uint32_t constexpr faydaIndex = 609861;
+  uint32_t const faydaIndex =
+      FindNamedFeature(source, south.first, "فيضة الخويش", {25.3479422061, 47.2901334412},
+                       classif().GetTypeByPath({"place", "locality"}), feature::GeomType::Point);
   TEST_GREATER(loader.GetNumFeatures(), faydaIndex, ());
   auto fayda = loader.GetFeatureByIndex(faydaIndex);
   TEST(fayda, ());
@@ -300,9 +420,7 @@ struct OutdoorFeatureAuditRecord
 
 std::string NormalizeOutdoorAuditName(std::string_view name)
 {
-  auto value = strings::ToUtf8(search::NormalizeAndSimplifyString(name));
-  std::erase(value, ' ');
-  return value;
+  return NormalizeOutdoorName(name);
 }
 
 void PrintOutdoorAuditFeature(std::string const & event, std::string const & source, FeatureType & feature,
@@ -436,10 +554,14 @@ UNIT_TEST(MikshatOutdoor_ActualLocalitiesAndReportedTrack)
   TEST(directory && *directory && officialNorth && *officialNorth && officialSouth && *officialSouth,
        ("The real supplementary and both verified official fixtures are required"));
   std::array<std::string, 4> const names = {"خب أبو خصام", "طعس مشرف", "الأمغر", "خب حشمة"};
-  std::array<std::array<uint32_t, 4>, 2> const indices = {
-      {{17844, 17877, 17886, 17896}, {613505, 613534, 613543, 613550}}};
+  std::array<uint32_t, 4> const supplementaryIndices = {17844, 17877, 17886, 17896};
+  std::array<ms::LatLon, 4> const officialLocations = {{{28.6001633474, 41.3101644912},
+                                                        {28.6177791034, 41.2874998248},
+                                                        {28.6294428236, 41.3394434850},
+                                                        {28.7150892686, 41.3658739728}}};
   std::array<std::string, 2> const paths = {std::string(directory) + "/desert-ksa-north.mwm", officialNorth};
   size_t checked = 0;
+  uint32_t reportedTrack = 0;
   for (size_t map = 0; map < paths.size(); ++map)
   {
     FeaturesFetcher source;
@@ -450,7 +572,11 @@ UNIT_TEST(MikshatOutdoor_ActualLocalitiesAndReportedTrack)
     FeaturesLoaderGuard loader(source.GetDataSource(), registered.first);
     for (size_t named = 0; named < names.size(); ++named)
     {
-      auto feature = loader.GetFeatureByIndex(indices[map][named]);
+      auto const index = map == 0
+                           ? supplementaryIndices[named]
+                           : FindNamedFeature(source, registered.first, names[named], officialLocations[named],
+                                              classif().GetTypeByPath({"place", "locality"}), feature::GeomType::Point);
+      auto feature = loader.GetFeatureByIndex(index);
       bool sameName = false;
       feature->ForEachName([&](int8_t, std::string_view name)
       { sameName = sameName || NormalizeOutdoorAuditName(name) == NormalizeOutdoorAuditName(names[named]); });
@@ -489,7 +615,8 @@ UNIT_TEST(MikshatOutdoor_ActualLocalitiesAndReportedTrack)
     }
     else
     {
-      auto road = loader.GetFeatureByIndex(202546);
+      reportedTrack = FindReportedTrack(source, registered.first);
+      auto road = loader.GetFeatureByIndex(reportedTrack);
       TEST(feature::TypesHolder(*road).Has(classif().GetTypeByPath({"highway", "track"})), ());
       TEST(ftypes::IsUnpavedRoad(feature::TypesHolder(*road)), ());
       TEST_EQUAL(feature::GetMikshatOutdoorFeatureVisibility(*road), feature::kMikshatOutdoorVisibility, ());
@@ -514,12 +641,15 @@ UNIT_TEST(MikshatOutdoor_ActualLocalitiesAndReportedTrack)
   auto const south = southSource.RegisterMap(southFile);
   TEST_EQUAL(south.second, MwmSet::RegResult::Success, ());
   FeaturesLoaderGuard southLoader(southSource.GetDataSource(), south.first);
-  auto fayda = southLoader.GetFeatureByIndex(609861);
+  auto const faydaIndex = FindNamedFeature(southSource, south.first, "فيضة الخويش", {25.3479422061, 47.2901334412},
+                                           classif().GetTypeByPath({"place", "locality"}), feature::GeomType::Point);
+  auto fayda = southLoader.GetFeatureByIndex(faydaIndex);
   TEST(ftypes::IsNamedFayda(*fayda), ());
   TEST_EQUAL(feature::GetMikshatOutdoorFeatureVisibility(*fayda), feature::kMikshatOutdoorVisibility, ());
   TEST_EQUAL(checked, 8, ("All four actual examples in both map sources must be verified"));
   std::cout << "MIKSHAT_REAL_LOCALITY_POLICY {\"sources\":2,\"namedLandmarks\":" << checked
-            << ",\"reportedTrack\":202546,\"hamletControl\":15632,\"faydaControl\":609861}" << std::endl;
+            << ",\"reportedTrack\":" << reportedTrack << ",\"hamletControl\":15632,\"faydaControl\":" << faydaIndex
+            << "}" << std::endl;
 }
 
 UNIT_TEST(MikshatOutdoor_ActualProtectedAreasAcrossSources)
@@ -539,7 +669,10 @@ UNIT_TEST(MikshatOutdoor_ActualProtectedAreasAcrossSources)
   std::array<std::string, 4> const paths = {std::string(directory) + "/desert-ksa-north.mwm",
                                             std::string(directory) + "/desert-ksa-south.mwm", officialNorth,
                                             officialSouth};
-  std::array<uint32_t, 4> const areas = {36786, 28626, 9947, 6867};
+  std::array<uint32_t, 2> const supplementaryAreas = {36786, 28626};
+  std::array<std::string, 2> const officialNames = {"محمية الأمير محمد بن سلمان الملكية", "محمية جزر فرسان"};
+  std::array<ms::LatLon, 2> const officialLocations = {
+      {{27.0353257466, 36.3903064757}, {16.7586886391, 41.8749974808}}};
   for (size_t map = 0; map < paths.size(); ++map)
   {
     FeaturesFetcher source;
@@ -548,7 +681,12 @@ UNIT_TEST(MikshatOutdoor_ActualProtectedAreasAcrossSources)
     auto const registered = source.RegisterMap(file);
     TEST_EQUAL(registered.second, MwmSet::RegResult::Success, (paths[map]));
     FeaturesLoaderGuard loader(source.GetDataSource(), registered.first);
-    auto area = loader.GetFeatureByIndex(areas[map]);
+    uint32_t const areaIndex =
+        map < 2 ? supplementaryAreas[map]
+                : FindNamedFeature(source, registered.first, officialNames[map - 2], officialLocations[map - 2],
+                                   classif().GetTypeByPath({"leisure", "nature_reserve"}), feature::GeomType::Area,
+                                   20000.0);
+    auto area = loader.GetFeatureByIndex(areaIndex);
     TEST_EQUAL(area->GetGeomType(), feature::GeomType::Area, (map));
     TEST(area->HasName(), (map));
     TEST_EQUAL(feature::GetMikshatOutdoorFeatureVisibility(*area), feature::kMikshatProtectedVisibility, (map));
@@ -569,7 +707,7 @@ UNIT_TEST(MikshatOutdoor_ActualProtectedAreasAcrossSources)
                                           feature::GetMikshatOutdoorVisibility(50000.0));
       TEST(std::find(ids.begin(), ids.end(), area->GetID()) != ids.end(),
            ("The 50 km protected policy must return pure areas, not only separate line records", map, scale));
-      auto rendered = loader.GetFeatureByIndex(areas[map]);
+      auto rendered = loader.GetFeatureByIndex(areaIndex);
       feature::PrepareMikshatOverviewGeometry(*rendered, scale);
       TEST(!rendered->IsEmptyGeometry(scale), (map, scale));
       for (auto const style : styles)

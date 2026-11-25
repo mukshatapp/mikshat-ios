@@ -1,12 +1,42 @@
 import importlib.util
+import json
 from pathlib import Path
 import re
+import tempfile
 import unittest
+from unittest.mock import patch
 
 
 SPEC = importlib.util.spec_from_file_location("rotation_renderer", Path(__file__).with_name("renderer.py"))
 RENDERER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(RENDERER)
+
+
+class RendererFixtureTests(unittest.TestCase):
+    def check_rejected_catalog(self, catalog):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "data").mkdir()
+            (root / "data/countries.json").write_text(json.dumps(catalog))
+            with patch.object(RENDERER, "ROOT", root), patch.object(RENDERER.subprocess, "run") as download:
+                with self.assertRaises(ValueError):
+                    RENDERER.prepare_fixture(root / "evidence")
+                download.assert_not_called()
+
+    def test_another_catalog_version_is_rejected_before_download(self):
+        self.check_rejected_catalog({"v": 260714})
+
+    def test_wrong_country_hash_or_size_is_rejected_before_download(self):
+        fixture = RENDERER.FIXTURE
+        for field, wrong in (("h", "invalid"), ("s", fixture["size"] + 1)):
+            entry = {"id": fixture["country"], "s": fixture["size"], "h": fixture["catalogHash"]}
+            entry[field] = wrong
+            self.check_rejected_catalog({"v": fixture["version"], "g": [entry]})
+
+    def test_another_country_cannot_substitute_the_required_fixture(self):
+        fixture = RENDERER.QATAR_FIXTURE
+        self.check_rejected_catalog({"v": fixture["version"], "g": [
+            {"id": fixture["country"], "s": fixture["size"], "h": fixture["catalogHash"]}]})
 
 
 class RendererPlanTests(unittest.TestCase):

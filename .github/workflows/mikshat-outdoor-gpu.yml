@@ -2,7 +2,7 @@ name: Mikshat outdoor native OpenGL rendering
 
 'on':
   push:
-    branches: [feature/automatic-outdoor-map-styling-4.6.20]
+    branches: [feature/automatic-outdoor-map-styling-4.6.20, fix/organic-maps-routing-4.6.21]
   workflow_dispatch:
 
 permissions:

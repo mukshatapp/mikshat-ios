@@ -82,7 +82,7 @@ workflows:
         APP_STORE_APPLE_ID: "6828427541"
         XCODE_WORKSPACE: xcode/omim.xcworkspace
         XCODE_SCHEME: OMaps
-        APP_VERSION: "4.6.20"
+        APP_VERSION: "4.6.21"
     scripts:
       - name: Prepare Mikshat branding and check navigation math
         script: |
@@ -108,6 +108,7 @@ workflows:
           set -euo pipefail
           python3 -m unittest discover -s mikshat/tests/update-native -p 'test_*.py'
           python3 mikshat/tests/update-native/rotation_diagnostic.py --production build/rotation-verification
+          python3 mikshat/tests/update-native/vehicle_routing.py --products build/RotationDiagnosticDerivedData/Build/Products --output-dir build/vehicle-routing-verification
       - name: Apply distribution provisioning profiles
         script: |
           set -euo pipefail

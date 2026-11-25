@@ -28,19 +28,27 @@ CASES = {
 }
 FIXTURE = {
     "country": "Saudi Arabia_North",
-    "version": 260714,
-    "size": 71760131,
-    "catalogHash": "i5mCFqnSjXOf",
-    "sha256": "6cd35fcb5b2bcd8c0ce5f9249426126c1a3c56635033c07fde855b9316651fe0",
-    "url": "https://cdn.organicmaps.app/maps/260714/Saudi%20Arabia_North.mwm",
+    "version": 261110,
+    "size": 64114071,
+    "catalogHash": "OcIgcLPKjqk6",
+    "sha256": "3aa9b59cd1f9036567086e0f89de29db24c94799fa0689afd01ccf2b7970a70d",
+    "url": "https://cdn.organicmaps.app/maps/261110/Saudi%20Arabia_North.mwm",
 }
 SOUTH_FIXTURE = {
     "country": "Saudi Arabia_South",
-    "version": 260714,
-    "size": 69904708,
-    "catalogHash": "gl/FyL+gwsOW",
-    "sha256": "7591a4c97628994b04856b84988ea6259bda4bf4c194702ef39817f02d484425",
-    "url": "https://cdn.organicmaps.app/maps/260714/Saudi%20Arabia_South.mwm",
+    "version": 261110,
+    "size": 61864689,
+    "catalogHash": "bpjIM5sPT4op",
+    "sha256": "f0db9cc017584b9431aaed1f1642d7dfd467bbe6f5e4b1524eeeb13c20ba6de7",
+    "url": "https://cdn.organicmaps.app/maps/261110/Saudi%20Arabia_South.mwm",
+}
+QATAR_FIXTURE = {
+    "country": "Qatar",
+    "version": 261110,
+    "size": 24043520,
+    "catalogHash": "UjE2PYOIma94",
+    "sha256": "82ff18fe0d23f9a061636eda9276f01805711d347cbe8bb6ac0a20832c750a26",
+    "url": "https://cdn.organicmaps.app/maps/261110/Qatar.mwm",
 }
 
 
@@ -55,7 +63,7 @@ def validate_fixture(path, fixture_info=FIXTURE):
     inspector = load_module("renderer_mwm_inspector", ROOT / "tools/python/mikshat/inspect_mwm.py")
     result = inspector.inspect(path, expected_version=fixture_info["version"], expected_size=fixture_info["size"], country=True)
     if result["sha256"] != fixture_info["sha256"]:
-        raise ValueError("The official Saudi map differs from the independently verified fixture SHA-256")
+        raise ValueError("The official map differs from the independently verified fixture SHA-256")
     return result
 
 
@@ -83,7 +91,12 @@ def prepare_fixture(output, map_file=None, fixture_info=FIXTURE):
         subprocess.run(["curl", "--fail", "--location", "--silent", "--show-error", "--connect-timeout", "20",
                         "--max-time", "240", "--output", str(fixture), fixture_info["url"]], check=True, timeout=250)
     inspection = validate_fixture(fixture, fixture_info)
-    name = "official-map-inspection.json" if fixture_info == FIXTURE else "official-map-inspection-south.json"
+    if fixture_info == FIXTURE:
+        name = "official-map-inspection.json"
+    elif fixture_info == SOUTH_FIXTURE:
+        name = "official-map-inspection-south.json"
+    else:
+        name = "official-map-inspection-" + fixture_info["country"].lower().replace(" ", "-") + ".json"
     (output / name).write_text(json.dumps(inspection, indent=2) + "\n")
     return fixture
 
@@ -160,7 +173,8 @@ def prepare(options):
     previous = simctl("get_app_container", options.udid, BUNDLE, "data", check=False)
     old = previous.stdout.strip() if previous.returncode == 0 else None
     simctl("terminate", options.udid, BUNDLE, check=False)
-    simctl("uninstall", options.udid, BUNDLE)
+    if old:
+        simctl("uninstall", options.udid, BUNDLE)
     simctl("install", options.udid, str(apps[0]))
     container = Path(simctl("get_app_container", options.udid, BUNDLE, "data").stdout.strip())
     documents = container / "Documents"
