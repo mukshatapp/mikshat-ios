@@ -35,6 +35,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace mikshat_outdoor_gpu_test
@@ -158,7 +159,9 @@ bool IsPurpleBorder(QColor const & c)
 }
 bool IsLightPurple(QColor const & c)
 {
-  return c.blue() > c.red() + 4 && c.red() > c.green() + 4 && c.red() >= 195;
+  // Analytic hatching modulates the rule's 0.3 alpha: visible lavender over white
+  // can differ by only 2-4 channel values. White and neutral glyph edges still fail.
+  return c.blue() > c.red() + 1 && c.red() > c.green() + 1 && c.red() >= 195;
 }
 bool IsWhite(QColor const & c)
 {
@@ -172,6 +175,22 @@ void SaveFrame(QImage const & image, std::string const & name, std::string const
   TEST(QDir().mkpath(QString::fromStdString(directory)), (directory));
   auto const path = directory + "/" + name;
   TEST(image.save(QString::fromStdString(path + ".png"), "PNG"), (path));
+  std::unordered_map<QRgb, size_t> histogram;
+  for (int y = 0; y < image.height(); ++y)
+    for (int x = 0; x < image.width(); ++x)
+      ++histogram[image.pixelColor(x, y).rgba()];
+  std::vector<std::pair<size_t, QRgb>> frequentColours;
+  for (auto const & [colour, count] : histogram)
+    frequentColours.emplace_back(count, colour);
+  std::sort(frequentColours.rbegin(), frequentColours.rend());
+  std::cout << "MIKSHAT_OUTDOOR_GPU_COLOURS " << name;
+  for (size_t i = 0; i < std::min<size_t>(10, frequentColours.size()); ++i)
+  {
+    QColor const colour(frequentColours[i].second);
+    std::cout << " (" << colour.red() << ',' << colour.green() << ',' << colour.blue() << ":"
+              << frequentColours[i].first << ')';
+  }
+  std::cout << '\n';
   std::ofstream metadata(path + ".json");
   TEST(metadata.is_open(), (path));
   metadata << "{\"scope\":\"Actual MWM feature, generated light style, production Apply helpers, isolated OpenGL "
@@ -325,6 +344,10 @@ UNIT_CLASS_TEST(OutdoorGpuFixture, MikshatOutdoorGPU_ActualProtectedBoundary50To
     auto const style = StyleFor(*feature, screen);
     TEST(!style.m_areaOutlineRules.empty(), (ruler));
     TEST(style.m_captionRule && !style.m_captionDescriptor.GetMainText().empty(), (ruler));
+    std::cout << "MIKSHAT_OUTDOOR_GPU_AREA_RULES ruler=" << ruler
+              << " area=" << (style.m_areaRule ? std::to_string(style.m_areaRule->color) : "none")
+              << " hatch=" << (style.m_hatchingRule ? std::to_string(style.m_hatchingRule->color) : "none")
+              << " pattern=" << style.m_hatchingPattern << '\n';
     df::test_support::ShapeTestFixture fixture;
     fixture.SetScreen(screen);
     fixture.Render("Actual MWM protected polygon / generated style", kWidth, kHeight, [&](auto & f)
