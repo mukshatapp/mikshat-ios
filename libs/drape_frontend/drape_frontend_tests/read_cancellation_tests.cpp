@@ -369,7 +369,8 @@ UNIT_CLASS_TEST(ReadCoverageFixture, OutdoorVisibility_RulerTierRereadsOnceWitho
     screen.SetFromParams(center, 0.0, (east.x - center.x) / 60.0);
     return screen;
   };
-  m_screen = screenAt(14990.0);
+  // GetSmPoint uses an approximate metre conversion; keep both samples clear of the ruler boundary.
+  m_screen = screenAt(14900.0);
   auto const originalScale = df::GetDrawTileScale(m_screen);
   TEST_EQUAL(gui::RulerHelper::GetMetricRulerDistance(m_screen), 15000.0, ());
   Update({m_a});
@@ -378,14 +379,14 @@ UNIT_CLASS_TEST(ReadCoverageFixture, OutdoorVisibility_RulerTierRereadsOnceWitho
   Update({m_a});
   TEST_EQUAL(m_reader.GetCancellationRevision(), revision, ());
 
-  m_screen = screenAt(15010.0);
+  m_screen = screenAt(15100.0);
   TEST_EQUAL(df::GetDrawTileScale(m_screen), originalScale, ());
   TEST_EQUAL(gui::RulerHelper::GetMetricRulerDistance(m_screen), 20000.0, ());
   Update({m_a});
   TEST(WaitForReads(2), ());
   TEST_EQUAL(m_reader.GetCancellationRevision(), revision + 1, ("The category transition retires the old tile"));
 
-  m_screen = screenAt(15020.0);
+  m_screen = screenAt(15200.0);
   TEST_EQUAL(df::GetDrawTileScale(m_screen), originalScale, ());
   Update({m_a});
   TEST_EQUAL(m_reader.GetCancellationRevision(), revision + 1,
