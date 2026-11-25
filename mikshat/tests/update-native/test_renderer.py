@@ -1,10 +1,12 @@
 import importlib.util
 import json
+import os
 import plistlib
 from pathlib import Path
 import re
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 
@@ -41,6 +43,40 @@ class RendererFixtureTests(unittest.TestCase):
 
 
 class RendererPlanTests(unittest.TestCase):
+    def test_renderer_host_installs_both_rotation_and_riyadh_route_maps(self):
+        plan = {"BlueprintName": "OMapsTests", "CommandLineArguments": ["-IsTests"]}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            products = root / "products"
+            app = products / "Debug-iphonesimulator/Mikshat.app"
+            app.mkdir(parents=True)
+            (app / "Info.plist").write_bytes(plistlib.dumps({"CFBundleIdentifier": RENDERER.BUNDLE}))
+            (products / "OMaps.xctestrun").write_bytes(plistlib.dumps(plan))
+            sources = root / "verified-fixtures"
+            sources.mkdir()
+            for info in (RENDERER.FIXTURE, RENDERER.SOUTH_FIXTURE):
+                (sources / (info["country"] + ".mwm")).write_bytes(info["country"].encode())
+            container = root / "container"
+
+            def prepared_fixture(_output, _map_file=None, fixture_info=RENDERER.FIXTURE):
+                return sources / (fixture_info["country"] + ".mwm")
+
+            with patch.object(RENDERER, "prepare_fixture", side_effect=prepared_fixture) as prepare, \
+                 patch.object(RENDERER, "simctl", return_value=SimpleNamespace(returncode=0, stdout=str(container))), \
+                 patch.dict(os.environ, {"GITHUB_ENV": ""}), patch("builtins.print"):
+                output = root / "evidence"
+                RENDERER.prepare(SimpleNamespace(products=products, output_dir=output, udid="isolated", map_file=None))
+            self.assertEqual(prepare.call_count, 2)
+            self.assertEqual(prepare.call_args_list[1].kwargs["fixture_info"], RENDERER.SOUTH_FIXTURE)
+            launch = json.loads((output / "launch.json").read_text())
+            expected = [container / "Documents" / str(info["version"]) / (info["country"] + ".mwm")
+                        for info in (RENDERER.FIXTURE, RENDERER.SOUTH_FIXTURE)]
+            self.assertEqual(launch["installedMap"], str(expected[0]))
+            self.assertEqual(launch["installedMaps"], list(map(str, expected)))
+            self.assertEqual(launch["officialMaps"], [RENDERER.FIXTURE, RENDERER.SOUTH_FIXTURE])
+            for path, info in zip(expected, (RENDERER.FIXTURE, RENDERER.SOUTH_FIXTURE)):
+                self.assertEqual(path.read_bytes(), info["country"].encode())
+
     def test_production_profile_plans_cannot_replace_the_original_native_plan(self):
         plan = {"TestConfigurations": [{"TestTargets": [
             {"BlueprintName": "OMapsTests", "CommandLineArguments": ["-IsTests"]}]}]}

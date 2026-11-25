@@ -271,8 +271,14 @@ UIControl * FindTouchControl(UIView * view)
                     .GetMwmIdByCountryFile(platform::CountryFile("Saudi Arabia_North"))
                     .IsAlive());
   XCTAssertTrue(framework.GetDataSource()
+                    .GetMwmIdByCountryFile(platform::CountryFile("Saudi Arabia_South"))
+                    .IsAlive(), @"The actual Riyadh route requires the official South map");
+  XCTAssertTrue(framework.GetDataSource()
                     .GetMwmIdByCountryFile(platform::CountryFile("desert-ksa-north"))
                     .IsAlive(), @"Vehicle routing must coexist with the default supplementary maps");
+  XCTAssertTrue(framework.GetDataSource()
+                    .GetMwmIdByCountryFile(platform::CountryFile("desert-ksa-south"))
+                    .IsAlive(), @"The actual Riyadh route must coexist with the default South supplementary map");
   [MWMRouter setType:MWMRouterTypeVehicle];
   [self addExplicitStart];
 }

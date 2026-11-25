@@ -169,6 +169,7 @@ def prepare(options):
     target.write_bytes(plistlib.dumps(plan))
 
     fixture = prepare_fixture(output, options.map_file)
+    south_fixture = prepare_fixture(output, fixture_info=SOUTH_FIXTURE)
 
     apps = [app for app in (products / "Debug-iphonesimulator").glob("*.app")
             if plistlib.loads((app / "Info.plist").read_bytes()).get("CFBundleIdentifier") == BUNDLE]
@@ -182,10 +183,12 @@ def prepare(options):
     simctl("install", options.udid, str(apps[0]))
     container = Path(simctl("get_app_container", options.udid, BUNDLE, "data").stdout.strip())
     documents = container / "Documents"
-    catalog = FIXTURE["version"]
-    destination = documents / str(catalog) / fixture.name
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(fixture, destination)
+    destinations = []
+    for info, source in ((FIXTURE, fixture), (SOUTH_FIXTURE, south_fixture)):
+        destination = documents / str(info["version"]) / source.name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, destination)
+        destinations.append(destination)
     latitude, longitude = 26 + 13.904 / 60, 44 + 56.718 / 60
     mercator_y = math.degrees(math.log(math.tan(math.pi / 4 + math.radians(latitude) / 2)))
     viewport = (longitude, mercator_y, 0, -0.1, -0.2, 0.1, 0.2)
@@ -194,7 +197,8 @@ def prepare(options):
     simctl("location", options.udid, "set", str(latitude) + "," + str(longitude))
     report = {"nativePlan": str(original), "rendererPlan": str(target), "arguments": targets,
               "oldContainer": old, "isolatedContainer": str(container), "officialMap": FIXTURE,
-              "installedMap": str(destination), "selectedCoordinate": [latitude, longitude],
+              "installedMap": str(destinations[0]), "officialMaps": [FIXTURE, SOUTH_FIXTURE],
+              "installedMaps": [str(path) for path in destinations], "selectedCoordinate": [latitude, longitude],
               "scope": "Normal Drape with verified Saudi map backdrop and synthetic point selection; isolated Debug simulator only"}
     (output / "launch.json").write_text(json.dumps(report, indent=2) + "\n")
     environment = os.environ.get("GITHUB_ENV")
