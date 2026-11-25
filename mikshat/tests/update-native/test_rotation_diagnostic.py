@@ -125,6 +125,83 @@ class SamplingScopeTests(unittest.TestCase):
             self.assertIn(phase["pid"], sampler.fallback_pids)
 
 
+class SimulatorInstallTests(unittest.TestCase):
+    def install(self, directory, side_effect):
+        with patch.object(rotation_diagnostic.subprocess, "run", side_effect=side_effect) as run:
+            rotation_diagnostic.install_app("isolated-sim", Path("/compiled/app.app"), directory)
+        return run
+
+    def success(self, args, **kwargs):
+        return subprocess.CompletedProcess(args, 0, stdout="installed", stderr="")
+
+    def test_successful_install_does_not_reboot_or_retry(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            run = self.install(directory, self.success)
+            report = json.loads((directory / "simulator-install.json").read_text())
+        self.assertEqual(run.call_count, 1)
+        self.assertTrue(report["installed"])
+
+    def test_install_timeout_reboots_only_its_profile_then_retries_once(self):
+        calls = []
+        def run(args, **kwargs):
+            calls.append((args, kwargs))
+            if len(calls) == 1:
+                raise subprocess.TimeoutExpired(args, 120, output=b"partial install", stderr=b"service stalled")
+            return self.success(args, **kwargs)
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            self.install(directory, run)
+            report = json.loads((directory / "simulator-install.json").read_text())
+        self.assertEqual([args[2] for args, _ in calls], ["install", "shutdown", "boot", "bootstatus", "install"])
+        self.assertTrue(all(args[3] == "isolated-sim" for args, _ in calls))
+        self.assertEqual([kwargs["timeout"] for _, kwargs in calls], [120, 30, 60, 180, 120])
+        self.assertTrue(report["installed"])
+        self.assertTrue(report["commands"][0]["timedOut"])
+        self.assertIn("partial install", report["commands"][0]["stdout"])
+        self.assertIn("service stalled", report["commands"][0]["stderr"])
+
+    def test_second_install_timeout_remains_an_infrastructure_error(self):
+        calls = []
+        def run(args, **kwargs):
+            calls.append(args)
+            if args[2] == "install":
+                raise subprocess.TimeoutExpired(args, 120)
+            return self.success(args, **kwargs)
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            with self.assertRaises(subprocess.TimeoutExpired):
+                self.install(directory, run)
+            report = json.loads((directory / "simulator-install.json").read_text())
+        self.assertEqual(sum(args[2] == "install" for args in calls), 2)
+        self.assertFalse(report["installed"])
+
+    def test_recovery_failure_stops_before_another_install(self):
+        calls = []
+        def run(args, **kwargs):
+            calls.append(args)
+            raise subprocess.TimeoutExpired(args, kwargs["timeout"])
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            with self.assertRaises(subprocess.TimeoutExpired):
+                self.install(directory, run)
+            report = json.loads((directory / "simulator-install.json").read_text())
+        self.assertEqual([args[2] for args in calls], ["install", "shutdown"])
+        self.assertFalse(report["installed"])
+
+    def test_install_rejection_is_not_retried(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            with patch.object(rotation_diagnostic.subprocess, "run", side_effect=subprocess.CalledProcessError(
+                    1, ["xcrun", "simctl", "install"], stderr="Invalid application")) as run:
+                with self.assertRaises(subprocess.CalledProcessError):
+                    rotation_diagnostic.install_app("isolated-sim", Path("/compiled/app.app"), directory)
+            report = json.loads((directory / "simulator-install.json").read_text())
+        self.assertEqual(run.call_count, 1)
+        self.assertFalse(report["installed"])
+        self.assertIn("Invalid application", report["commands"][0]["stderr"])
+
+
 class ProbePlanTests(unittest.TestCase):
     def test_only_native_target_gets_each_explicit_probe_and_renderer_stays_off(self):
         original = {"TestTargets": [{"BlueprintName": "OMapsTests", "CommandLineArguments": ["-IsTests", "-MikshatRequireRenderer"]},
