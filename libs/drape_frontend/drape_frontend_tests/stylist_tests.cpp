@@ -43,11 +43,24 @@ public:
   }
 };
 
+class SampleMapInfo : public MwmInfo
+{
+public:
+  SampleMapInfo()
+  {
+    m_minScale = 9;
+    m_maxScale = 17;
+    m_data.SetLanguages({"ar"});
+  }
+};
+
 class SampleFeature : public osm::MapObject
 {
 public:
   SampleFeature(uint32_t type, feature::GeomType geomType)
   {
+    // Readable captions need the region metadata of a real map.
+    m_featureID = FeatureID(MwmSet::MwmId(std::make_shared<SampleMapInfo>()), 0);
     m_geomType = geomType;
     m_points = {{0.0, 0.0}, {0.01, 0.01}};
     m_triangles = {{0.0, 0.0}, {0.01, 0.0}, {0.0, 0.01}};
@@ -76,23 +89,12 @@ private:
 
 class NamedLocality : public osm::MapObject
 {
-  class LocalityMapInfo : public MwmInfo
-  {
-  public:
-    LocalityMapInfo()
-    {
-      m_minScale = 9;
-      m_maxScale = 17;
-      m_data.SetLanguages({"ar"});
-    }
-  };
-
 public:
   explicit NamedLocality(std::string_view name)
   {
     // CaptionDescription resolves readable names through the feature's map.
     // A detached synthetic feature would correctly have its caption cleared.
-    m_featureID = FeatureID(MwmSet::MwmId(std::make_shared<LocalityMapInfo>()), 0);
+    m_featureID = FeatureID(MwmSet::MwmId(std::make_shared<SampleMapInfo>()), 0);
     m_geomType = feature::GeomType::Point;
     m_points = {{0.0, 0.0}};
     m_types.Add(classif().GetTypeByPath({"place", "locality"}));
@@ -146,7 +148,8 @@ UNIT_CLASS_TEST(StyleSnapshotFixture, Stylist_MikshatNamedFayda)
       auto ft = FeatureType::CreateFromMapObject(NamedLocality(name));
       for (uint8_t const zoom : {9, 14})
       {
-        df::Stylist const stylist(*ft, zoom, StringUtf8Multilang::kEnglishCode, style);
+        df::Stylist const stylist(*ft, zoom, StringUtf8Multilang::kEnglishCode, style,
+                                  feature::GetMikshatOutdoorVisibility(20000.0));
         TEST(stylist.m_captionRule && stylist.m_captionRule->primary, (style, zoom, name));
         TEST_EQUAL(stylist.m_captionRule->primary->color & 0xFFFFFF, green, (style, zoom, name));
       }
@@ -154,9 +157,15 @@ UNIT_CLASS_TEST(StyleSnapshotFixture, Stylist_MikshatNamedFayda)
     for (auto const name : {"مزرعة الخويش", "شعيب الفيضة", "الخويش"})
     {
       auto ft = FeatureType::CreateFromMapObject(NamedLocality(name));
-      df::Stylist const overview(*ft, 9, StringUtf8Multilang::kEnglishCode, style);
+      df::Stylist const overview(*ft, 9, StringUtf8Multilang::kEnglishCode, style,
+                                 feature::GetMikshatOutdoorVisibility(20000.0));
       TEST(!overview.m_captionRule, (style, name));
-      df::Stylist const detail(*ft, 14, StringUtf8Multilang::kEnglishCode, style);
+      df::Stylist const sandyOverview(*ft, 9, StringUtf8Multilang::kEnglishCode, style,
+                                      feature::GetMikshatOutdoorVisibility(15000.0));
+      TEST(sandyOverview.m_captionRule && sandyOverview.m_captionRule->primary, (style, name));
+      TEST_EQUAL(sandyOverview.m_captionRule->primary->color & 0xFFFFFF, 0, (style, name));
+      df::Stylist const detail(*ft, 14, StringUtf8Multilang::kEnglishCode, style,
+                               feature::GetMikshatOutdoorVisibility(15000.0));
       TEST(detail.m_captionRule && detail.m_captionRule->primary, (style, name));
       TEST_NOT_EQUAL(detail.m_captionRule->primary->color & 0xFFFFFF, green, (style, name));
     }
@@ -190,8 +199,8 @@ UNIT_CLASS_TEST(StyleSnapshotFixture, Stylist_MikshatUnpavedRoads)
           if ((actual.color & 0xFFFFFF) == brown)
           {
             ++brownLines;
-            // A paved track can share the reference brown RGB, but keeps its base opacity.
-            TEST_NOT_EQUAL(original.color, actual.color, (style, highway, surface));
+            // Existing track styles can already have the target opaque brown.
+            TEST_EQUAL(actual.color, brown, (style, highway, surface));
             TEST(!actual.dashdot, ("Dirt roads must be solid", style, highway, surface));
             actual.color = original.color;
             actual.dashdot = original.dashdot;
