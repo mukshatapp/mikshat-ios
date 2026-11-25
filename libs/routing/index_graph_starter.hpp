@@ -99,8 +99,6 @@ public:
   std::set<NumMwmId> const & GetStartMwms() const { return m_start.m_mwmIds; }
   std::set<NumMwmId> const & GetFinishMwms() const { return m_finish.m_mwmIds; }
 
-  // Checks whether |weight| meets non-pass-through crossing restrictions according to placement of
-  // start and finish in pass-through/non-pass-through area and number of non-pass-through crosses.
   bool CheckLength(RouteWeight const & weight);
 
   void GetEdgeList(astar::VertexData<JointSegment, Weight> const & parentVertexData, Segment const & segment,
@@ -151,6 +149,9 @@ public:
   }
 
   RouteWeight CalcSegmentWeight(Segment const & segment, EdgeEstimator::Purpose purpose) const;
+  /// \returns the weight of the |from| -> |to| edge as the forward wave gets it: the |to| weight with
+  /// the transition penalties, or the |to| weight only if the wave has no such edge.
+  RouteWeight CalcRouteEdgeWeight(Segment const & from, Segment const & to) const;
   RouteWeight CalcGuidesSegmentWeight(Segment const & segment, EdgeEstimator::Purpose purpose) const;
   double CalculateETA(Segment const & from, Segment const & to, time_t arrivalTime) const;
   double CalculateETAWithoutPenalty(Segment const & segment) const;
@@ -229,16 +230,6 @@ private:
   // Adds fake edges of type PartOfReal which correspond real edges from |edges| and are connected
   // to |segment|
   void AddFakeEdges(Segment const & segment, bool isOutgoing, EdgeListT & edges) const;
-
-  // The route must leave the start's neighbourhood and arrive at the finish's; for an ending in a
-  // non-pass-through zone (service, living_street) that mandatory crossing is not a cut-through. So
-  // bank one free non-pass-through change per such ending, applied once on the forward expansion of
-  // the fake start. RouteWeight::GetIntegratedWeight then charges only the genuine pass-throughs that
-  // remain. See the .cpp for why the whole allowance is banked at the start rather than split.
-  void CreditEndingPassThrough(Segment const & segment, bool isOutgoing, EdgeListT & edges) const;
-
-  // Checks whether ending belongs to non-pass-through zone (service, living street, etc).
-  bool HasNoPassThroughAllowed(Ending const & ending) const;
 
   WorldGraph & m_graph;
   // Start segment id

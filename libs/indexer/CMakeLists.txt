@@ -85,7 +85,6 @@ set(SRC
   index_builder.hpp
   interval_index.hpp
   interval_index_builder.hpp
-  isolines_info.cpp
   isolines_info.hpp
   map_object.cpp
   map_object.hpp
@@ -132,6 +131,7 @@ set(SRC
   utils.hpp
   validate_and_format_contacts.cpp
   validate_and_format_contacts.hpp
+  value_set.hpp
 )
 
 omim_add_library(${PROJECT_NAME} ${SRC})

@@ -34,6 +34,7 @@ waterway-dock                                       # area z1-
 === 40
 
 organicapp-mwm_border                               # WARNING: no style defined (the type will be not included into map data)
+organicapp-twm_border                               # WARNING: no style defined (the type will be not included into map data)
 === 30
 
 landuse-basin-intermittent                          # area z12-

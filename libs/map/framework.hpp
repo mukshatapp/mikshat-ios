@@ -45,8 +45,11 @@
 #include "storage/downloading_policy.hpp"
 #include "storage/storage.hpp"
 
+#include "terrain/terrain_provider.hpp"
+
 #include "platform/distance.hpp"
 #include "platform/location.hpp"
+#include "platform/measurement_utils.hpp"
 #include "platform/placement_settings.hpp"
 #include "platform/platform.hpp"
 #include "platform/products.hpp"
@@ -59,6 +62,7 @@
 
 #include "std/target_os.hpp"
 
+#include <atomic>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -192,6 +196,22 @@ protected:
 
   TransitReadManager m_transitManager;
   IsolinesManager m_isolinesManager;
+  measurement_utils::Units m_isolinesUnits = measurement_utils::GetMeasurementUnits();
+  // The installed .twm terrain blocks: the hillshade, the dynamic isolines and the place page elevation.
+  terrain::TerrainProvider m_terrainProvider;
+  // The isolines availability waits for the terrain registration (see RegisterAllMaps).
+  std::atomic_bool m_terrainRegistered = false;
+  // The terrain download hint of the regions in the last viewport (see HasViewportTerrain).
+  storage::CountriesVec m_terrainHintRegions;
+  std::optional<bool> m_terrainHintMissing;
+  struct TerrainLight
+  {
+    double m_azimuthDeg;
+    double m_altitudeDeg;
+    double m_shadowGamma;
+  };
+  // The last SetTerrainLight, re-applied to a re-created drape engine.
+  std::optional<TerrainLight> m_terrainLight;
 
   // Note. |m_routingManager| should be declared before |m_trafficManager|
   RoutingManager m_routingManager;
@@ -208,6 +228,14 @@ protected:
 
   /// This function is called by m_featuresFetcher when the map file is deregistered.
   void OnMapDeregistered(platform::LocalCountryFile const & localFile);
+  void OnTerrainDeregistered(terrain::TwmFile const & file);
+  // Redraws the changed terrain.
+  void OnTerrainChanged(m2::RectD const & rect);
+  // Re-evaluates the isolines availability after a map or terrain change.
+  void InvalidateIsolines();
+  // Pushes the terrain availability of the current viewport into the isolines layer.
+  void UpdateIsolinesAvailability();
+  bool HasViewportTerrain(m2::RectD const & rect);
 
   void ClearAllCaches();
 
@@ -381,6 +409,7 @@ private:
 
   void OnTapEvent(place_page::BuildInfo const & buildInfo);
   place_page::Info BuildPlacePageInfo(place_page::BuildInfo const & buildInfo);
+  place_page::Info BuildPlacePageInfoImpl(place_page::BuildInfo const & buildInfo);
   std::optional<kml::TrackData> TryBuildRelationTrack(Track::TrackSelectionInfo const & candidateInfo);
   bool BuildTrackPlacePage(Track::TrackSelectionInfo const & trackSelectionInfo, place_page::Info & info);
   std::vector<Track::TrackSelectionInfo> FindTracksInTapPosition(place_page::BuildInfo const & buildInfo) const;
@@ -560,6 +589,10 @@ public:
                          bool trackVisibleViewport = false);
 
   m2::RectD GetCurrentViewport() const;
+  /// The terrain hillshade light (the desktop ALT+SHIFT hotkeys, see DrapeEngine): azimuth
+  /// degrees clockwise from north towards the light, altitude degrees above the
+  /// horizon, and the shadow gamma (the gentle slopes lift, 1 = linear).
+  void SetTerrainLight(double azimuthDeg, double altitudeDeg, double shadowGamma);
   void SetVisibleViewport(m2::RectD const & rect);
 
   void ShowRect(m2::RectD const & rect, bool animation = true, bool useVisibleViewport = false);
@@ -798,6 +831,8 @@ public:
 
   static bool LoadIsolinesEnabled();
   static void SaveIsolinesEnabled(bool enabled);
+  // Switches the isolines layer and evaluates its terrain hint for the current viewport.
+  void SetIsolinesEnabled(bool enabled);
 
   static bool LoadOutdoorsEnabled();
   static void SaveOutdoorsEnabled(bool enabled);
@@ -839,6 +874,8 @@ private:
   settings::UsageStats m_usageStats;
 
   bool m_showDownloadedRegions = false;
+  // The ?terrain-blocks debug highlight of the downloaded terrain blocks.
+  bool m_showTerrainBlocks = false;
 
 public:
   power_management::PowerManager & GetPowerManager() { return m_powerManager; }

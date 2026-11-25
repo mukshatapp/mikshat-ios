@@ -83,7 +83,14 @@ double CalcClimbSegment(EdgeEstimator::Purpose purpose, Segment const & segment,
   return distanceM / speedMpS;
 }
 
+// Turns onto and off service roads and living streets, see CarEstimator::GetTurnPenalty.
+double constexpr kServiceTurnPenaltyS = 30.0;
 }  // namespace
+
+bool IsServiceOrLivingStreet(HighwayType type)
+{
+  return type == HighwayType::HighwayService || type == HighwayType::HighwayLivingStreet;
+}
 
 double GetPedestrianClimbPenalty(EdgeEstimator::Purpose purpose, double tangent, geometry::Altitude altitudeM)
 {
@@ -185,6 +192,18 @@ EdgeEstimator::EdgeEstimator(double maxWeightSpeedKMpH, double distanceBiasCapSp
 
   if (m_offroadSpeedKMpH.m_eta != kNotUsed)
     CHECK_GREATER_OR_EQUAL(m_maxWeightSpeedMpS, KmphToMps(m_offroadSpeedKMpH.m_eta), ());
+}
+
+double EdgeEstimator::GetTurnPenaltyFactor(std::optional<HighwayType> to, ms::LatLon const & junction) const
+{
+  auto const & [start, finish] = m_serviceEndings;
+  if (!start && !finish)
+    return 1.0;
+
+  bool const isStartRule =
+      start && (!finish || ms::DistanceOnEarth(*start, junction) <= ms::DistanceOnEarth(*finish, junction));
+  bool const isOntoService = to && IsServiceOrLivingStreet(*to);
+  return isStartRule == isOntoService ? 2.0 : 0.0;
 }
 
 double EdgeEstimator::CalcHeuristic(ms::LatLon const & from, ms::LatLon const & to, bool tightAllowed) const
@@ -416,6 +435,15 @@ public:
     case Purpose::ETA: return 20 * 60;     // seconds
     }
     UNREACHABLE();
+  }
+
+  double GetTurnPenalty(Purpose purpose, std::optional<HighwayType> from, std::optional<HighwayType> to) const override
+  {
+    // Turns onto and off service roads (parking aisles, driveways) and living streets are slow, and these roads are
+    // not for through traffic. A route preference: the ETA is not changed.
+    if (purpose != Purpose::Weight || !from || !to)
+      return 0.0;
+    return IsServiceOrLivingStreet(*from) != IsServiceOrLivingStreet(*to) ? kServiceTurnPenaltyS : 0.0;
   }
 
 private:

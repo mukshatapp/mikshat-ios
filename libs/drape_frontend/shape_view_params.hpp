@@ -78,6 +78,9 @@ struct AreaViewParams : CommonViewParams
   bool m_isProtectedAreaFill = false;
   std::string_view m_areaPattern;  // analytic pattern key (hatch or solid-fill), empty for a plain fill
   double m_baseGtoPScale = 1.0;
+  // Translucent fills use the opaque fill program too, to share one bucket and blend in their paint order.
+  // The Less depth test keeps a fill from blending twice with its copy in a tile that is being replaced.
+  bool m_blendInPaintOrder = false;
 };
 
 struct LineViewParams : CommonViewParams
@@ -90,6 +93,10 @@ struct LineViewParams : CommonViewParams
   dp::PenPatternT m_pattern;
   double m_baseGtoPScale = 1.0;
   int m_zoomLevel = -1;
+  // Round joins are line triangles too, and thin lines aren't GL lines, so that translucent lines of one bucket
+  // blend in their paint order. Caps must be butt ones. The Less depth test keeps a line from blending twice where
+  // its segments and joins overlap.
+  bool m_blendInPaintOrder = false;
 
   /// Optional rainbow mode: colors for a multi-stripe overlay.
   /// When non-empty, LineShape allocates a color strip texture in Prepare().
@@ -113,6 +120,7 @@ struct PathTextViewParams : CommonOverlayViewParams
   std::string m_mainText;
   std::string m_auxText;
   double m_baseGtoPScale = 1.0;
+  bool m_allowRepositioning = false;
   // StringUtf8Multilang code of m_mainText for HarfBuzz `locl` shaping. The concatenated
   // "main + aux" path-text is shaped under this single tag (aux is the minority case and
   // typically shares main's script). kUnsupportedLanguageCode means "no locl hint".

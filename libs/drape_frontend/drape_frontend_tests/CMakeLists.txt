@@ -13,9 +13,12 @@ set(SRC
   read_cancellation_tests.cpp
   shape_batch_tests.cpp
   stylist_tests.cpp
+  terrain_shade_tests.cpp
   tile_background_coverage_tests.cpp
   tile_background_renderer_tests.cpp
+  user_area_tests.cpp
   user_event_stream_tests.cpp
+  user_line_render_params_tests.cpp
   visual_params_fixture.hpp
   visual_params_tests.cpp
 )
@@ -24,13 +27,17 @@ if (BUILD_OPENGL_TESTS)
   list(APPEND SRC
     area_pattern_gpu_test.cpp
     mikshat_outdoor_gpu_test.cpp
+    path_text_gpu_test.cpp
+    path_text_layout_gpu_test.cpp
     rainbow_line_gpu_test.cpp
     shape_test_fixture.cpp
     shape_test_fixture.hpp
+    terrain_shade_gpu_test.cpp
     track_direction_gpu_test.cpp
+    user_area_gpu_test.cpp
   )
 endif()
 
 omim_add_test(${PROJECT_NAME} ${SRC})
 
-target_link_libraries(${PROJECT_NAME} PRIVATE drape_frontend qt_tstfrm)
+target_link_libraries(${PROJECT_NAME} PRIVATE drape_frontend kml qt_tstfrm)

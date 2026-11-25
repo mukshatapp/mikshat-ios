@@ -11,6 +11,7 @@
 #include "base/logging.hpp"
 #include "base/scope_guard.hpp"
 
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <future>
@@ -18,7 +19,6 @@
 #include <mutex>
 #include <string>
 #include <thread>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -58,6 +58,7 @@ enum class Outcome
 {
   Success,
   BlockedSuccess,
+  BlockedProgress,
   Failure,
   Exception
 };
@@ -72,11 +73,13 @@ public:
   void SwapAltRouteToActive() override { ++m_swaps; }
 
   RouterResultCode CalculateRoute(Checkpoints const & checkpoints, m2::PointD const &, bool, bool,
-                                  RouterDelegate const &, RoutesResult & result) override
+                                  RouterDelegate const & delegate, RoutesResult & result) override
   {
     CHECK_LESS(m_calculations, m_outcomes.size(), ());
     auto const outcome = m_outcomes[m_calculations++];
-    if (outcome == Outcome::BlockedSuccess)
+    if (outcome == Outcome::BlockedProgress)
+      delegate.OnProgress(50.0f);
+    if (outcome == Outcome::BlockedSuccess || outcome == Outcome::BlockedProgress)
     {
       unique_lock lock(m_mutex);
       m_started = true;
@@ -167,17 +170,6 @@ uint64_t WaitReady(ReadyRequest & ready)
   auto const [id, code] = ready.m_future.get();
   TEST_EQUAL(code, RouterResultCode::NoError, ());
   return id;
-}
-
-template <typename Fn>
-auto RunOnGui(Fn && fn)
-{
-  // Return GUI-thread assertion failures to the test thread, keeping the task alive on timeout.
-  auto task = make_shared<packaged_task<invoke_result_t<Fn>()>>(std::forward<Fn>(fn));
-  auto done = task->get_future();
-  GetPlatform().RunTask(Platform::Thread::Gui, [task] { (*task)(); });
-  TEST(done.wait_for(30s) == future_status::ready, ("GUI task did not finish."));
-  return done.get();
 }
 
 UNIT_CLASS_TEST(AsyncGuiThreadTest, RouterCallsWhileCalculating)
@@ -285,6 +277,30 @@ UNIT_CLASS_TEST(AsyncGuiThreadTest, SwapAfterSupersededCalculation)
   TEST(superseded.m_future.wait_for(0s) != future_status::ready, ());
   TEST(!async.SwapAltRouteToActive(oldId), ());
   TEST(async.SwapAltRouteToActive(newId), ());
+}
+
+UNIT_CLASS_TEST(AsyncGuiThreadTest, QueuedProgressIsDiscardedAfterCancellation)
+{
+  for (bool cancel : {false, true})
+  {
+    auto router = make_unique<TestRouter>(vector{Outcome::BlockedProgress});
+    auto * raw = router.get();
+    AsyncRouter async(nullptr);
+    async.SetRouter(std::move(router), nullptr);
+    SCOPE_GUARD(releaseRouter, [raw] { raw->Release(); });
+    auto progress = make_shared<atomic<int>>(0);
+    RunOnGui([&]
+    {
+      async.CalculateRoute(Checkpoints({1, 2}, {5, 6}), {}, false, false, nullptr, nullptr, nullptr,
+                           [progress](float value) { *progress = static_cast<int>(value); });
+      TEST(raw->WaitStarted(), ());
+      if (cancel)
+        async.ClearState();
+    });
+    // Keep progress queued until the GUI has had a chance to cancel the request.
+    RunOnGui([] {});
+    TEST_EQUAL(progress->load(), cancel ? 0 : 50, (cancel));
+  }
 }
 
 UNIT_CLASS_TEST(AsyncGuiThreadTestWithRoutingSession, AlternativesDiscardedDuringRebuild)

@@ -17,7 +17,7 @@ final class NavigationDashboardViewController: UIViewController {
     static let transportOptionsCollectionInsets = UIEdgeInsets(top: 6, left: 16, bottom: 0, right: -20)
     static let transportOptionsCollectionHeight: CGFloat = 44
 
-    static let routePointsInsets = UIEdgeInsets(top: 8, left: 16, bottom: -8, right: -16)
+    static let routePointsSpacing: CGFloat = 8
 
     static let routeStatusInsets = UIEdgeInsets(top: 8, left: 16, bottom: 0, right: -16)
     static let routeStatusStackSpacing: CGFloat = 4
@@ -40,6 +40,16 @@ final class NavigationDashboardViewController: UIViewController {
   private let estimatesStackView = UIStackView()
   private let routeControlsStackView = UIStackView()
   private let routeStatusStackView = UIStackView()
+  private let contentScrollView = UIScrollView()
+  private let contentStackView = UIStackView()
+  private var presentationStep: NavigationDashboardModalPresentationStep = .hidden {
+    didSet {
+      if presentationStep == .compact, oldValue != .compact {
+        contentScrollView.setContentOffset(.zero, animated: false)
+      }
+    }
+  }
+
   private let estimatesView = EstimatesView()
   private let transportTransitStepsView = TransportTransitStepsView()
   private let elevationProfileContainerView = UIView()
@@ -61,7 +71,6 @@ final class NavigationDashboardViewController: UIViewController {
   private var internalScrollViewContentOffset: CGFloat = .zero
   private var bottomMenuViewportConstraint: NSLayoutConstraint?
   private var bottomMenuCardConstraint: NSLayoutConstraint?
-  private var currentPresentationStep: NavigationDashboardModalPresentationStep = .hidden
   private var previewViewport = CGRect.null
   private var previewSafeArea = UIEdgeInsets.zero
   private var previewContentCategory: UIContentSizeCategory?
@@ -129,10 +138,14 @@ final class NavigationDashboardViewController: UIViewController {
       previewContentCategory = category
       updatePreviewMenuAnchor()
       presentationStepsController.updateFrame()
-      updatePresentationStep(currentPresentationStep)
     }
-    let routePointsBottomPoint = availableAreaView.convert(routePointsView.contentBottom, to: view)
-    bottomActionsMenu.setShadowVisible(routePointsBottomPoint.y + Constants.startButtonSpacing > bottomActionsMenu.origin.y)
+    updatePresentationGeometry(presentationStep)
+    updateBottomActionsMenuShadow()
+  }
+
+  private func updateBottomActionsMenuShadow() {
+    let contentBottomPoint = contentStackView.convert(CGPoint(x: 0, y: contentStackView.bounds.maxY), to: view)
+    bottomActionsMenu.setShadowVisible(contentBottomPoint.y + Constants.startButtonSpacing > bottomActionsMenu.origin.y)
   }
 
   override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
@@ -195,7 +208,7 @@ final class NavigationDashboardViewController: UIViewController {
       case .didUpdateFrame(let frame):
         self.interactor?.process(.updateVisibleAreaInsets(visibleAreaInsets(for: frame)))
       case .didUpdateStep(let step):
-        self.currentPresentationStep = step
+        self.presentationStep = step
         self.interactor?.process(.didUpdatePresentationStep(step))
       }
     }
@@ -244,12 +257,21 @@ final class NavigationDashboardViewController: UIViewController {
     routeControlsStackView.axis = .horizontal
     routeControlsStackView.alignment = .center
     routeControlsStackView.spacing = 4
+    routeControlsStackView.isLayoutMarginsRelativeArrangement = true
+    routeControlsStackView.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 4)
   }
 
   private func setupRouteStatusView() {
     routeStatusStackView.axis = .vertical
     routeStatusStackView.distribution = .equalSpacing
     routeStatusStackView.spacing = Constants.routeStatusStackSpacing
+    transportTransitStepsView.onContentHeightChanged = { [weak self] in
+      self?.view.setNeedsLayout()
+    }
+    contentScrollView.contentInsetAdjustmentBehavior = .never
+    contentScrollView.delegate = self
+    contentStackView.axis = .vertical
+    contentStackView.spacing = Constants.routePointsSpacing
   }
 
   private func setupElevationProfileView() {
@@ -309,7 +331,6 @@ final class NavigationDashboardViewController: UIViewController {
   private func setupRoutePointsView() {
     routePointsView.isHidden = true
     routePointsView.interactor = interactor
-    routePointsView.scrollViewDelegate = self
   }
 
   private func updateElevationProfile(with routeElevationPreviewData: RouteElevationPreviewData?,
@@ -424,14 +445,17 @@ final class NavigationDashboardViewController: UIViewController {
     routeStatusStackView.addArrangedSubview(estimatesStackView)
     routeStatusStackView.addArrangedSubview(transportTransitStepsView)
     routeStatusStackView.addArrangedSubview(elevationProfileContainerView)
-    availableAreaView.addSubview(routeStatusStackView)
-
-    availableAreaView.addSubview(routePointsView)
+    contentStackView.addArrangedSubview(routeStatusStackView)
+    contentStackView.addArrangedSubview(routePointsView)
+    contentScrollView.addSubview(contentStackView)
+    availableAreaView.addSubview(contentScrollView)
     view.addSubview(bottomActionsMenu)
 
     grabberView.translatesAutoresizingMaskIntoConstraints = false
     closeButton.translatesAutoresizingMaskIntoConstraints = false
     transportOptionsView.translatesAutoresizingMaskIntoConstraints = false
+    contentScrollView.translatesAutoresizingMaskIntoConstraints = false
+    contentStackView.translatesAutoresizingMaskIntoConstraints = false
     routeStatusStackView.translatesAutoresizingMaskIntoConstraints = false
     reverseRoutePointsButton.translatesAutoresizingMaskIntoConstraints = false
     settingsButton.translatesAutoresizingMaskIntoConstraints = false
@@ -459,19 +483,23 @@ final class NavigationDashboardViewController: UIViewController {
       transportOptionsView.topAnchor.constraint(equalTo: grabberView.bottomAnchor, constant: Constants.transportOptionsCollectionInsets.top),
       transportOptionsView.heightAnchor.constraint(equalToConstant: Constants.transportOptionsCollectionHeight),
 
-      routeStatusStackView.leadingAnchor.constraint(equalTo: availableAreaView.leadingAnchor, constant: Constants.routeStatusInsets.left),
-      routeStatusStackView.trailingAnchor.constraint(equalTo: availableAreaView.trailingAnchor, constant: Constants.routeStatusInsets.right),
-      routeStatusStackView.topAnchor.constraint(equalTo: transportOptionsView.bottomAnchor, constant: Constants.routeStatusInsets.top),
+      contentScrollView.leadingAnchor.constraint(equalTo: availableAreaView.leadingAnchor, constant: Constants.routeStatusInsets.left),
+      contentScrollView.trailingAnchor.constraint(equalTo: availableAreaView.trailingAnchor, constant: Constants.routeStatusInsets.right),
+      contentScrollView.topAnchor.constraint(equalTo: transportOptionsView.bottomAnchor, constant: Constants.routeStatusInsets.top),
+      contentScrollView.bottomAnchor.constraint(equalTo: bottomActionsMenu.topAnchor, constant: -Constants.startButtonSpacing)
+        .withPriority(UILayoutPriority(999)),
+      contentScrollView.heightAnchor.constraint(greaterThanOrEqualToConstant: 0),
+
+      contentStackView.leadingAnchor.constraint(equalTo: contentScrollView.contentLayoutGuide.leadingAnchor),
+      contentStackView.trailingAnchor.constraint(equalTo: contentScrollView.contentLayoutGuide.trailingAnchor),
+      contentStackView.topAnchor.constraint(equalTo: contentScrollView.contentLayoutGuide.topAnchor),
+      contentStackView.bottomAnchor.constraint(equalTo: contentScrollView.contentLayoutGuide.bottomAnchor),
+      contentStackView.widthAnchor.constraint(equalTo: contentScrollView.frameLayoutGuide.widthAnchor),
 
       settingsButton.heightAnchor.constraint(equalToConstant: Constants.settingsButtonSize),
       settingsButton.widthAnchor.constraint(equalTo: settingsButton.heightAnchor),
       reverseRoutePointsButton.heightAnchor.constraint(equalToConstant: Constants.reverseRouteButtonSize),
       reverseRoutePointsButton.widthAnchor.constraint(equalTo: reverseRoutePointsButton.heightAnchor),
-
-      routePointsView.leadingAnchor.constraint(equalTo: availableAreaView.leadingAnchor, constant: Constants.routePointsInsets.left),
-      routePointsView.trailingAnchor.constraint(equalTo: availableAreaView.trailingAnchor, constant: Constants.routePointsInsets.right),
-      routePointsView.topAnchor.constraint(equalTo: routeStatusStackView.bottomAnchor, constant: Constants.routePointsInsets.top),
-      routePointsView.bottomAnchor.constraint(equalTo: availableAreaView.bottomAnchor, constant: Constants.routePointsInsets.bottom),
 
       bottomActionsMenu.leadingAnchor.constraint(equalTo: availableAreaView.leadingAnchor),
       bottomActionsMenu.trailingAnchor.constraint(equalTo: availableAreaView.trailingAnchor),
@@ -498,39 +526,53 @@ final class NavigationDashboardViewController: UIViewController {
   }
 
   private func updatePresentationStep(_ step: NavigationDashboardModalPresentationStep) {
-    currentPresentationStep = step
+    presentationStep = step
     updatePreviewMenuAnchor()
     view.layoutIfNeeded()
-    let regularHeight = routePointsView.contentBottom.y
+    updatePresentationGeometry(step)
+  }
+
+  private func updatePresentationGeometry(_ step: NavigationDashboardModalPresentationStep) {
+    // Measure content independently of the current scroll offset.
+    let contentTop = contentScrollView.frame.minY
+    let regularHeight = contentTop + contentStackView.bounds.height
       + bottomActionsMenu.frame.height
       + Constants.startButtonSpacing
 
-    let compactBaseHeight = routePointsView.origin.y
+    let routePointsTop = routePointsView.isHidden ? routeStatusStackView.frame.maxY : routePointsView.frame.minY
+    let compactBaseHeight = contentTop + routePointsTop
       + bottomActionsMenu.frame.height
+      + (routePointsView.isHidden ? Constants.startButtonSpacing : 0)
 
-    let estimatesBottom = estimatesStackView.convert(CGPoint(x: .zero, y: estimatesStackView.bounds.maxY), to: availableAreaView).y
+    let estimatesBottom = contentTop + estimatesStackView.convert(CGPoint(x: .zero, y: estimatesStackView.bounds.maxY),
+                                                                  to: contentStackView).y
     let estimatesHeight = estimatesBottom
       + bottomActionsMenu.frame.height
       + Constants.startButtonSpacing
 
     let containerHeight = view.bounds.height
-    let shouldShowHalfScreenStep = traitCollection.verticalSizeClass == .regular &&
-      containerHeight > 0 &&
-      regularHeight > containerHeight * NavigationDashboardModalPresentationStepStrategy.halfScreenActivationHeightFactor
     let shouldShowEstimatesStep = !elevationProfileContainerView.isHidden && estimatesHeight < compactBaseHeight
 
-    let shouldForceContentFrameUpdate =
+    let hasContentSizeChanges =
       presentationStepStrategy.regularHeight != regularHeight ||
       presentationStepStrategy.compactBaseHeight != compactBaseHeight ||
       presentationStepStrategy.estimatesHeight != estimatesHeight ||
-      presentationStepStrategy.shouldShowEstimatesStep != shouldShowEstimatesStep ||
-      presentationStepStrategy.shouldShowHalfScreenStep != shouldShowHalfScreenStep
+      presentationStepStrategy.shouldShowEstimatesStep != shouldShowEstimatesStep
 
     presentationStepStrategy.regularHeight = regularHeight
     presentationStepStrategy.compactBaseHeight = compactBaseHeight
     presentationStepStrategy.estimatesHeight = estimatesHeight
-    presentationStepStrategy.compactDiscoverabilityOffset = Constants.routePointsDiscoverabilityPadding
+    // There are no extra route rows to reveal in the Mikshat preview.
+    presentationStepStrategy.compactDiscoverabilityOffset = routePointsView.isHidden ? 0 : Constants.routePointsDiscoverabilityPadding
     presentationStepStrategy.shouldShowEstimatesStep = shouldShowEstimatesStep
+
+    let compactOrigin = presentationStepStrategy.frame(.compact, for: availableAreaView, in: self).minY
+    let halfScreenOrigin = presentationStepStrategy.frame(.halfScreen, for: availableAreaView, in: self).minY
+    let shouldShowHalfScreenStep = traitCollection.verticalSizeClass == .regular &&
+      compactOrigin > halfScreenOrigin &&
+      regularHeight > containerHeight * NavigationDashboardModalPresentationStepStrategy.halfScreenActivationHeightFactor
+    let shouldForceContentFrameUpdate = hasContentSizeChanges ||
+      presentationStepStrategy.shouldShowHalfScreenStep != shouldShowHalfScreenStep
     presentationStepStrategy.shouldShowHalfScreenStep = shouldShowHalfScreenStep
 
     let resolvedStep = presentationStepStrategy.resolvedStep(step)
@@ -538,6 +580,7 @@ final class NavigationDashboardViewController: UIViewController {
   }
 
   private func close() {
+    interactor?.invalidate()
     navigationInfoView.state = .hidden
     navigationControlView.isVisible = false
     bottomActionsMenu.setHidden(true)
@@ -580,6 +623,7 @@ extension NavigationDashboardViewController: UIScrollViewDelegate {
       scrollView.contentOffset.y = 0
     }
     internalScrollViewContentOffset = scrollView.contentOffset.y
+    updateBottomActionsMenuShadow()
   }
 }
 

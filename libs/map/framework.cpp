@@ -20,6 +20,7 @@
 #include "storage/storage.hpp"
 #include "storage/storage_helpers.hpp"
 
+#include "drape_frontend/clip_splines_builder.hpp"
 #include "drape_frontend/color_constants.hpp"
 #include "drape_frontend/gps_track_point.hpp"
 #include "drape_frontend/relations_draw_info.hpp"
@@ -65,6 +66,7 @@
 #include "base/checked_cast.hpp"
 #include "base/logging.hpp"
 #include "base/math.hpp"
+#include "base/stl_helpers.hpp"
 #include "base/string_utils.hpp"
 
 #include "std/target_os.hpp"
@@ -370,6 +372,7 @@ void Framework::OnViewportChanged(ScreenBase const & screen)
   m_trafficManager.UpdateViewport(m_currentModelView);
   m_transitManager.UpdateViewport(m_currentModelView);
   m_isolinesManager.UpdateViewport(m_currentModelView);
+  UpdateIsolinesAvailability();
 
   if (m_viewportChangedFn != nullptr)
     m_viewportChangedFn(screen);
@@ -382,8 +385,6 @@ Framework::Framework(FrameworkParams const & params, bool loadMaps)
                      [this](FeatureCallback const & fn, std::vector<FeatureID> const & features)
 { return m_featuresFetcher.ReadFeatures(fn, features); },
                      std::bind(&Framework::GetMwmsByRect, this, _1, false /* rough */))
-  , m_isolinesManager(m_featuresFetcher.GetDataSource(),
-                      std::bind(&Framework::GetMwmsByRect, this, _1, false /* rough */))
   , m_routingManager(RoutingManager::Callbacks([this]() -> DataSource & { return m_featuresFetcher.GetDataSource(); },
                                                [this]() -> storage::CountryInfoGetter const &
 { return GetCountryInfoGetter(); }, [this](std::string const & id) -> std::string
@@ -456,6 +457,26 @@ Framework::Framework(FrameworkParams const & params, bool loadMaps)
   m_storage.Init(std::bind(&Framework::OnCountryFileDownloaded, this, _1, _2),
                  std::bind(&Framework::OnCountryFileDelete, this, _1, _2));
 
+  m_terrainProvider.SetOnTerrainDeregisteredCallback(std::bind(&Framework::OnTerrainDeregistered, this, _1));
+  // A downloaded block: Storage resolved the overlaps and the versions already.
+  m_storage.SetTerrainCallbacks(
+      [this](terrain::TwmFile const & file)
+  {
+    m2::RectD invalidRect;
+    m_terrainProvider.RegisterBlock(file, &invalidRect);
+    OnTerrainChanged(invalidRect);
+  }, [this](std::vector<terrain::TwmFile> const & files)
+  {
+    std::vector<terrain::TerrainId> ids;
+    for (auto const & file : files)
+      ids.push_back(file.m_id);
+    m2::RectD invalidRect;
+    m_terrainProvider.DeleteBlocks(ids, invalidRect);
+    OnTerrainChanged(invalidRect);
+  });
+  // A failed or cancelled terrain request changes the download hint without changing the blocks.
+  m_storage.Subscribe([this](storage::CountryId const &) { InvalidateIsolines(); }, {});
+
   m_storage.SetDownloadingPolicy(&m_storageDownloadingPolicy);
   m_storage.SetStartDownloadingCallback([this]()
   {
@@ -476,7 +497,7 @@ Framework::Framework(FrameworkParams const & params, bool loadMaps)
   // m_trafficManager.SetSimplifiedColorScheme(LoadTrafficSimplifiedColors());
   // m_trafficManager.SetEnabled(LoadTrafficEnabled());
 
-  m_isolinesManager.SetEnabled(LoadIsolinesEnabled());
+  SetIsolinesEnabled(LoadIsolinesEnabled());
 
   InitTransliteration();
   LOG(LDEBUG, ("Transliterators initialized"));
@@ -510,6 +531,7 @@ Framework::~Framework()
   m_trafficManager.Teardown();
   DestroyDrapeEngine();
   m_featuresFetcher.SetOnMapDeregisteredCallback(nullptr);
+  m_terrainProvider.SetOnTerrainDeregisteredCallback(nullptr);
 }
 
 void Framework::ShowNode(storage::CountryId const & countryId)
@@ -536,7 +558,7 @@ void Framework::OnCountryFileDownloaded(storage::CountryId const &, storage::Loc
 
   m_trafficManager.Invalidate();
   m_transitManager.Invalidate();
-  m_isolinesManager.Invalidate();
+  InvalidateIsolines();
 
   InvalidateRect(rect);
 
@@ -565,6 +587,8 @@ bool Framework::OnCountryFileDelete(storage::CountryId const & countryId, storag
   }
 
   InvalidateRect(rect);
+  // Recomputed on the next viewport change, when the map is already gone.
+  m_terrainHintMissing.reset();
 
   GetSearchAPI().ClearCaches();
   return deferredDelete;
@@ -575,7 +599,6 @@ void Framework::OnMapDeregistered(platform::LocalCountryFile const & localFile)
   auto action = [this, localFile]
   {
     m_transitManager.OnMwmDeregistered(localFile);
-    m_isolinesManager.OnMwmDeregistered(localFile);
     m_trafficManager.OnMwmDeregistered(localFile);
     m_descriptionsLoader->OnMwmDeregistered(localFile);
 
@@ -585,6 +608,89 @@ void Framework::OnMapDeregistered(platform::LocalCountryFile const & localFile)
 
   // Call action on thread in which the framework was created
   // For more information look at comment for Observer class in mwm_set.hpp
+  if (m_storage.GetThreadChecker().CalledOnOriginalThread())
+    action();
+  else
+    GetPlatform().RunTask(Platform::Thread::Gui, action);
+}
+
+void Framework::OnTerrainChanged(m2::RectD const & rect)
+{
+  // The isolines layer draws the terrain, the ?terrain-blocks debug highlight its downloaded blocks.
+  if ((m_isolinesManager.IsEnabled() || m_showTerrainBlocks) && rect.IsValid())
+    InvalidateRect(df::GetTerrainInvalidationRect(rect));
+  InvalidateIsolines();
+  // Skip the opened place page elevation update intentionally, it is not important for UX.
+}
+
+void Framework::InvalidateIsolines()
+{
+  m_terrainHintMissing.reset();
+  UpdateIsolinesAvailability();
+}
+
+void Framework::SetIsolinesEnabled(bool enabled)
+{
+  m_isolinesManager.SetEnabled(enabled);
+  UpdateIsolinesAvailability();
+}
+
+void Framework::UpdateIsolinesAvailability()
+{
+  // Only the enabled layer on the isolines zooms needs the hint. The low zooms keep the last state:
+  // the platforms announce the NoData transition, don't repeat it on every zoom bounce over a place.
+  if (m_isolinesManager.IsEnabled() && m_isolinesManager.IsVisible())
+    m_isolinesManager.SetHasTerrain(HasViewportTerrain(m_currentModelView.ClipRect()));
+}
+
+bool Framework::HasViewportTerrain(m2::RectD const & rect)
+{
+  // Before the maps load the terrain registry is empty: claim the coverage present,
+  // the InvalidateIsolines after the load re-evaluates the real state (no premature hint).
+  if (!m_terrainRegistered)
+    return true;
+  // The viewport rect can poke beyond the +-180 antimeridian: probe the canonical pieces.
+  bool has = false;
+  mercator::ForEachRectWrapped(rect,
+                               [&](m2::RectD const & piece) { has = has || m_terrainProvider.HasTerrain(piece); });
+  if (has)
+    return true;
+  // The download hint is for the installed maps without terrain, not for the sea or other maps.
+  // Cached by the regions in view: the terrain attrs are too heavy for every viewport change
+  // (InvalidateIsolines resets it, also on every storage status change).
+  storage::CountriesVec regions;
+  mercator::ForEachRectWrapped(rect, [&](m2::RectD const & piece)
+  {
+    auto const ids = m_infoGetter->GetRegionsCountryIdByRect(piece, false /* rough */);
+    regions.insert(regions.end(), ids.begin(), ids.end());
+  });
+  base::SortUnique(regions);
+  if (!m_terrainHintMissing || regions != m_terrainHintRegions)
+  {
+    using TerrainStatus = storage::Storage::TerrainStatus;
+    m_terrainHintMissing = base::AnyOf(regions, [this](storage::CountryId const & countryId)
+    {
+      if (!m_storage.GetInstalledLocalFile(countryId))
+        return false;
+      // Only with something to request: the blocks queued for a neighbour land without this update.
+      auto const attrs = m_storage.GetTerrainAttrs(countryId);
+      return attrs.m_remainingSize > 0 &&
+             (attrs.m_status == TerrainStatus::NotDownloaded || attrs.m_status == TerrainStatus::Partly ||
+              attrs.m_status == TerrainStatus::Failed);
+    });
+    m_terrainHintRegions = std::move(regions);
+  }
+  return !*m_terrainHintMissing;
+}
+
+void Framework::OnTerrainDeregistered(terrain::TwmFile const & file)
+{
+  auto action = [this, file]
+  {
+    // The same file may have been registered again while this completion was queued.
+    if (!m_terrainProvider.IsFileInUse(file))
+      m_storage.OnTerrainFileDeregistered(file);
+  };
   if (m_storage.GetThreadChecker().CalledOnOriginalThread())
     action();
   else
@@ -669,18 +775,27 @@ void Framework::RegisterAllMaps()
       // Otherwise we have blank map view instead of countries, without Download button.
     }
   }
+
+  // Storage resolves the overlaps and the versions of the installed terrain.
+  m_storage.RegisterAllLocalTerrain();
+  for (auto const & file : m_storage.GetLocalTerrainFiles())
+    m_terrainProvider.RegisterBlock(file);
+  m_terrainRegistered = true;
+  // RegisterAllMaps can run on the map-loading thread.
+  GetPlatform().RunTask(Platform::Thread::Gui, [this] { OnTerrainChanged(mercator::Bounds::FullRect()); });
 }
 
 void Framework::DeregisterAllMaps()
 {
+  m_terrainRegistered = false;
   m_transitManager.Clear();
-  m_isolinesManager.Clear();
   m_trafficManager.Clear();
   m_descriptionsLoader->Clear();
 
   GetSearchAPI().ClearCaches();
 
   m_featuresFetcher.Clear();
+  m_terrainProvider.Clear();
   m_storage.Clear();
 }
 
@@ -781,9 +896,9 @@ void Framework::FillTrackInfo(Track const & track, Track::TrackSelectionInfo con
   info.SetTrackId(track.GetId());
   info.SetTrackRelationId(trackSelectionInfo.m_relationId);
   auto const groupId = track.GetGroupId();
-  info.SetBookmarkCategoryId(groupId);
-  if (groupId != kml::kInvalidMarkGroupId)
-    info.SetBookmarkCategoryName(GetBookmarkManager().GetCategoryName(groupId));
+  bool const isBookmarkCategory = BookmarkManager::IsBookmarkCategory(groupId);
+  info.SetBookmarkCategoryId(isBookmarkCategory ? groupId : kml::kInvalidMarkGroupId);
+  info.SetBookmarkCategoryName(isBookmarkCategory ? GetBookmarkManager().GetCategoryName(groupId) : std::string{});
   info.SetMercator(trackSelectionInfo.m_trackPoint);
   info.SetTitlesForTrack(track);
 }
@@ -1063,7 +1178,11 @@ void Framework::ShowTrack(kml::TrackId trackId)
 
   place_page::BuildInfo info;
   info.m_trackId = trackId;
-  info.m_mercator = rect.Center();
+  info.m_mercator = track->GetPoint(0.0);
+  info.m_match = place_page::BuildInfo::Match::TrackOnly;
+  // Seed the start before building: the place-page builder reads the stored selection mark,
+  // so reopening must replace any previous map or elevation selection.
+  bm.SetTrackSelectionInfo({trackId, info.m_mercator, 0.0}, false /* notifyListeners */);
 
   m_currentPlacePageInfo = BuildPlacePageInfo(info);
 
@@ -1238,6 +1357,16 @@ m2::RectD Framework::GetCurrentViewport() const
   return m_currentModelView.ClipRect();
 }
 
+void Framework::SetTerrainLight(double azimuthDeg, double altitudeDeg, double shadowGamma)
+{
+  // The shading divides by both sin(altitude) and 1 - sin(altitude) (see terrain_shade.vsh.glsl).
+  ASSERT(altitudeDeg > 0 && altitudeDeg < 90, (altitudeDeg));
+  ASSERT_GREATER(shadowGamma, 0, ());
+  m_terrainLight = {azimuthDeg, altitudeDeg, shadowGamma};
+  if (m_drapeEngine != nullptr)
+    m_drapeEngine->SetTerrainLight(azimuthDeg, altitudeDeg, shadowGamma);
+}
+
 void Framework::SetVisibleViewport(m2::RectD const & rect)
 {
   if (m_drapeEngine == nullptr)
@@ -1396,6 +1525,7 @@ void Framework::ClearAllCaches()
   m_featuresFetcher.ClearCaches();
   m_infoGetter->ClearCaches();
   GetSearchAPI().ClearCaches();
+  m_terrainProvider.ClearCache();
 }
 
 void Framework::OnUpdateCurrentCountry(m2::PointD const & pt, int zoomLevel)
@@ -1786,6 +1916,35 @@ m2::PointD Framework::P3dtoG(m2::PointD const & p) const
   return pt;
 }
 
+namespace
+{
+// The synthetic null-mwm FeatureID index space of the downloaded regions highlight: the
+// CountryInfoGetter region ids are small, the high bit marks a terrain block encoded by its
+// integer degrees rect: 9 bits of the left, 8 of the bottom, 7 of the width and of the height.
+uint32_t constexpr kTwmBorderIndexBase = 1u << 31;
+
+uint32_t EncodeTwmBorderIndex(m2::RectD const & blockRect)
+{
+  auto const bottom = std::lround(mercator::YToLat(blockRect.minY()));
+  auto const left = std::lround(blockRect.minX());
+  auto const width = std::lround(blockRect.SizeX());
+  auto const height = std::lround(mercator::YToLat(blockRect.maxY())) - bottom;
+  ASSERT(width > 0 && width <= 128 && height > 0 && height <= 128, (blockRect));
+  return kTwmBorderIndexBase | (static_cast<uint32_t>(left + 180) << 22) | (static_cast<uint32_t>(bottom + 90) << 14) |
+         (static_cast<uint32_t>(width - 1) << 7) | static_cast<uint32_t>(height - 1);
+}
+
+std::vector<m2::PointD> GetTwmBorderTriangles(uint32_t index)
+{
+  auto const bits = [index](uint32_t offset, uint32_t mask) { return static_cast<int>((index >> offset) & mask); };
+  terrain::GridBlock const block{bits(22, 0x1FF) - 180, bits(14, 0xFF) - 90, bits(7, 0x7F) + 1, bits(0, 0x7F) + 1};
+  auto const rect = block.GetRectMercator();
+  // The two CW triangles of the block rect (cf. ApplyAreaFeature winding).
+  m2::PointD const a = rect.LeftBottom(), b = rect.RightBottom(), c = rect.RightTop(), d = rect.LeftTop();
+  return {a, d, c, a, c, b};
+}
+}  // namespace
+
 void Framework::CreateDrapeEngine(ref_ptr<dp::GraphicsContextFactory> contextFactory, DrapeCreationParams && params)
 {
   auto idReadFn = [this](auto const & fn, m2::RectD const & r, int scale, auto const & stop, uint8_t outdoorVisibility)
@@ -1801,19 +1960,38 @@ void Framework::CreateDrapeEngine(ref_ptr<dp::GraphicsContextFactory> contextFac
       ASSERT(base::IsSortedAndUnique(names), ());
       m_infoGetter->ForEachRegionId(names, [&fn](size_t id) { fn(FeatureID({}, id)); });
     }
+
+    // The ?terrain-blocks debug highlight rides the same synthetic channel.
+    if (m_showTerrainBlocks && scale <= 7)
+    {
+      std::vector<m2::RectD> rects;
+      m_terrainProvider.GetDownloadedRects(r, rects);
+      for (auto const & rect : rects)
+        fn(FeatureID({}, EncodeTwmBorderIndex(rect)));
+    }
   };
 
   uint32_t const borderType = classif().GetTypeByPath({"organicapp", "mwm_border"});
-  auto featureReadFn = [this, borderType](auto const & fn, std::vector<FeatureID> const & ids)
+  uint32_t const twmBorderType = classif().GetTypeByPath({"organicapp", "twm_border"});
+  auto featureReadFn = [this, borderType, twmBorderType](auto const & fn, std::vector<FeatureID> const & ids)
   {
     m_featuresFetcher.ReadFeatures(fn, ids);
 
     for (auto const & id : ids)
       if (id.m_mwmId.IsNull())
       {
-        FeatureType ft(id, borderType);
-        m_infoGetter->GetTriangles(id.m_index, ft);
-        fn(ft);
+        if (id.m_index >= kTwmBorderIndexBase)
+        {
+          FeatureType ft(id, twmBorderType);
+          ft.SetTriangles(GetTwmBorderTriangles(id.m_index));
+          fn(ft);
+        }
+        else
+        {
+          FeatureType ft(id, borderType);
+          m_infoGetter->GetTriangles(id.m_index, ft);
+          fn(ft);
+        }
       }
       else
         break;
@@ -1871,6 +2049,11 @@ void Framework::CreateDrapeEngine(ref_ptr<dp::GraphicsContextFactory> contextFac
   auto isCountryLoadedByNameFn = std::bind(&Framework::IsCountryLoadedByName, this, _1);
   auto updateCurrentCountryFn = std::bind(&Framework::OnUpdateCurrentCountry, this, _1, _2);
 
+  auto hasTerrainFn = [this](m2::RectD const & rect) { return m_terrainProvider.HasTerrain(rect); };
+  auto readTerrainFn = [this](m2::RectD const & rect, int zoom, terrain::TerrainData & data,
+                              base::SharedCancellable const & isCancellable)
+  { m_terrainProvider.ReadTerrain(rect, zoom, data, isCancellable); };
+
   bool allow3d;
   bool allow3dBuildings;
   Load3dMode(allow3d, allow3dBuildings);
@@ -1891,7 +2074,7 @@ void Framework::CreateDrapeEngine(ref_ptr<dp::GraphicsContextFactory> contextFac
       params.m_apiVersion, contextFactory, dp::Viewport(0, 0, params.m_surfaceWidth, params.m_surfaceHeight),
       df::MapDataProvider(std::move(idReadFn), std::move(featureReadFn), std::move(isCountryLoadedByNameFn),
                           std::move(updateCurrentCountryFn), std::move(tileBackgroundReadFn),
-                          std::move(cancelTileBackgroundReadingFn)),
+                          std::move(cancelTileBackgroundReadingFn), std::move(hasTerrainFn), std::move(readTerrainFn)),
       params.m_hints, params.m_visualScale, fontsScaleFactor, std::move(params.m_widgetsInitInfo),
       std::move(myPositionModeChangedFn), allow3dBuildings, trafficEnabled, isolinesEnabled,
       params.m_isChoosePositionMode, params.m_isChoosePositionMode, GetSelectedFeatureTriangles(),
@@ -1932,6 +2115,9 @@ void Framework::CreateDrapeEngine(ref_ptr<dp::GraphicsContextFactory> contextFac
   m_transitManager.SetDrapeEngine(make_ref(m_drapeEngine));
   m_isolinesManager.SetDrapeEngine(make_ref(m_drapeEngine));
   m_searchMarks.SetDrapeEngine(make_ref(m_drapeEngine));
+  if (m_terrainLight)
+    m_drapeEngine->SetTerrainLight(m_terrainLight->m_azimuthDeg, m_terrainLight->m_altitudeDeg,
+                                   m_terrainLight->m_shadowGamma);
 
   InvalidateUserMarks();
 
@@ -1960,7 +2146,7 @@ void Framework::OnRecoverSurface(int width, int height, bool recreateContextDepe
 
   m_trafficManager.OnRecoverSurface();
   m_transitManager.Invalidate();
-  m_isolinesManager.Invalidate();
+  InvalidateIsolines();
 }
 
 void Framework::OnDestroySurface()
@@ -2161,7 +2347,15 @@ void Framework::SetupMeasurementSystem()
 {
   GetPlatform().SetupMeasurementSystem();
 
-  m_routingManager.SetTurnNotificationsUnits(measurement_utils::GetMeasurementUnits());
+  auto const units = measurement_utils::GetMeasurementUnits();
+  m_routingManager.SetTurnNotificationsUnits(units);
+  if (m_isolinesUnits == units)
+    return;
+  m_isolinesUnits = units;
+
+  // Include off-screen tiles so panning cannot reveal contours in the old units.
+  if (m_drapeEngine && m_isolinesManager.IsEnabled())
+    InvalidateRect(mercator::Bounds::FullRect());
 }
 
 void Framework::SetWidgetLayout(gui::TWidgetsLayoutInfo && layout)
@@ -2283,7 +2477,10 @@ void Framework::ActivateMapSelection()
   if (m_currentPlacePageInfo->GetSelectedObject() == df::SelectionShape::OBJECT_TRACK)
     bm.OnTrackSelected(m_currentPlacePageInfo->GetTrackId());
   else
+  {
     bm.OnTrackDeselected();
+    bm.ClearTempRelationTrack();
+  }
 
   auto const & featureId = m_currentPlacePageInfo->GetID();
 
@@ -2538,7 +2735,23 @@ bool Framework::BuildTrackPlacePage(Track::TrackSelectionInfo const & trackSelec
   return true;
 }
 
+namespace
+{
+bool NeedsTerrainElevation(place_page::Info const & info)
+{
+  return !info.IsMyPosition() && !info.IsTrack() && info.GetSelectedObject() != df::SelectionShape::OBJECT_EMPTY;
+}
+}  // namespace
+
 place_page::Info Framework::BuildPlacePageInfo(place_page::BuildInfo const & buildInfo)
+{
+  auto info = BuildPlacePageInfoImpl(buildInfo);
+  if (NeedsTerrainElevation(info))
+    info.SetTerrainElevation(m_terrainProvider.GetElevation(info.GetMercator()));
+  return info;
+}
+
+place_page::Info Framework::BuildPlacePageInfoImpl(place_page::BuildInfo const & buildInfo)
 {
   place_page::Info outInfo;
   outInfo.SetBuildInfo(buildInfo);
@@ -2607,38 +2820,25 @@ place_page::Info Framework::BuildPlacePageInfo(place_page::BuildInfo const & bui
     return outInfo;
   }
 
-  // 4. User Tracks. Using VisualParams inside FindTracksInTapPosition/GetDefaultTapRect requires drapeEngine.
-  if (m_drapeEngine != nullptr && buildInfo.IsTrackMatchingEnabled())
+  // 4. User Tracks. Spatial matching needs VisualParams; an explicit ID only reads its selection mark.
+  if (buildInfo.IsTrackMatchingEnabled() && (buildInfo.m_trackId != kml::kInvalidTrackId || m_drapeEngine != nullptr))
   {
-    Track::TrackSelectionInfo trackToSelect;
-    std::vector<Track::TrackSelectionInfo> trackSelectionCandidates;
+    auto trackSelectionCandidates = FindTracksInTapPosition(buildInfo);
+    if (buildInfo.m_trackId != kml::kInvalidTrackId && trackSelectionCandidates.empty())
+      return outInfo;
+    if (!trackSelectionCandidates.empty() && buildInfo.m_trackId == kml::kInvalidTrackId && isFeatureMatchingEnabled)
+    {
+      auto const searchRect = df::TapInfo::GetDefaultTapRect(buildInfo.m_mercator, m_currentModelView).GetGlobalRect();
+      auto relationTrackCandidates = FindRelationTracksInTapPosition(
+          sp.FindFeaturesInRect(buildInfo.m_mercator, searchRect).m_lineCandidates, buildInfo.m_mercator);
+      trackSelectionCandidates.insert(trackSelectionCandidates.end(), relationTrackCandidates.begin(),
+                                      relationTrackCandidates.end());
+      std::sort(trackSelectionCandidates.begin(), trackSelectionCandidates.end(), HasHigherTrackSelectionPriority);
+    }
 
-    if (buildInfo.m_trackId != kml::kInvalidTrackId)
-    {
-      // Known track: find the closest point to the track's bounding-rect center, no distance limit.
-      auto const * track = GetBookmarkManager().GetTrack(buildInfo.m_trackId);
-      if (track == nullptr)
-        return outInfo;
-      track->UpdateSelectionInfo(track->GetLimitRect().Center(), trackToSelect);
-      ASSERT(trackToSelect.IsValid(), ());
-      trackSelectionCandidates.push_back(trackToSelect);
-    }
-    else
-    {
-      trackSelectionCandidates = FindTracksInTapPosition(buildInfo);
-      if (!trackSelectionCandidates.empty() && isFeatureMatchingEnabled)
-      {
-        auto const searchRect =
-            df::TapInfo::GetDefaultTapRect(buildInfo.m_mercator, m_currentModelView).GetGlobalRect();
-        auto relationTrackCandidates = FindRelationTracksInTapPosition(
-            sp.FindFeaturesInRect(buildInfo.m_mercator, searchRect).m_lineCandidates, buildInfo.m_mercator);
-        trackSelectionCandidates.insert(trackSelectionCandidates.end(), relationTrackCandidates.begin(),
-                                        relationTrackCandidates.end());
-        std::sort(trackSelectionCandidates.begin(), trackSelectionCandidates.end(), HasHigherTrackSelectionPriority);
-      }
-      if (!trackSelectionCandidates.empty())
-        trackToSelect = trackSelectionCandidates.front();
-    }
+    Track::TrackSelectionInfo trackToSelect;
+    if (!trackSelectionCandidates.empty())
+      trackToSelect = trackSelectionCandidates.front();
 
     if (trackToSelect.IsValid() && BuildTrackPlacePage(trackToSelect, outInfo))
     {
@@ -3316,12 +3516,12 @@ bool Framework::ParseDrapeDebugCommand(std::string const & query)
   }
   if (query == "?isolines")
   {
-    m_isolinesManager.SetEnabled(true /* enable */);
+    SetIsolinesEnabled(true /* enable */);
     return true;
   }
   if (query == "?no-isolines")
   {
-    m_isolinesManager.SetEnabled(false /* enable */);
+    SetIsolinesEnabled(false /* enable */);
     return true;
   }
   if (query == "?debug-info")
@@ -3359,6 +3559,13 @@ bool Framework::ParseDrapeDebugCommand(std::string const & query)
   if (query == "?no-show-downloaded")
   {
     SetShowDownloadedRegions(false);
+    return true;
+  }
+  // The downloaded terrain blocks on the world zooms, off by default and not saved.
+  if (query == "?terrain-blocks" || query == "?no-terrain-blocks")
+  {
+    m_showTerrainBlocks = query == "?terrain-blocks";
+    Invalidate();
     return true;
   }
 
@@ -3942,6 +4149,8 @@ std::vector<MwmSet::MwmId> Framework::GetMwmsByRect(m2::RectD const & rect, bool
 // RoutingManager::Delegate
 void Framework::OnRouteFollow(routing::RouterType type)
 {
+  CHECK(m_drapeEngine, ());
+
   bool const isPedestrianRoute = type == RouterType::Pedestrian;
   bool const enableAutoZoom = isPedestrianRoute ? false : LoadAutoZoom();
   int const scale = isPedestrianRoute ? scales::GetPedestrianNavigationScale() : scales::GetNavigationScale();

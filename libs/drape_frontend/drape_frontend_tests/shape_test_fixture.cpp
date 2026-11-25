@@ -6,7 +6,6 @@
 
 #include "drape/gl_functions.hpp"
 #include "drape/gl_includes.hpp"
-#include "drape/oglcontext.hpp"
 #include "drape/support_manager.hpp"
 #include "drape/utils/projection.hpp"
 
@@ -15,42 +14,52 @@
 #include "platform/platform.hpp"
 
 #include "base/file_name_utils.hpp"
+#include "base/scope_guard.hpp"
 
 #include <QtGui/QPainter>
 
+#include <algorithm>
 #include <chrono>
+#include <optional>
 #include <thread>
 
 namespace df::test_support
 {
 namespace
 {
-/// Lightweight OGLContext wrapper that assumes a GL context is already current
-/// (e.g., set up by RunTestInOpenGLOffscreenEnvironment).
-class CurrentOGLContext : public dp::OGLContext
-{
-public:
-  void MakeCurrent() override {}
-  void DoneCurrent() override {}
-  void Present() override { GLFunctions::glFinish(); }
-
-  void SetFramebuffer(ref_ptr<dp::BaseFramebuffer>) override {}
-  void ForgetFramebuffer(ref_ptr<dp::BaseFramebuffer>) override {}
-  void ApplyFramebuffer(std::string const &) override {}
-};
+uint32_t constexpr kBatchSize = 5000;
 }  // namespace
+
+void CurrentOGLContext::Present()
+{
+  GLFunctions::glFinish();
+}
+
+void InitTextureManager(ref_ptr<dp::GraphicsContext> context, dp::TextureManager & texMng)
+{
+  dp::TextureManager::Params texParams;
+  texParams.m_resPostfix = df::VisualParams::GetResourcePostfix(1.0);
+  texParams.m_visualScale = 1.0;
+  texParams.m_colors = "colors.txt";
+  texParams.m_patterns = "patterns.txt";
+  texParams.m_glyphMngParams.m_uniBlocks = base::JoinPath("fonts", "unicode_blocks.txt");
+  texParams.m_glyphMngParams.m_whitelist = base::JoinPath("fonts", "whitelist.txt");
+  texParams.m_glyphMngParams.m_blacklist = base::JoinPath("fonts", "blacklist.txt");
+  GetPlatform().GetFontNames(texParams.m_glyphMngParams.m_fonts);
+  texMng.Init(context, texParams);
+}
 
 void ShapeTestFixture::Render(char const * title, uint32_t width, uint32_t height, ShapeCreatorFn const & createShapes)
 {
   RunTestInOpenGLOffscreenEnvironment(title, [&]()
   {
+    SCOPE_GUARD(releaseResources, [this] { ReleaseGLResources(); });
     Init(width, height);
 
     createShapes(*this);
 
     Flush();
     Render();
-    ReleaseGLResources();
   });
 
   CHECK(!m_lastImage.isNull(), ("OpenGL render produced no image", title));
@@ -97,7 +106,7 @@ void ShapeTestFixture::Init(uint32_t width, uint32_t height)
 
   m_context->SetViewport(0, 0, width, height);
   m_context->SetDepthTestEnabled(true);
-  m_context->SetCullingEnabled(false);
+  m_context->SetCullingEnabled(true);
 
   // Global GL state, applied once per context by FrontendRenderer::OnContextCreate. Without it GL keeps
   // its default (GL_ONE, GL_ZERO) and every fragment overwrites the target, so shapes would be validated
@@ -110,22 +119,12 @@ void ShapeTestFixture::Init(uint32_t width, uint32_t height)
 
   // Initialize TextureManager with real data.
   m_texMng = std::make_unique<dp::TextureManager>();
-  dp::TextureManager::Params texParams;
-  texParams.m_resPostfix = df::VisualParams::GetResourcePostfix(1.0);
-  texParams.m_visualScale = 1.0;
-  texParams.m_colors = "colors.txt";
-  texParams.m_patterns = "patterns.txt";
-  texParams.m_glyphMngParams.m_uniBlocks = base::JoinPath("fonts", "unicode_blocks.txt");
-  texParams.m_glyphMngParams.m_whitelist = base::JoinPath("fonts", "whitelist.txt");
-  texParams.m_glyphMngParams.m_blacklist = base::JoinPath("fonts", "blacklist.txt");
-  GetPlatform().GetFontNames(texParams.m_glyphMngParams.m_fonts);
-  m_texMng->Init(contextRef, texParams);
+  InitTextureManager(contextRef, *m_texMng);
 
   // Upload textures to GPU (creates hardware texture objects).
   m_texMng->UpdateDynamicTextures(contextRef);
 
   // Create batcher.
-  uint32_t constexpr kBatchSize = 5000;
   m_batcher = std::make_unique<dp::Batcher>(kBatchSize, kBatchSize);
   m_batcher->StartSession([this](dp::RenderState const & state, drape_ptr<dp::RenderBucket> && bucket)
   { m_buckets.push_back({state, std::move(bucket)}); });
@@ -142,6 +141,22 @@ void ShapeTestFixture::AddUserLines(TileKey const & tileKey, TracksSource const 
 {
   CHECK(m_batcher != nullptr, ("Call Init() before AddUserLines()"));
   CacheUserLines(make_ref(m_context), tileKey, make_ref(m_texMng), source, renderParams, *m_batcher);
+}
+
+void ShapeTestFixture::AddUserAreas(TileKey const & tileKey, UserAreasToCache const & areas)
+{
+  CHECK(m_batcher != nullptr, ("Call Init() before AddUserAreas()"));
+  auto const tileCenter = tileKey.GetGlobalRect().Center();
+  if (!m_viewCenter)
+    m_viewCenter = tileCenter;
+  auto const offset = (tileCenter - *m_viewCenter) * m_worldToPixelScale;
+  glsl::vec2 const shift(offset.x, -offset.y);
+
+  dp::Batcher batcher(kBatchSize, kBatchSize);
+  dp::SessionGuard guard(make_ref(m_context), batcher,
+                         [this, shift](dp::RenderState const & state, drape_ptr<dp::RenderBucket> && bucket)
+  { m_buckets.push_back({state, std::move(bucket), shift}); });
+  CacheUserAreas(make_ref(m_context), tileKey, make_ref(m_texMng), areas, batcher);
 }
 
 void ShapeTestFixture::Flush()
@@ -183,35 +198,46 @@ void ShapeTestFixture::Render()
   auto const contextRef = make_ref(m_context);
 
   m_framebuffer->Bind();
-  m_context->SetClearColor(dp::Color::White());
+  m_context->SetClearColor(m_backgroundColor);
   m_context->Clear(dp::ClearBits::ColorBit | dp::ClearBits::DepthBit, 0);
 
   // Coordinate pipeline:
   //   world coords -> ToShapeVertex2: (world - tileCenter) * kShapeCoordScalar -> shape coords
-  //   shape coords -> modelView -> pixel coords (m_worldToPixelScale pixels per world unit)
+  //   shape coords -> modelView -> pixel coords (m_worldToPixelScale pixels per world unit, Y down as in production)
   //   pixel coords -> projection -> NDC [-1, 1]
   float const halfW = static_cast<float>(m_width) / 2.0f;
   float const halfH = static_cast<float>(m_height) / 2.0f;
   float const modelViewScale = m_worldToPixelScale / static_cast<float>(kShapeCoordScalar);
 
   gpu::MapProgramParams params;
-  params.m_modelView = glsl::mat4(modelViewScale, 0, 0, 0, 0, modelViewScale, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1);
-  params.m_projection = glsl::mat4(1.0f / halfW, 0, 0, 0, 0, 1.0f / halfH, 0, 0, 0, 0, -0.5f, 0.5f, 0, 0, 0, 1);
-  if (m_screen)
-  {
-    // Apply* shapes carry production depth priorities, unlike the zero-depth geometry fixtures.
-    auto const projection = dp::MakeProjection(m_context->GetApiVersion(), -halfW, halfW, -halfH, halfH);
-    params.m_projection = glsl::make_mat4(projection.data());
-  }
+  auto const projection = dp::MakeProjection(m_context->GetApiVersion(), -halfW, halfW, halfH, -halfH);
+  params.m_projection = glsl::make_mat4(projection.data());
   params.m_pivotTransform = glsl::mat4(1.0f);
   params.m_opacity = 1.0f;
   params.m_zScale = 1.0f;
 
+  // FrontendRenderer sorts render groups within each layer and clears depth between user-line passes.
+  std::ranges::stable_sort(m_buckets, [](auto const & lhs, auto const & rhs)
+  {
+    auto const leftLayer = GetDepthLayer(lhs.m_state);
+    auto const rightLayer = GetDepthLayer(rhs.m_state);
+    return leftLayer == rightLayer ? lhs.m_state < rhs.m_state : leftLayer < rightLayer;
+  });
+  std::optional<DepthLayer> layer;
   for (auto & entry : m_buckets)
   {
     if (m_screen && IsProtectedAreaFill(entry.m_state) && !IsProtectedAreaFillVisible(*m_screen))
       continue;
 
+    auto const nextLayer = GetDepthLayer(entry.m_state);
+    if (layer != nextLayer)
+    {
+      m_context->Clear(dp::ClearBits::DepthBit, dp::kClearBitsStoreAll);
+      layer = nextLayer;
+    }
+    auto const & shift = entry.m_tileShift;
+    params.m_modelView =
+        glsl::mat4(modelViewScale, 0, 0, shift.x, 0, -modelViewScale, 0, shift.y, 0, 0, 1, 0, 0, 0, 0, 1);
     auto const programId = entry.m_state.GetProgram<gpu::Program>();
     auto program = m_progMng->GetProgram(programId);
     program->Bind();

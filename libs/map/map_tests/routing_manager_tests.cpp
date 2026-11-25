@@ -2,9 +2,11 @@
 
 #include "map/framework.hpp"
 #include "map/routing_mark.hpp"
+#include "map/track.hpp"
 
 #include "drape_frontend/visual_params.hpp"
 
+#include "routing/router.hpp"
 #include "routing/ruler_router.hpp"
 
 #include "storage/routing_helpers.hpp"
@@ -12,16 +14,19 @@
 #include "platform/gui_thread.hpp"
 #include "platform/platform.hpp"
 #include "platform/platform_tests_support/scoped_dir.hpp"
+#include "platform/settings.hpp"
 
 #include "geometry/mercator.hpp"
 
 #include "base/file_name_utils.hpp"
 #include "base/scope_guard.hpp"
 #include "base/thread_safe_queue.hpp"
+#include "base/waiter.hpp"
 
 #include <algorithm>
-#include <future>
+#include <chrono>
 #include <memory>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -29,6 +34,41 @@ namespace routing_manager_tests
 {
 namespace
 {
+// Framework reads the saved router at initialization; optimization cases need a road router.
+class ScopedVehicleRouter
+{
+public:
+  ScopedVehicleRouter() : m_hasOriginal(settings::Get("router", m_original))
+  {
+    settings::Set("router", routing::ToString(routing::RouterType::Vehicle));
+  }
+
+  ~ScopedVehicleRouter()
+  {
+    if (m_hasOriginal)
+      settings::Set("router", m_original);
+    else
+      settings::Delete("router");
+  }
+
+private:
+  std::string m_original;
+  bool const m_hasOriginal;
+};
+
+class TestFramework
+{
+public:
+  RoutingManager & GetRoutingManager() { return m_framework.GetRoutingManager(); }
+  BookmarkManager & GetBookmarkManager() { return m_framework.GetBookmarkManager(); }
+  storage::Storage & GetStorage() { return m_framework.GetStorage(); }
+
+private:
+  // Select the router before Framework reads it, and restore it after Framework is destroyed.
+  ScopedVehicleRouter const m_routerSetting;
+  Framework m_framework{FrameworkParams(false /* m_enableDiffs */)};
+};
+
 // Pump only this fixture's tasks, not callbacks left by earlier Framework instances.
 class TestGuiThread final : public base::TaskLoop
 {
@@ -36,46 +76,33 @@ public:
   PushResult Push(Task && task) override
   {
     m_tasks.Push(std::move(task));
+    m_tasksReady.Notify();
     return {true, kNoId};
   }
   PushResult Push(Task const & task) override { return Push(Task(task)); }
 
-  void RunNext()
+  template <typename Predicate>
+  void RunUntil(Predicate && done)
   {
-    Task task;
-    m_tasks.WaitAndPop(task);
-    task();
+    auto const deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
+    while (!done())
+    {
+      TEST(std::chrono::steady_clock::now() < deadline, ("GUI callback timed out"));
+      Task task;
+      while (!m_tasks.TryPop(task))
+      {
+        TEST(m_tasksReady.Wait(deadline - std::chrono::steady_clock::now()) != base::Waiter::Result::Timeout,
+             ("GUI callback timed out"));
+        m_tasksReady.Reset();
+      }
+      task();
+    }
   }
 
 private:
   threads::ThreadSafeQueue<Task> m_tasks;
+  base::Waiter m_tasksReady;
 };
-
-void WaitForFileThread()
-{
-  std::promise<void> completed;
-  auto future = completed.get_future();
-  GetPlatform().RunTask(Platform::Thread::File, [&completed] { completed.set_value(); });
-  future.wait();
-}
-
-bool LoadRoutePoints(RoutingManager & routingManager, TestGuiThread & guiThread)
-{
-  bool loaded = false;
-  bool completed = false;
-  // Failures may call back from the file thread, so always finish on the test GUI thread.
-  routingManager.LoadRoutePoints([&](bool success)
-  {
-    GetPlatform().RunTask(Platform::Thread::Gui, [&, success]
-    {
-      loaded = success;
-      completed = true;
-    });
-  });
-  while (!completed)
-    guiThread.RunNext();
-  return loaded;
-}
 
 template <typename Fn>
 void WithSavedRoute(Fn && fn)
@@ -90,11 +117,10 @@ void WithSavedRoute(Fn && fn)
   SCOPE_GUARD(restoreGuiThread, [&platform] { platform.SetGuiThread(std::make_unique<platform::GuiThread>()); });
 
   // Initialize global settings before redirecting the saved route to its test directory.
-  Framework framework(FrameworkParams(false /* m_enableDiffs */));
+  TestFramework framework;
   auto const originalSettingsDir = platform.SettingsDir();
   platform.SetSettingsDir(testSettingsDir);
   SCOPE_GUARD(restoreSettingsDir, [&] { platform.SetSettingsDir(originalSettingsDir); });
-  SCOPE_GUARD(drainFileThread, [] { WaitForFileThread(); });
 
   std::forward<Fn>(fn)(framework.GetRoutingManager(), framework.GetBookmarkManager(), *guiThread);
 }
@@ -136,7 +162,7 @@ void FillRouteToLimit(RoutingManager & routingManager)
 void TestSavedRouteOrder(bool myPositionStart, size_t passedStops, bool hasCurrentPosition,
                          size_t intermediateCount = 3)
 {
-  WithSavedRoute([=](RoutingManager & routingManager, BookmarkManager & bookmarks, TestGuiThread & guiThread)
+  WithSavedRoute([=](RoutingManager & routingManager, BookmarkManager & bookmarks, TestGuiThread &)
   {
     auto start = MakeRoutePoint(RouteMarkType::Start, 0, 1.0);
     start.m_title = "Start";
@@ -174,11 +200,11 @@ void TestSavedRouteOrder(bool myPositionStart, size_t passedStops, bool hasCurre
     if (restoreMyPosition && hasCurrentPosition)
     {
       expected.front().m_position = currentPosition;
-      expected.front().m_title.clear();
+      expected.front().m_title = "My Position";
       expected.front().m_subTitle.clear();
     }
 
-    TEST(LoadRoutePoints(routingManager, guiThread), ());
+    TEST(routingManager.LoadRoutePoints(), ());
 
     auto const actual = routingManager.GetRoutePoints();
     TEST_EQUAL(actual.size(), expected.size(), ());
@@ -194,7 +220,6 @@ void TestSavedRouteOrder(bool myPositionStart, size_t passedStops, bool hasCurre
     TEST_EQUAL(actual.front().m_isMyPosition, restoreMyPosition && hasCurrentPosition, ());
     TEST_EQUAL(actual.front().m_replaceWithMyPositionAfterRestart, restoreMyPosition && !hasCurrentPosition, ());
 
-    WaitForFileThread();
     TEST(!routingManager.HasSavedRoutePoints(), ());
   });
 }
@@ -228,11 +253,40 @@ double GetRouteLengthMeters(RoutingManager const & manager)
     length += mercator::DistanceOnEarth(points[i - 1].m_position, points[i].m_position);
   return length;
 }
+
+kml::TrackId SaveSingleSegmentRoute(RoutingManager & manager, BookmarkManager & bookmarks,
+                                    geometry::PointWithAltitude const & finish)
+{
+  bookmarks.EnableTestMode(true);
+  SCOPE_GUARD(restoreTestMode, [&] { bookmarks.EnableTestMode(false); });
+  // Saving is profile-independent; Ruler initializes without map regions.
+  manager.SetRouter(routing::RouterType::Ruler);
+  manager.Init(std::make_shared<routing::NumMwmIds>());
+  manager.AddRoutePoint(MakeRoutePointOnXAxis(RouteMarkType::Start, 0, 0.0), false);
+  manager.AddRoutePoint(MakeRoutePointOnXAxis(RouteMarkType::Finish, 0, finish.GetPoint().x), false);
+
+  geometry::PointWithAltitude const start({0.0, 0.0}, 100);
+  routing::Segment const fake(routing::kFakeNumMwmId, 0, 0, false);
+  std::vector<routing::RouteSegment> segments;
+  segments.emplace_back(fake, routing::turns::TurnItem(1, routing::turns::CarDirection::ReachedYourDestination), finish,
+                        routing::RouteSegment::RoadNameInfo{});
+  double const distance = mercator::DistanceOnEarth(start.GetPoint(), finish.GetPoint());
+  segments.front().SetDistancesAndTime(distance, finish.GetPoint().x, distance);
+  routing::Route route;
+  route.SetRouteSegments(std::move(segments));
+  route.SetSubroutes(std::vector<routing::Route::SubrouteAttrs>{{start, finish, 0, 1}});
+  routing::RoutesResult result;
+  result.MakeFrom("ruler", std::move(route));
+  manager.RoutingSession().AssignRouteForTesting(routing::Route(result.GetActive()),
+                                                 routing::RouterResultCode::NoError);
+  TEST(manager.IsRouteValid(), ());
+  return manager.SaveRoute();
+}
 }  // namespace
 
 UNIT_TEST(RoutingManager_ReverseRoutePointsRequiresBothEndpoints)
 {
-  Framework framework(FrameworkParams(false /* m_enableDiffs */));
+  TestFramework framework;
   auto & manager = framework.GetRoutingManager();
 
   TEST(!manager.ReverseRoutePoints(), ());
@@ -265,7 +319,7 @@ UNIT_TEST(RoutingManager_ReverseRoutePointsRequiresBothEndpoints)
 
 UNIT_TEST(RoutingManager_ReverseRoutePointsReversesEntireRoute)
 {
-  Framework framework(FrameworkParams(false /* m_enableDiffs */));
+  TestFramework framework;
   auto & manager = framework.GetRoutingManager();
 
   auto start = MakeRoutePoint(RouteMarkType::Start, 0, 1.0);
@@ -315,7 +369,7 @@ UNIT_TEST(RoutingManager_ReverseRoutePointsReversesEntireRoute)
 
 UNIT_TEST(RoutingManager_ReverseRoutePointsWithNoStops)
 {
-  Framework framework(FrameworkParams(false /* m_enableDiffs */));
+  TestFramework framework;
   auto & manager = framework.GetRoutingManager();
   manager.AddRoutePoint(MakeRoutePoint(RouteMarkType::Start, 0, 1.0), false /* optimize */);
   manager.AddRoutePoint(MakeRoutePoint(RouteMarkType::Finish, 0, 2.0), false /* optimize */);
@@ -331,7 +385,7 @@ UNIT_TEST(RoutingManager_ReverseRoutePointsWithNoStops)
 
 UNIT_TEST(RoutingManager_MoveSingleRoutePointBetweenEndpoints)
 {
-  Framework framework(FrameworkParams(false /* m_enableDiffs */));
+  TestFramework framework;
   auto & manager = framework.GetRoutingManager();
   auto point = MakeRoutePoint(RouteMarkType::Start, 0, 1.0);
   point.m_title = "Only point";
@@ -372,7 +426,7 @@ UNIT_TEST(RoutingManager_MoveSingleRoutePointBetweenEndpoints)
 
 UNIT_TEST(RoutingManager_OptimizationWithIncompleteRoute)
 {
-  Framework framework(FrameworkParams(false /* m_enableDiffs */));
+  TestFramework framework;
   auto & manager = framework.GetRoutingManager();
 
   TEST(!manager.OptimizeRoutePoints(), ());
@@ -386,7 +440,7 @@ UNIT_TEST(RoutingManager_OptimizationWithIncompleteRoute)
 
 UNIT_TEST(RoutingManager_OptimizationCannotChangeWhileFollowing)
 {
-  Framework framework(FrameworkParams(false /* m_enableDiffs */));
+  TestFramework framework;
   auto & manager = framework.GetRoutingManager();
 
   AddTestRoute(manager, {3, 1, 2});
@@ -397,16 +451,32 @@ UNIT_TEST(RoutingManager_OptimizationCannotChangeWhileFollowing)
   TEST_EQUAL(GetStopCoordinates(manager), (std::vector<double>{3, 1, 2}), ());
 }
 
+UNIT_TEST(RoutingManager_SavedRouterFallback)
+{
+  TestFramework framework;
+  auto const & manager = framework.GetRoutingManager();
+
+  settings::Set("router", routing::ToString(routing::RouterType::Pedestrian));
+  TEST_EQUAL(manager.GetLastUsedRouter(), routing::RouterType::Pedestrian, ());
+
+  settings::Set("router", std::string("future-router"));
+  TEST_EQUAL(manager.GetLastUsedRouter(), routing::RouterType::Vehicle, ());
+  std::string retained;
+  TEST(settings::Get("router", retained), ());
+  TEST_EQUAL(retained, "future-router", ());
+
+  settings::Delete("router");
+  TEST_EQUAL(manager.GetLastUsedRouter(), routing::RouterType::Vehicle, ());
+}
+
 UNIT_TEST(RoutingManager_RulerPreservesMeasurementOrder)
 {
   for (bool const enabled : {false, true})
   {
-    Framework framework(FrameworkParams(false /* m_enableDiffs */));
+    TestFramework framework;
     auto & manager = framework.GetRoutingManager();
     manager.Init(routing::CreateNumMwmIds(framework.GetStorage()));
 
-    auto const originalRouter = manager.GetLastUsedRouter();
-    SCOPE_GUARD(restoreRouter, [&] { manager.SetLastUsedRouter(originalRouter); });
     manager.SetRouter(routing::RouterType::Pedestrian);
     AddTestRoute(manager, {3, 1, 2});
     auto const before = GetStopCoordinates(manager);
@@ -424,7 +494,7 @@ UNIT_TEST(RoutingManager_RulerPreservesMeasurementOrder)
 
 UNIT_TEST(RoutingManager_OptimizeRoutePointsUsesRouteMarks)
 {
-  Framework framework(FrameworkParams(false /* m_enableDiffs */));
+  TestFramework framework;
   auto & manager = framework.GetRoutingManager();
 
   AddTestRoute(manager, {5, 4, 3, 2, 1});
@@ -441,7 +511,7 @@ UNIT_TEST(RoutingManager_OptimizeRoutePointsUsesRouteMarks)
 
 UNIT_TEST(RoutingManager_OptimizationNeverIncreasesRouteLength)
 {
-  Framework framework(FrameworkParams(false /* m_enableDiffs */));
+  TestFramework framework;
   auto & manager = framework.GetRoutingManager();
 
   RouteMarkData start;
@@ -484,7 +554,7 @@ UNIT_TEST(RoutingManager_OptimizationNeverIncreasesRouteLength)
 
 UNIT_TEST(RoutingManager_ManualEditsAndNextAddPreserveExistingOrder)
 {
-  Framework framework(FrameworkParams(false /* m_enableDiffs */));
+  TestFramework framework;
   auto & manager = framework.GetRoutingManager();
 
   AddTestRoute(manager, {5, 4, 3, 2, 1});
@@ -505,7 +575,7 @@ UNIT_TEST(RoutingManager_SaveLoadKeepsVisibleOrder)
 {
   for (bool const enabled : {false, true})
   {
-    WithSavedRoute([enabled](RoutingManager & manager, BookmarkManager &, TestGuiThread & guiThread)
+    WithSavedRoute([enabled](RoutingManager & manager, BookmarkManager &, TestGuiThread &)
     {
       std::vector<double> const original = {5, 4, 3, 2, 1};
       AddTestRoute(manager, original);
@@ -514,9 +584,8 @@ UNIT_TEST(RoutingManager_SaveLoadKeepsVisibleOrder)
       manager.MoveRoutePoint(1, 4);
       auto const displayed = GetStopCoordinates(manager);
       manager.SaveRoutePoints();
-      WaitForFileThread();
       manager.RemoveRoutePoints();
-      TEST(LoadRoutePoints(manager, guiThread), ());
+      TEST(manager.LoadRoutePoints(), ());
       TEST_EQUAL(GetStopCoordinates(manager), displayed, ());
     });
   }
@@ -524,7 +593,7 @@ UNIT_TEST(RoutingManager_SaveLoadKeepsVisibleOrder)
 
 UNIT_TEST(RoutingManager_UpdatingMyPositionKeepsAppendOrder)
 {
-  Framework framework(FrameworkParams(false /* m_enableDiffs */));
+  TestFramework framework;
   auto & manager = framework.GetRoutingManager();
 
   AddTestRoute(manager, {4, 3, 2});
@@ -555,7 +624,7 @@ UNIT_TEST(RoutingManager_ReplaceStopWithMyPositionKeepsSlot)
   for (auto const & c : {Case{RouteMarkType::Start, 1, {5, 3}, 1, 10}, Case{RouteMarkType::Start, 0, {2, 3}, 5, 10},
                          Case{RouteMarkType::Finish, 2, {1, 2}, -1, 5}})
   {
-    Framework framework(FrameworkParams(false /* m_enableDiffs */));
+    TestFramework framework;
     auto & manager = framework.GetRoutingManager();
 
     AddTestRoute(manager, {1, 2, 3});
@@ -579,7 +648,7 @@ UNIT_TEST(RoutingManager_ReplaceStopWithMyPositionKeepsSlot)
 
 UNIT_TEST(RoutingManager_AddAppendsRegardlessOfSuppliedIndex)
 {
-  Framework framework(FrameworkParams(false /* m_enableDiffs */));
+  TestFramework framework;
   auto & manager = framework.GetRoutingManager();
 
   AddTestRoute(manager, {4, 2});
@@ -596,7 +665,7 @@ UNIT_TEST(RoutingManager_NewStopInsertionUsesRouteEndpointsAndPreservesPassedSto
 {
   for (bool const passed : {false, true})
   {
-    Framework framework(FrameworkParams(false /* m_enableDiffs */));
+    TestFramework framework;
     auto & manager = framework.GetRoutingManager();
     auto & bookmarks = framework.GetBookmarkManager();
 
@@ -622,7 +691,7 @@ UNIT_TEST(RoutingManager_NewStopInsertionUsesRouteEndpointsAndPreservesPassedSto
 
 UNIT_TEST(RoutingManager_AddingEndpointDoesNotReorderStops)
 {
-  Framework framework(FrameworkParams(false /* m_enableDiffs */));
+  TestFramework framework;
   auto & manager = framework.GetRoutingManager();
 
   auto start = MakeRoutePointOnXAxis(RouteMarkType::Start, 0, -1.0);
@@ -642,7 +711,7 @@ UNIT_TEST(RoutingManager_AddingEndpointDoesNotReorderStops)
 
 UNIT_TEST(RoutingManager_ReplacementAtCapacityKeepsSlot)
 {
-  Framework framework(FrameworkParams(false /* m_enableDiffs */));
+  TestFramework framework;
   auto & manager = framework.GetRoutingManager();
   auto & bookmarks = framework.GetBookmarkManager();
 
@@ -676,7 +745,7 @@ UNIT_TEST(RoutingManager_ReplacementAtCapacityKeepsSlot)
 
 UNIT_TEST(RoutingManager_ReplacingPassedStopMakesItPending)
 {
-  Framework framework(FrameworkParams(false /* m_enableDiffs */));
+  TestFramework framework;
   auto & manager = framework.GetRoutingManager();
   auto & bookmarks = framework.GetBookmarkManager();
 
@@ -702,7 +771,7 @@ UNIT_TEST(RoutingManager_ReplacingPassedStopMakesItPending)
 
 UNIT_TEST(RoutingManager_AddingOptimizedStopAfterPassedStopReplacement)
 {
-  Framework framework(FrameworkParams(false /* m_enableDiffs */));
+  TestFramework framework;
   auto & manager = framework.GetRoutingManager();
   auto & bookmarks = framework.GetBookmarkManager();
 
@@ -725,7 +794,7 @@ UNIT_TEST(RoutingManager_AddingOptimizedStopAfterPassedStopReplacement)
 
 UNIT_TEST(RoutingManager_ReplaceMissingStopAddsNormally)
 {
-  Framework framework(FrameworkParams(false /* m_enableDiffs */));
+  TestFramework framework;
   auto & manager = framework.GetRoutingManager();
 
   AddTestRoute(manager, {1, 2});
@@ -738,7 +807,7 @@ UNIT_TEST(RoutingManager_EndpointReplacementDoesNotOptimize)
 {
   for (auto const type : {RouteMarkType::Start, RouteMarkType::Finish})
   {
-    Framework framework(FrameworkParams(false /* m_enableDiffs */));
+    TestFramework framework;
     auto & manager = framework.GetRoutingManager();
 
     AddTestRoute(manager, {5, 4, 3, 2, 1});
@@ -772,9 +841,68 @@ UNIT_TEST(RoutingManager_SaveLoadRoutePointsRestoresMyPosition)
   TestSavedRouteOrder(true /* myPositionStart */, 0 /* passedStops */, true /* hasCurrentPosition */);
 }
 
+UNIT_TEST(RoutingManager_BuildKeepsResolvedMyPosition)
+{
+  for (auto const type : {RouteMarkType::Start, RouteMarkType::Intermediate, RouteMarkType::Finish})
+  {
+    WithSavedRoute([type](RoutingManager & manager, BookmarkManager & bookmarks, TestGuiThread & guiThread)
+    {
+      manager.SetRouter(routing::RouterType::Ruler);
+      manager.Init(std::make_shared<routing::NumMwmIds>());
+      size_t movingIndex = 0;
+      for (size_t i = 0;
+           auto const pointType : {RouteMarkType::Start, RouteMarkType::Intermediate, RouteMarkType::Finish})
+      {
+        auto point = MakeRoutePoint(pointType, 0, 0.001 * ++i);
+        point.m_isMyPosition = pointType == type;
+        if (point.m_isMyPosition)
+          movingIndex = i - 1;
+        manager.AddRoutePoint(std::move(point), false /* optimize */);
+      }
+      m2::PointD const calculationPosition(0.004, 0.004);
+      bookmarks.MyPositionMark().SetUserPosition(calculationPosition, true /* hasPosition */);
+
+      bool built = false;
+      manager.SetRouteBuildingListener([&](routing::RouterResultCode code, storage::CountriesSet const &)
+      {
+        TEST_EQUAL(code, routing::RouterResultCode::NoError, ());
+        built = true;
+      });
+      manager.BuildRoute();
+      guiThread.RunUntil([&] { return built; });
+      TEST(manager.IsRouteValid(), ());
+
+      m2::PointD const rebuildPosition(0.008, 0.008);
+      bookmarks.MyPositionMark().SetUserPosition(rebuildPosition, true /* hasPosition */);
+      auto const points = manager.GetRoutePoints();
+      TEST_EQUAL(points[movingIndex].m_position, calculationPosition, ());
+      TEST_EQUAL(RoutePointsLayout(bookmarks).GetRoutePoint(type)->GetPivot(), calculationPosition, ());
+      TEST(points[movingIndex].m_isMyPosition, ());
+
+      built = false;
+      manager.BuildRoute();
+      guiThread.RunUntil([&] { return built; });
+      TEST(manager.IsRouteValid(), ());
+      TEST_EQUAL(manager.GetRoutePoints()[movingIndex].m_position, rebuildPosition, ());
+      TEST_EQUAL(RoutePointsLayout(bookmarks).GetRoutePoint(type)->GetPivot(), rebuildPosition, ());
+      TEST(manager.GetRoutePoints()[movingIndex].m_isMyPosition, ());
+
+      bookmarks.MyPositionMark().SetUserPosition({0.012, 0.012}, true /* hasPosition */);
+      // A saved start follows the live position on restart; intermediate and finish points are fixed.
+      if (type != RouteMarkType::Start)
+      {
+        manager.SaveRoutePoints();
+        manager.CloseRouting(true /* removeRoutePoints */);
+        TEST(manager.LoadRoutePoints(), ());
+        TEST_EQUAL(manager.GetRoutePoints()[movingIndex].m_position, rebuildPosition, ());
+      }
+    });
+  }
+}
+
 UNIT_TEST(RoutingManager_ContinueRouteToPointAtLimitKeepsFinish)
 {
-  Framework framework(FrameworkParams(false /* m_enableDiffs */));
+  TestFramework framework;
   auto & routingManager = framework.GetRoutingManager();
 
   FillRouteToLimit(routingManager);
@@ -797,7 +925,7 @@ UNIT_TEST(RoutingManager_ContinueRouteToPointAtLimitKeepsFinish)
 
 UNIT_TEST(RoutingManager_AddRoutePointAtLimitReportsFailure)
 {
-  Framework framework(FrameworkParams(false /* m_enableDiffs */));
+  TestFramework framework;
   auto & routingManager = framework.GetRoutingManager();
 
   FillRouteToLimit(routingManager);
@@ -817,7 +945,7 @@ UNIT_TEST(RoutingManager_AddRoutePointAtLimitReportsFailure)
 // standing in the slot before adding. Pin that: at the limit only a new intermediate point can be rejected.
 UNIT_TEST(RoutingManager_ReplaceStartAndFinishAtLimitSucceeds)
 {
-  Framework framework(FrameworkParams(false /* m_enableDiffs */));
+  TestFramework framework;
   auto & routingManager = framework.GetRoutingManager();
 
   FillRouteToLimit(routingManager);
@@ -838,7 +966,7 @@ UNIT_TEST(RoutingManager_ReplaceStartAndFinishAtLimitSucceeds)
 // the latter must return false without mutating the (empty) layout.
 UNIT_TEST(RoutingManager_ContinueRouteToPointWithoutFinishFailsCleanly)
 {
-  Framework framework(FrameworkParams(false /* m_enableDiffs */));
+  TestFramework framework;
   auto & routingManager = framework.GetRoutingManager();
 
   TEST_EQUAL(routingManager.GetRoutePointsCount(), 0, ());
@@ -850,7 +978,7 @@ UNIT_TEST(RoutingManager_ContinueRouteToPointWithoutFinishFailsCleanly)
 
 UNIT_TEST(RoutingManager_OptimizeRoutePointsPreservesPassedStops)
 {
-  Framework framework(FrameworkParams(false /* m_enableDiffs */));
+  TestFramework framework;
   auto & routingManager = framework.GetRoutingManager();
   auto & bookmarks = framework.GetBookmarkManager();
 
@@ -952,8 +1080,7 @@ UNIT_TEST(RoutingManager_RebuildClearsUnavailableAlternatives)
   session.SetRoutingCallbacks([&built](routing::RoutesResult const &, routing::RouterResultCode) { built = true; },
                               nullptr, nullptr, nullptr);
   session.BuildRoute(routing::Checkpoints({1, 2}, {5, 6}), routing::RouterDelegate::kNoTimeout);
-  while (!built)
-    guiThread->RunNext();
+  guiThread->RunUntil([&] { return built; });
   TEST(session.SwapActiveAlternative(1), ());
   {
     auto edit = bookmarks.GetEditSession();
@@ -975,16 +1102,331 @@ UNIT_TEST(RoutingManager_RebuildClearsUnavailableAlternatives)
     TEST_EQUAL(result.GetActive().GetDiffMidpoint(), std::optional<m2::PointD>({2, 5}),
                ("The selected route must be retained."));
   });
-  while (!failed)
-    guiThread->RunNext();
+  guiThread->RunUntil([&] { return failed; });
   TEST(bookmarks.GetUserMarkIds(UserMark::Type::ROUTE_ALT).empty(), ());
 
   bool recovered = false;
   session.RebuildRoute({1, 2}, [&recovered](routing::RoutesResult const &, routing::RouterResultCode) {
     recovered = true;
   }, nullptr, nullptr, routing::RouterDelegate::kNoTimeout, routing::SessionState::RouteRebuilding, false);
-  while (!recovered)
-    guiThread->RunNext();
+  guiThread->RunUntil([&] { return recovered; });
   TEST(session.SwapActiveAlternative(1), ("Fresh alternatives must become selectable."));
+}
+
+// Stop names need no subtitle; only endpoint names filter unnamed-pin placeholders.
+UNIT_TEST(RoutingManager_SaveRouteKeepsStopNames)
+{
+  WithSavedRoute([](RoutingManager & routingManager, BookmarkManager & bmManager, TestGuiThread & guiThread)
+  {
+    // Also makes the category saving synchronous: no File-thread write outlives the scoped dir.
+    bmManager.EnableTestMode(true);
+    SCOPE_GUARD(restoreTestMode, [&] { bmManager.EnableTestMode(false); });
+
+    // The Ruler router builds a real route deterministically, with no map data at all.
+    routingManager.SetRouter(routing::RouterType::Ruler);
+    routingManager.Init(std::make_shared<routing::NumMwmIds>());
+
+    auto start = MakeRoutePoint(RouteMarkType::Start, 0, 0.0);
+    start.m_title = "Dropped pin";  // An unnamed tapped spot: a placeholder title, no subtitle.
+    routingManager.AddRoutePoint(std::move(start), false /* optimize */);
+
+    std::vector<kml::TrackStopData> const expectedStops = {{{0.0007, 0.0007}, "Calais"}, {{0.0004, 0.0004}, ""}};
+    for (size_t i = 0; i < expectedStops.size(); ++i)
+    {
+      auto stop = MakeRoutePoint(RouteMarkType::Intermediate, i, expectedStops[i].m_point.x);
+      stop.m_title = expectedStops[i].m_name;
+      stop.m_isMyPosition = i == 1;
+      if (stop.m_isMyPosition)
+        stop.m_position = {0.0003, 0.0003};
+      routingManager.AddRoutePoint(std::move(stop), false /* optimize */);
+    }
+    bmManager.MyPositionMark().SetUserPosition(expectedStops.back().m_point, true /* hasPosition */);
+
+    auto finish = MakeRoutePoint(RouteMarkType::Finish, 0, 0.001);
+    finish.m_title = "Paris";
+    finish.m_subTitle = "City";
+    routingManager.AddRoutePoint(std::move(finish), false /* optimize */);
+
+    bool built = false;
+    routingManager.SetRouteBuildingListener([&](routing::RouterResultCode code, storage::CountriesSet const &)
+    {
+      TEST_EQUAL(code, routing::RouterResultCode::NoError, ());
+      built = true;
+    });
+    routingManager.BuildRoute();
+    guiThread.RunUntil([&] { return built; });
+    TEST(routingManager.IsRouteValid(), ());
+
+    // Save the fix used by the build, even if the user moved again before saving.
+    bmManager.MyPositionMark().SetUserPosition({0.0008, 0.0008}, true /* hasPosition */);
+
+    auto const trackId = routingManager.SaveRoute();
+    TEST_NOT_EQUAL(trackId, kml::kInvalidTrackId, ());
+    auto const * track = bmManager.GetTrack(trackId);
+    TEST(track != nullptr, ());
+    // The from/to names keep the subtitle guard: the start placeholder is filtered out.
+    TEST_EQUAL(track->GetName(), "Paris", ());
+    TEST_EQUAL(track->GetData().m_routerType, "ruler", ());
+    TEST_EQUAL(track->GetData().m_stops, expectedStops, ());
+  });
+}
+
+UNIT_TEST(RoutingManager_RecoveryOperationsCompleteBeforeReturning)
+{
+  WithSavedRoute([](RoutingManager & manager, BookmarkManager &, TestGuiThread &)
+  {
+    manager.AddRoutePoint(MakeRoutePoint(RouteMarkType::Start, 0, 1), false);
+    manager.AddRoutePoint(MakeRoutePoint(RouteMarkType::Finish, 0, 2), false);
+    manager.SaveRoutePoints();
+    TEST(manager.HasSavedRoutePoints(), ());
+    manager.RemoveRoutePoints();
+    TEST(manager.LoadRoutePoints(), ());
+    TEST_EQUAL(manager.GetRoutePointsCount(), 2, ());
+    TEST(!manager.HasSavedRoutePoints(), ());
+
+    manager.SaveRoutePoints();
+    manager.DeleteSavedRoutePoints();
+    TEST(!manager.HasSavedRoutePoints(), ());
+    manager.RemoveRoutePoints();
+    TEST(!manager.LoadRoutePoints(), ());
+    TEST_EQUAL(manager.GetRoutePointsCount(), 0, ());
+  });
+}
+
+UNIT_TEST(RoutingManager_RecoveryDoesNotReplaceANewItinerary)
+{
+  WithSavedRoute([](RoutingManager & manager, BookmarkManager &, TestGuiThread &)
+  {
+    manager.AddRoutePoint(MakeRoutePoint(RouteMarkType::Start, 0, 1), false);
+    manager.AddRoutePoint(MakeRoutePoint(RouteMarkType::Finish, 0, 2), false);
+    manager.SaveRoutePoints();
+    manager.RemoveRoutePoints();
+    manager.AddRoutePoint(MakeRoutePoint(RouteMarkType::Start, 0, 3), false);
+    manager.AddRoutePoint(MakeRoutePoint(RouteMarkType::Finish, 0, 4), false);
+    TEST(!manager.LoadRoutePoints(), ());
+    auto const points = manager.GetRoutePoints();
+    TEST_EQUAL(points.size(), 2, ());
+    TEST_EQUAL(points.front().m_position, m2::PointD(3, 3), ());
+    TEST_EQUAL(points.back().m_position, m2::PointD(4, 4), ());
+    TEST(manager.HasSavedRoutePoints(), ());
+    manager.DeleteSavedRoutePoints();
+    manager.CloseRouting(true);
+    TEST(!manager.LoadRoutePoints(), ());
+    TEST_EQUAL(manager.GetRoutePointsCount(), 0, ());
+  });
+}
+
+UNIT_TEST(RoutingManager_PartialAndFinishedRoutesDiscardRecovery)
+{
+  WithSavedRoute([](RoutingManager & manager, BookmarkManager &, TestGuiThread &)
+  {
+    manager.AddRoutePoint(MakeRoutePoint(RouteMarkType::Start, 0, 1), false);
+    manager.AddRoutePoint(MakeRoutePoint(RouteMarkType::Finish, 0, 2), false);
+    manager.SaveRoutePoints();
+    manager.RemoveRoutePoint(RouteMarkType::Finish);
+    manager.SaveRoutePoints();
+    TEST(!manager.HasSavedRoutePoints(), ());
+
+    manager.AddRoutePoint(MakeRoutePoint(RouteMarkType::Finish, 0, 2), false);
+    manager.SaveRoutePoints();
+    TEST(manager.HasSavedRoutePoints(), ());
+    manager.OnRoutePointPassed(RouteMarkType::Finish, 0);
+    TEST(!manager.HasSavedRoutePoints(), ());
+  });
+}
+
+UNIT_TEST(RoutingManager_RecoveryWhileActivePreservesTheSnapshot)
+{
+  WithSavedRoute([](RoutingManager & manager, BookmarkManager &, TestGuiThread & gui)
+  {
+    manager.RoutingSession().SetRouter(std::make_unique<routing::RulerRouter>(), nullptr);
+    manager.AddRoutePoint(MakeRoutePoint(RouteMarkType::Start, 0, 1), false);
+    manager.AddRoutePoint(MakeRoutePoint(RouteMarkType::Finish, 0, 2), false);
+    bool built = false;
+    manager.SetRouteBuildingListener([&](routing::RouterResultCode code, storage::CountriesSet const &)
+    {
+      TEST(code == routing::RouterResultCode::NoError, ());
+      built = true;
+    });
+    manager.BuildRoute();
+    gui.RunUntil([&] { return built; });
+    TEST(manager.RoutingSession().EnableFollowMode(), ());
+    manager.SaveRoutePoints();
+    manager.RemoveRoutePoints();
+    TEST(manager.IsRoutingActive(), ("Point edits do not retire the followed session."));
+    TEST(!manager.LoadRoutePoints(), ());
+    TEST_EQUAL(manager.GetRoutePointsCount(), 0, ());
+    TEST(manager.HasSavedRoutePoints(), ());
+    manager.CloseRouting(true);
+    TEST(manager.LoadRoutePoints(), ());
+    TEST_EQUAL(manager.GetRoutePointsCount(), 2, ());
+    TEST(!manager.HasSavedRoutePoints(), ());
+  });
+}
+
+UNIT_TEST(RoutingManager_ValidationObserverCanStartANewBuild)
+{
+  WithSavedRoute([](RoutingManager & manager, BookmarkManager &, TestGuiThread & gui)
+  {
+    manager.RoutingSession().SetRouter(std::make_unique<routing::RulerRouter>(), nullptr);
+    bool requested = false;
+    bool built = false;
+    manager.SetRouteBuildingListener([&](routing::RouterResultCode code, storage::CountriesSet const &)
+    {
+      if (!requested)
+      {
+        TEST(code == routing::RouterResultCode::Cancelled, ());
+        TEST(!manager.IsRoutingActive(), ());
+        requested = true;
+        manager.AddRoutePoint(MakeRoutePoint(RouteMarkType::Start, 0, 1), false);
+        manager.AddRoutePoint(MakeRoutePoint(RouteMarkType::Finish, 0, 2), false);
+        manager.BuildRoute();
+      }
+      else
+      {
+        TEST(code == routing::RouterResultCode::NoError, ());
+        built = true;
+      }
+    });
+    manager.BuildRoute();
+    TEST(requested, ());
+    TEST(manager.IsRouteBuilding(), ());
+    gui.RunUntil([&] { return built; });
+    TEST(manager.IsRouteBuilt(), ());
+  });
+}
+
+UNIT_TEST(RoutingManager_CheckpointPassUpdatesRecoveryBeforeReturning)
+{
+  WithSavedRoute([](RoutingManager & manager, BookmarkManager &, TestGuiThread & gui)
+  {
+    manager.RoutingSession().SetRouter(std::make_unique<routing::RulerRouter>(), nullptr);
+    manager.AddRoutePoint(MakeRoutePoint(RouteMarkType::Start, 0, 1), false);
+    manager.AddRoutePoint(MakeRoutePoint(RouteMarkType::Finish, 0, 2), false);
+    manager.SaveRoutePoints();
+    TEST(manager.HasSavedRoutePoints(), ());
+    bool built = false;
+    manager.SetRouteBuildingListener([&](routing::RouterResultCode code, storage::CountriesSet const &)
+    {
+      TEST(code == routing::RouterResultCode::NoError, ());
+      built = true;
+    });
+    manager.BuildRoute();
+    gui.RunUntil([&] { return built; });
+    auto & session = manager.RoutingSession();
+    TEST(session.EnableFollowMode(), ());
+    location::GpsInfo info;
+    info.m_longitude = 2;
+    info.m_latitude = mercator::YToLat(2);
+    info.m_horizontalAccuracy = 1;
+    session.OnLocationPositionChanged(info);
+    TEST(session.IsFinished(), ());
+    TEST(manager.GetRoutePoints().back().m_isPassed, ());
+    TEST(!manager.HasSavedRoutePoints(), ());
+  });
+}
+
+UNIT_TEST(RoutingManager_RemovedCheckpointDoesNotUpdateRecovery)
+{
+  WithSavedRoute([](RoutingManager & manager, BookmarkManager &, TestGuiThread & gui)
+  {
+    manager.RoutingSession().SetRouter(std::make_unique<routing::RulerRouter>(), nullptr);
+    manager.AddRoutePoint(MakeRoutePoint(RouteMarkType::Start, 0, 1), false);
+    manager.AddRoutePoint(MakeRoutePoint(RouteMarkType::Finish, 0, 2), false);
+    bool built = false;
+    manager.SetRouteBuildingListener([&](routing::RouterResultCode code, storage::CountriesSet const &)
+    {
+      TEST(code == routing::RouterResultCode::NoError, ());
+      built = true;
+    });
+    manager.BuildRoute();
+    gui.RunUntil([&] { return built; });
+    auto & session = manager.RoutingSession();
+    TEST(session.EnableFollowMode(), ());
+    manager.SaveRoutePoints();
+    manager.RemoveRoutePoint(RouteMarkType::Finish);
+    TEST(session.IsFollowing(), ("Editing marks does not reset the session."));
+
+    location::GpsInfo info;
+    info.m_longitude = 2;
+    info.m_latitude = mercator::YToLat(2);
+    info.m_horizontalAccuracy = 1;
+    session.OnLocationPositionChanged(info);
+    TEST(session.IsFinished(), ());
+    TEST_EQUAL(manager.GetRoutePointsCount(), 1, ());
+    TEST(!manager.GetRoutePoints().front().m_isPassed, ());
+    TEST(manager.HasSavedRoutePoints(), ("A removed checkpoint must not save an unrelated layout."));
+  });
+}
+
+UNIT_TEST(RoutingManager_RebuildAfterEditingNavigationRetiresOldCheckpoints)
+{
+  WithSavedRoute([](RoutingManager & manager, BookmarkManager &, TestGuiThread & gui)
+  {
+    manager.RoutingSession().SetRouter(std::make_unique<routing::RulerRouter>(), nullptr);
+    manager.AddRoutePoint(MakeRoutePoint(RouteMarkType::Start, 0, 1), false);
+    manager.AddRoutePoint(MakeRoutePoint(RouteMarkType::Intermediate, 0, 2), false);
+    manager.AddRoutePoint(MakeRoutePoint(RouteMarkType::Finish, 0, 3), false);
+    bool built = false;
+    manager.SetRouteBuildingListener([&](routing::RouterResultCode code, storage::CountriesSet const &)
+    {
+      TEST(code == routing::RouterResultCode::NoError, ());
+      built = true;
+    });
+    manager.BuildRoute();
+    gui.RunUntil([&] { return built; });
+    auto & session = manager.RoutingSession();
+    TEST(session.EnableFollowMode(), ());
+
+    manager.RemoveRoutePoint(RouteMarkType::Intermediate, 0);
+    built = false;
+    manager.BuildRoute();
+    TEST(!session.IsFollowing(), ());
+    location::GpsInfo info;
+    info.m_longitude = 2;
+    info.m_latitude = mercator::YToLat(2);
+    info.m_horizontalAccuracy = 1;
+    manager.CheckLocationForRouting(info);
+    TEST(manager.IsRouteBuilding(), ());
+    TEST(!manager.GetRoutePoints().back().m_isPassed, ());
+    gui.RunUntil([&] { return built; });
+
+    TEST(session.EnableFollowMode(), ());
+    manager.SaveRoutePoints();
+    manager.CheckLocationForRouting(info);
+    TEST(!session.IsFinished(), ());
+    TEST(!manager.GetRoutePoints().back().m_isPassed, ());
+    info.m_longitude = 3;
+    info.m_latitude = mercator::YToLat(3);
+    manager.CheckLocationForRouting(info);
+    TEST(session.IsFinished(), ());
+    TEST(manager.GetRoutePoints().back().m_isPassed, ());
+    TEST(!manager.HasSavedRoutePoints(), ());
+  });
+}
+
+UNIT_TEST(RoutingManager_SaveRoutePreservesSingleSegmentGeometry)
+{
+  WithSavedRoute([](RoutingManager & manager, BookmarkManager & bookmarks, TestGuiThread &)
+  {
+    geometry::PointWithAltitude const start({0.0, 0.0}, 100);
+    geometry::PointWithAltitude const finish({0.001, 0.0}, 110);
+    auto const id = SaveSingleSegmentRoute(manager, bookmarks, finish);
+    TEST_NOT_EQUAL(id, kml::kInvalidTrackId, ());
+    auto const * track = bookmarks.GetTrack(id);
+    TEST(track != nullptr, ());
+    TEST_EQUAL(track->GetData().m_geometry.m_lines.size(), 1, ());
+    TEST_EQUAL(track->GetGeometry(), (kml::TrackGeometry{start, finish}), ());
+    TEST_EQUAL(track->GetData().m_routerType, "ruler", ());
+  });
+}
+
+UNIT_TEST(RoutingManager_SaveRouteRejectsCollapsedGeometry)
+{
+  WithSavedRoute([](RoutingManager & manager, BookmarkManager & bookmarks, TestGuiThread &)
+  {
+    geometry::PointWithAltitude const finish({1e-7, 0.0}, 100);
+    TEST_EQUAL(SaveSingleSegmentRoute(manager, bookmarks, finish), kml::kInvalidTrackId, ());
+  });
 }
 }  // namespace routing_manager_tests

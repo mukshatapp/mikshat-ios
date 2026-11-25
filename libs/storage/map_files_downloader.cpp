@@ -5,6 +5,7 @@
 #include "platform/downloader_utils.hpp"
 #include "platform/http_client.hpp"
 #include "platform/locale.hpp"
+#include "platform/map_compatibility.hpp"
 #include "platform/platform.hpp"
 #include "platform/products.hpp"
 #include "platform/servers_list.hpp"
@@ -15,6 +16,10 @@
 #include "base/assert.hpp"
 #include "base/logging.hpp"
 #include "base/string_utils.hpp"
+
+#include "std/target_os.hpp"
+
+#include "defines.hpp"
 
 namespace storage
 {
@@ -62,7 +67,8 @@ void MapFilesDownloader::DownloadMapFile(QueuedCountry && queuedCountry)
     return;
   }
 
-  m_pendingRequests.Append(std::move(queuedCountry));
+  // Nothing is downloaded until the servers are known.
+  m_pendingRequests.Append(std::move(queuedCountry), false /* preserveFront */);
 
   EnsureMetaConfigReady([this, alive = m_alive]()
   {
@@ -88,11 +94,14 @@ void MapFilesDownloader::RunMetaConfigAsync()
     settings::Update(metaConfig.settings);
     products::ProductsSettings::Instance().Update(std::move(metaConfig.productsConfig));
 
-    GetPlatform().RunTask(Platform::Thread::Gui, [this, alive, metaConfigGeneration, servers = metaConfig.servers]()
+    GetPlatform().RunTask(Platform::Thread::Gui,
+                          [this, alive, metaConfigGeneration, servers = std::move(metaConfig.servers),
+                           terrainServers = std::move(metaConfig.terrainServers)]() mutable
     {
       if (!alive->load(std::memory_order_acquire) || metaConfigGeneration != m_metaConfigGeneration)
         return;
       m_serversList = std::move(servers);
+      m_terrainServersList = std::move(terrainServers);
 
       // Drain all queued waiters (from DownloadMapFile and DownloadAsString).
       auto waiters = std::move(m_metaConfigWaiters);
@@ -191,6 +200,7 @@ void MapFilesDownloader::SetServersList(ServersList const & serversList)
   ++m_metaConfigGeneration;
 
   m_serversList = serversList;
+  m_terrainServersList = serversList;
   m_isMetaConfigRequested = false;
 
   if (m_serversList.empty())
@@ -222,9 +232,10 @@ bool MapFilesDownloader::IsDownloadingAllowed() const
 
 std::vector<std::string> MapFilesDownloader::MakeUrlList(std::string const & relativeUrl) const
 {
+  auto const & servers = relativeUrl.starts_with(TERRAIN_DIR "/") ? m_terrainServersList : m_serversList;
   std::vector<std::string> urls;
-  urls.reserve(m_serversList.size());
-  for (auto const & server : m_serversList)
+  urls.reserve(servers.size());
+  for (auto const & server : servers)
     urls.emplace_back(url::Join(server, relativeUrl));
 
   return urls;
@@ -241,6 +252,18 @@ std::string GetAcceptLanguage()
   return locale.m_language + "-" + locale.m_country;
 }
 
+platform::HttpClient MapFilesDownloader::MakeMetaConfigRequest(std::string const & url) const
+{
+  platform::HttpClient request(url);
+  request.SetRawHeader("X-OM-DataVersion", std::to_string(m_dataVersion));
+  if (m_terrainDataVersion > 0)
+    request.SetRawHeader("X-OM-TerrainDataVersion", std::to_string(m_terrainDataVersion));
+  request.SetRawHeader("X-OM-AppVersion", std::string(platform::map_compatibility::kEngineRelease) + '-' + OMIM_OS_NAME);
+  request.SetRawHeader("Accept-Language", GetAcceptLanguage());
+  request.SetTimeout(10.0);
+  return request;
+}
+
 downloader::MetaConfig MapFilesDownloader::LoadMetaConfig() const
 {
   Platform & pl = GetPlatform();
@@ -249,17 +272,7 @@ downloader::MetaConfig MapFilesDownloader::LoadMetaConfig() const
   std::optional<downloader::MetaConfig> metaConfig;
   if (!metaServerUrl.empty())
   {
-    platform::HttpClient request(metaServerUrl);
-    request.SetRawHeader("X-OM-DataVersion", std::to_string(m_dataVersion));
-
-    request.SetRawHeader("X-OM-AppVersion", pl.Version());
-    request.SetRawHeader("Accept-Language", GetAcceptLanguage());
-
-    /// @DebugNote Uncomment to check donates flow.
-    // request.SetRawHeader("X-OM-AppVersion", "2025.09.19-6-ios");  // "2025.09.15-18-FDroid"
-    // request.SetRawHeader("Accept-Language", "de-DE");
-
-    request.SetTimeout(10.0);  // timeout in seconds
+    auto request = MakeMetaConfigRequest(metaServerUrl);
 
     std::string httpResult;
     request.RunHttpRequest(httpResult);

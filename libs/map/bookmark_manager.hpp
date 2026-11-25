@@ -380,6 +380,7 @@ public:
   void FilterInvalidTracks(kml::TrackIdCollection & tracks) const;
 
   void EnableTestMode(bool enable);
+  df::UserMarksProvider const & GetDrapeChangesForTests() const { return m_drapeChangesTracker; }
   bool SaveBookmarkCategory(kml::MarkGroupId groupId);
   bool SaveBookmarkCategory(kml::MarkGroupId groupId, Writer & writer, FileType fileType) const;
 
@@ -436,7 +437,8 @@ public:
   std::string GenerateTrackRecordingName() const;
   dp::Color GenerateTrackRecordingColor() const;
 
-  kml::TrackId SaveRoute(kml::TrackGeometry points, std::string const & from, std::string const & to);
+  kml::TrackId SaveRoute(kml::TrackGeometry points, std::string const & from, std::string const & to,
+                         std::vector<kml::TrackStopData> stops, std::string routerType);
 
   /// Creates a temporary track from relation data. Replaces any previous temp track.
   kml::TrackId SetTempRelationTrack(kml::TrackData && trackData);
@@ -461,6 +463,10 @@ private:
     void OnAddLine(kml::TrackId lineId);
     void OnDeleteLine(kml::TrackId lineId);
     void OnUpdateLine(kml::TrackId lineId);
+    void OnUpdateLineForRendering(kml::TrackId lineId, kml::MarkGroupId groupId);
+
+    void OnAddArea(kml::AreaId areaId);
+    void OnDeleteArea(kml::AreaId areaId);
 
     void OnAddGroup(kml::MarkGroupId groupId);
     void OnDeleteGroup(kml::MarkGroupId groupId);
@@ -496,6 +502,10 @@ private:
     kml::TrackIdSet const & GetGroupLineIds(kml::MarkGroupId groupId) const override;
     df::UserPointMark const * GetUserPointMark(kml::MarkId markId) const override;
     df::UserLineMark const * GetUserLineMark(kml::TrackId lineId) const override;
+    kml::AreaIdSet const & GetGroupAreaIds(kml::MarkGroupId groupId) const override;
+    kml::AreaIdSet const & GetCreatedAreaIds() const override { return m_createdAreas; }
+    kml::AreaIdSet const & GetRemovedAreaIds() const override { return m_removedAreas; }
+    kml::AreaData const * GetUserArea(kml::AreaId areaId) const override;
 
   private:
     void OnUpdateGroup(kml::MarkGroupId groupId);
@@ -515,6 +525,9 @@ private:
     kml::TrackIdSet m_createdLines;
     kml::TrackIdSet m_removedLines;
     kml::TrackIdSet m_updatedLines;
+
+    kml::AreaIdSet m_createdAreas;
+    kml::AreaIdSet m_removedAreas;
 
     kml::GroupIdSet m_createdGroups;
     kml::GroupIdSet m_removedGroups;
@@ -719,6 +732,7 @@ private:
   int GetTrackSelectionMarkMinZoom(kml::TrackId trackId) const;
   void SetTrackSelectionMark(kml::TrackId trackId, m2::PointD const & pt, double distance);
   void DeleteTrackSelectionMark(kml::TrackId trackId);
+  void SetTrackHighlight(kml::TrackId trackId, bool selected);
   void ResetTrackInfoMark(kml::TrackId trackId);
 
   bool IsTrackEffectivelyVisible(kml::TrackId trackId) const;

@@ -41,7 +41,6 @@ char const kMikshatBaseline[] = "mikshat-direct-baseline";
 
 @property(nonatomic) uint32_t routeManagerTransactionId;
 @property(nonatomic) BOOL canAutoAddLastLocation;
-@property(nonatomic) BOOL isAPICall;
 @property(nonatomic) BOOL isRestoreProcessCompleted;
 @property(strong, nonatomic) MWMRoutingOptions * routingOptions;
 
@@ -155,7 +154,7 @@ char const kMikshatBaseline[] = "mikshat-direct-baseline";
     return nil;
 
   auto const altitudesInfo = elevationInfo.CalculateAltitudesInfo(ElevationInfo::kDefThresholdMWM);
-  // A zero vertical range collapses the chart's Y-axis transforms, so suppress the misleading flat preview.
+  // Uniform profiles can be fallback values when elevation data is unavailable.
   if (altitudesInfo.m_maxAltitude == altitudesInfo.m_minAltitude)
     return nil;
 
@@ -514,13 +513,14 @@ char const kMikshatBaseline[] = "mikshat-direct-baseline";
   if (s_mikshatDirectActive || !startPoint || !finishPoint)
     return;
 
-  [MWMRouter setType:type];
-
-  auto router = [MWMRouter router];
-  router.isAPICall = YES;
-  [self addPoint:startPoint];
-  [self addPoint:finishPoint];
-  router.isAPICall = NO;
+  // Notify mark observers only after both endpoints have replaced the itinerary.
+  {
+    auto editSession = GetFramework().GetBookmarkManager().GetEditSession();
+    [self doStop:YES];
+    GetFramework().GetRoutingManager().SetRouter(coreRouterType(type));
+    [self addPoint:startPoint];
+    [self addPoint:finishPoint];
+  }
 
   [self rebuildWithBestRouter:NO];
 }
@@ -666,7 +666,7 @@ char const kMikshatBaseline[] = "mikshat-direct-baseline";
 
   auto startPoint = [MWMRouter startPoint];
   if (!startPoint || !startPoint.isMyPosition)
-    dispatch_async(dispatch_get_main_queue(), ^{ [MWMRouter disableFollowMode]; });
+    [MWMRouter disableFollowMode];
 
   [[MWMMapViewControlsManager manager] onRouteReady:hasWarnings];
   [self updateFollowingInfo];
@@ -743,7 +743,7 @@ char const kMikshatBaseline[] = "mikshat-direct-baseline";
           NSMutableArray * array = [NSMutableArray arrayWithCapacity:downloadCountries.size()];
           for (auto const & cid : downloadCountries)
             [array addObject:@(cid.c_str())];
-          [[MWMStorage sharedStorage] downloadNodes:array onSuccess:onSuccess];
+          [[MWMStorage sharedStorage] downloadMaps:array onSuccess:onSuccess];
         }
         downloadCompleteBlock:^{ [MWMRouter rebuildWithBestRouter:NO]; }];
   }
@@ -789,17 +789,9 @@ char const kMikshatBaseline[] = "mikshat-direct-baseline";
   if ([MapsAppDelegate theApp].isDrapeEngineCreated)
   {
     auto & rm = GetFramework().GetRoutingManager();
-    if ([self isRoutingActive] || ![self hasSavedRoute])
-    {
-      self.router.isRestoreProcessCompleted = YES;
-      return;
-    }
-    rm.LoadRoutePoints([self](bool success)
-    {
-      if (success)
-        [self rebuildWithBestRouter:YES];
-      self.router.isRestoreProcessCompleted = YES;
-    });
+    if (rm.LoadRoutePoints())
+      [self rebuildWithBestRouter:YES];
+    self.router.isRestoreProcessCompleted = YES;
   }
   else
   {

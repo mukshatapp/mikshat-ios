@@ -28,6 +28,12 @@ namespace df
 struct TextViewParams;
 struct BuildingOutline;
 
+/// Fills the line view params from the drule (color, width, dash, cap, join).
+/// Also used by the dynamic isolines path which has no FeatureType behind the lines.
+void ExtractLineParams(drule::LineRule const & lineRule, double visScale, LineViewParams & params);
+
+void CaptionDefToFontDecl(drule::CaptionDef const * capRule, double visScale, dp::FontDecl & params);
+
 struct ApplyFeatureParams;
 
 // Extract true polygon boundaries before clipping: clipping triangles first would draw tile seams.
@@ -158,11 +164,12 @@ class ApplyLineFeatureGeometry : public BaseApplyFeature
   using TBase = BaseApplyFeature;
 
 public:
-  ApplyLineFeatureGeometry(Params const & params, FeatureType & f, RelationsDrawSettings const & relsSettings);
-  void BuildGeometry(int zoomLevel, bool isIsoline);
+  ApplyLineFeatureGeometry(Params const & params, FeatureType & f, RelationsDrawSettings const & relsSettings,
+                           bool isIsoline);
+  void BuildGeometry(int zoomLevel);
 
   bool HasGeometry() const { return m_builder.HasGeometry(); }
-  void ProcessLineRules(Stylist::LineRulesT const & lineRules, bool isIsoline);
+  void ProcessLineRules(Stylist::LineRulesT const & lineRules);
 
   std::vector<m2::SharedSpline> MoveClippedSplines() { return std::move(m_clippedSplines); }
 
@@ -172,6 +179,7 @@ private:
   RelationsDrawInfo m_relsInfo;
   ClipSplinesBuilder m_builder;
   std::vector<m2::SharedSpline> m_clippedSplines;
+  bool const m_isIsoline;
 
 #ifdef LINES_GENERATION_CALC_FILTERED_POINTS
   int m_readCount = 0;
@@ -185,9 +193,10 @@ class ApplyLineFeatureAdditional : public BaseApplyFeature
 
 public:
   ApplyLineFeatureAdditional(Params const & params, FeatureType & f, CaptionDescription const & captions,
-                             std::vector<m2::SharedSpline> && clippedSplines)
+                             std::vector<m2::SharedSpline> && clippedSplines, bool isIsoline)
     : TBase(params, f, captions)
     , m_clippedSplines(std::move(clippedSplines))
+    , m_isIsoline(isIsoline)
   {
     ASSERT(!m_clippedSplines.empty(), ());
   }
@@ -205,6 +214,7 @@ private:
                           uint32_t minDistanceInPixels, std::vector<m2::RectD> & shields);
 
   std::vector<m2::SharedSpline> m_clippedSplines;
+  bool const m_isIsoline;
   float m_captionDepth = 0.0f, m_shieldDepth = 0.0f;
   drule::CaptionDef const * m_captionRule = nullptr;
   drule::ShieldRule const * m_shieldRule = nullptr;
