@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import plistlib
 from pathlib import Path
 import re
 import tempfile
@@ -40,6 +41,30 @@ class RendererFixtureTests(unittest.TestCase):
 
 
 class RendererPlanTests(unittest.TestCase):
+    def test_production_profile_plans_cannot_replace_the_original_native_plan(self):
+        plan = {"TestConfigurations": [{"TestTargets": [
+            {"BlueprintName": "OMapsTests", "CommandLineArguments": ["-IsTests"]}]}]}
+        with tempfile.TemporaryDirectory() as directory:
+            products = Path(directory)
+            original = products / "OMaps_iphonesimulator27.0-arm64.xctestrun"
+            original.write_bytes(plistlib.dumps(plan))
+            for name in ("phone-ar", "phone-en", "tablet-ar", "tablet-en"):
+                (products / f"MikshatTitleInsets-{name}.xctestrun").write_bytes(plistlib.dumps(plan))
+            (products / "MikshatRendererRotationArabic.xctestrun").write_bytes(plistlib.dumps(plan))
+            self.assertEqual(RENDERER.original_native_plan(products)[0], original)
+            original.unlink()
+            with self.assertRaisesRegex(ValueError, "found 0"):
+                RENDERER.original_native_plan(products)
+
+    def test_two_original_native_plans_are_still_rejected(self):
+        plan = {"BlueprintName": "OMapsTests", "CommandLineArguments": ["-IsTests"]}
+        with tempfile.TemporaryDirectory() as directory:
+            products = Path(directory)
+            for name in ("OMapsOne", "OMapsTwo"):
+                (products / f"{name}.xctestrun").write_bytes(plistlib.dumps(plan))
+            with self.assertRaisesRegex(ValueError, "found 2"):
+                RENDERER.original_native_plan(products)
+
     def test_only_native_target_switches_from_hosted_to_renderer_mode(self):
         original = {"TestConfigurations": [{"TestTargets": [
             {"BlueprintName": "OMapsTests", "CommandLineArguments": ["-IsTests", "-OtherFlag", "-AppleLanguages", "(en)"]},

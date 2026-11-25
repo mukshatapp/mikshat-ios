@@ -143,13 +143,10 @@ def simctl(*arguments, check=True):
     return subprocess.run(["xcrun", "simctl", *arguments], check=check, text=True, capture_output=True, timeout=60)
 
 
-def prepare(options):
-    output = options.output_dir.resolve()
-    output.mkdir(parents=True, exist_ok=True)
-    products = options.products.resolve()
+def original_native_plan(products):
     plans = []
     for path in products.glob("*.xctestrun"):
-        if path.name.startswith("MikshatRenderer"):
+        if path.name.startswith(("MikshatRenderer", "MikshatTitleInsets-")):
             continue
         try:
             plan, targets = patch_plan(plistlib.loads(path.read_bytes()))
@@ -160,7 +157,14 @@ def prepare(options):
             raise
     if len(plans) != 1:
         raise ValueError("Expected one native OMapsTests plan, found " + str(len(plans)))
-    original, plan, targets = plans[0]
+    return plans[0]
+
+
+def prepare(options):
+    output = options.output_dir.resolve()
+    output.mkdir(parents=True, exist_ok=True)
+    products = options.products.resolve()
+    original, plan, targets = original_native_plan(products)
     target = products / "MikshatRendererRotationArabic.xctestrun"
     target.write_bytes(plistlib.dumps(plan))
 
