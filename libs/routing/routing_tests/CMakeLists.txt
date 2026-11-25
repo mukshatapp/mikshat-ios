@@ -40,6 +40,7 @@ set(SRC
   routing_preference_tests.cpp
   routing_session_test.cpp
   speed_cameras_tests.cpp
+  supplementary_maps_test.cpp
   tools.cpp
   tools.hpp
   transit_graph_tests.cpp

@@ -486,12 +486,13 @@ char const kMikshatBaseline[] = "mikshat-direct-baseline";
   if (!finishPoint)
     return;
   [self addPoint:finishPoint];
-  if ([self type] == MWMRouterTypeRuler)
+  if ([self router].canAutoAddLastLocation && ![self startPoint] && [self type] == MWMRouterTypeRuler)
   {
     if (MWMRoutePoint * start = [self mikshatUserPosition])
       [self addPoint:start];
   }
-  else if (![MWMLocationManager isLocationProhibited])
+  else if ([self router].canAutoAddLastLocation && ![self startPoint] &&
+           ![MWMLocationManager isLocationProhibited])
   {
     // Planning a car route must work from the same real arrow during weak reception,
     // even while the active-session accessor temporarily returns no fresh reading.
@@ -501,8 +502,9 @@ char const kMikshatBaseline[] = "mikshat-direct-baseline";
     if (start)
       [self addPoint:start];
   }
-  if ([self startPoint] && [self finishPoint])
-    [self rebuildWithBestRouter:bestRouter];
+  // The native prepare state keeps the chosen destination visible and lets the
+  // user select an origin when GPS is unavailable or permission was denied.
+  [self rebuildWithBestRouter:bestRouter];
 }
 
 + (void)buildApiRouteWithType:(MWMRouterType)type
@@ -528,7 +530,8 @@ char const kMikshatBaseline[] = "mikshat-direct-baseline";
   auto & rm = GetFramework().GetRoutingManager();
   // Switching from car to direct guidance must also work when the native GPS
   // accessor is temporarily empty but the map still has a valid user arrow.
-  if (!s_mikshatDirectActive && self.type == MWMRouterTypeRuler && [self router].canAutoAddLastLocation)
+  if (!s_mikshatDirectActive && self.type == MWMRouterTypeRuler &&
+      [self router].canAutoAddLastLocation && ![self startPoint])
   {
     if (MWMRoutePoint * start = [self mikshatUserPosition])
       [self addPoint:start];

@@ -367,7 +367,7 @@ jobs:
         --products build/SearchDerivedData/Build/Products
         --udid "$MIKSHAT_SIMULATOR_UDID"
         --output-dir build/search-diagnostics/renderer-rotation
-    - name: Run the same selected-page test with normal Drape and Metal enabled
+    - name: Run selected-page rotation and both vehicle route entries with normal Drape and Metal
       id: rotation-renderer-tests
       if: matrix.device == 'iPhone 16' && matrix.language == 'ar' && !endsWith(github.ref_name, '-baseline')
       timeout-minutes: 8
@@ -399,6 +399,8 @@ jobs:
           -test-timeouts-enabled YES -default-test-execution-time-allowance 120 \
           -maximum-test-execution-time-allowance 180 \
           -only-testing:OMapsTests/MikshatMapSceneLayoutTests/testSelectedPointStaysAttachedAndResponsiveWhileTheSamePageRotatesRepeatedly \
+          -only-testing:OMapsTests/MikshatVehicleRoutingEntryTests/testMapSelectionGoToBuildsVehicleRouteWithSaudiMapAndRenderer \
+          -only-testing:OMapsTests/MikshatVehicleRoutingEntryTests/testSearchSelectionGoToBuildsVehicleRouteWithSaudiMapAndRenderer \
           CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO \
           2>&1 | tee build/search-diagnostics/renderer-rotation/xcodebuild-renderer.log
     - name: Require actual Metal readiness, twelve rotations and simulator screenshots

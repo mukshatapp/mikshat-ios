@@ -25,11 +25,9 @@ NS_ASSUME_NONNULL_BEGIN
 + (void)customizeAppearance;
 + (void)customizeAppearanceForNavigationBar:(UINavigationBar *)navigationBar;
 
-// User activities and quick actions are delivered to MainSceneDelegate; their handling lives here
+// User activities are delivered to MainSceneDelegate; their handling lives here
 // because it needs the app-wide search and map plumbing.
 - (BOOL)handleUserActivity:(NSUserActivity *)userActivity NS_SWIFT_NAME(handleUserActivity(_:));
-- (void)handleShortcutItem:(UIApplicationShortcutItem *)shortcutItem
-         completionHandler:(void (^)(BOOL))completionHandler NS_SWIFT_NAME(handleShortcutItem(_:completionHandler:));
 
 - (void)showMap;
 

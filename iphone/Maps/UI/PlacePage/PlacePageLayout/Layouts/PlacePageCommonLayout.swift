@@ -35,7 +35,7 @@ class PlacePageCommonLayout: NSObject, IPlacePageLayout {
   }()
 
   private lazy var osmDescriptionViewController: UIViewController? = {
-    guard let osmDescription = placePageData.osmDescription else { return nil }
+    guard let osmDescription = PlacePageSourceMetadata.descriptionForDisplay(placePageData.osmDescription) else { return nil }
     return PlacePageExpandableDetailsSectionBuilder.buildOSMDescriptionSection(osmDescription)
   }()
 

@@ -1,5 +1,6 @@
 import importlib.util
 from pathlib import Path
+import re
 import unittest
 
 
@@ -73,6 +74,45 @@ class RendererEvidenceTests(unittest.TestCase):
         captures = self.captures()
         captures[0]["startedAt"] = 0.5
         self.assertFalse(RENDERER.verify_records(self.records(), captures)["passed"])
+
+
+class RendererNativeInventoryTests(unittest.TestCase):
+    def log(self):
+        events = []
+        for name, methods in RENDERER.CASES.items():
+            for method in methods:
+                # ObjC++ XCTest classes have no Swift module prefix.
+                prefix = "" if name == "MikshatVehicleRoutingEntryTests" else "OMapsTests."
+                case = f"-[{prefix}{name} {method}]"
+                events += [f"Test Case '{case}' started.", f"Test Case '{case}' passed (1.0 seconds)."]
+        events += ["Executed 3 tests, with 0 failures in 24.0 seconds", "** TEST EXECUTE SUCCEEDED **"]
+        return "\n".join(events) + "\n"
+
+    def test_rotation_and_both_vehicle_entry_methods_must_execute(self):
+        report = RENDERER.native_result(self.log())
+        self.assertTrue(report["passed"])
+        self.assertEqual(report["expectedTotal"], 3)
+
+    def test_matching_class_count_cannot_substitute_a_vehicle_entry_method(self):
+        method = RENDERER.CASES["MikshatVehicleRoutingEntryTests"][0]
+        report = RENDERER.native_result(self.log().replace(method, "testUnrelatedVehicleRoute"))
+        self.assertFalse(report["passed"])
+        self.assertEqual(report["missingCases"], ["MikshatVehicleRoutingEntryTests." + method])
+        self.assertEqual(report["unexpectedCases"], ["MikshatVehicleRoutingEntryTests.testUnrelatedVehicleRoute"])
+
+    def test_skips_and_repeated_execution_cannot_pass(self):
+        for log in (self.log().replace("passed (1.0 seconds).", "skipped (1.0 seconds).", 1), self.log() * 2):
+            self.assertFalse(RENDERER.native_result(log)["passed"])
+
+    def test_workflow_selects_the_exact_renderer_inventory(self):
+        workflow = (RENDERER.ROOT / ".github/workflows/mikshat-responsive-ui.yml").read_text()
+        step = workflow.split("id: rotation-renderer-tests", 1)[1].split("\n    - name:", 1)[0]
+        selected = re.findall(r"-only-testing:OMapsTests/([^/\s]+)/([^\s]+)", step)
+        expected = [(name, method) for name, methods in RENDERER.CASES.items() for method in methods]
+        self.assertCountEqual(selected, expected)
+        routing = (RENDERER.ROOT / "iphone/Maps/Tests/Core/Routing/MikshatRoutingEntryTests.mm").read_text()
+        for method in RENDERER.CASES["MikshatVehicleRoutingEntryTests"]:
+            self.assertIn("- (void)" + method, routing)
 
 
 if __name__ == "__main__":

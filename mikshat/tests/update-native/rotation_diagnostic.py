@@ -51,6 +51,21 @@ PRODUCTION_CASES = {
         "testFailedActivationRetriesOnlyMissingMaps"),
     "MikshatLocalizationTests": (
         "testSettingsAndNavigationNamesHaveBothInterfaceTranslations",),
+    "PlacePageSourceMetadataTests": (
+        "test_SourceCopyrightDescriptionIsOmitted",
+        "test_RealPlaceDescriptionsRemainUnchanged",
+        "test_VerifiedProviderWebsiteEndpointsAreOmitted",
+        "test_BusinessWebsitesAndOtherProviderPathsRemainUnchanged",
+        "test_CopyrightOmitsWholeDescriptionSectionAndPreservesPlaceData",
+        "test_SourceWebsiteRowIsAbsentAndWeatherStillWorks",
+        "test_BusinessWebsiteRowStillOpensAndCopiesOriginalURL"),
+    "MikshatRoutingEntryTests": (
+        "testMapSelectionGoToWithoutOriginKeepsDestinationAndShowsNativePrepare",
+        "testSearchSelectionGoToWithoutOriginKeepsDestinationAndShowsNativePrepare",
+        "testMapSelectionGoToBuildsInternalRulerFromExplicitOrigin",
+        "testSearchSelectionGoToBuildsInternalRulerFromExplicitOrigin"),
+    "MainSceneDelegateTests": (
+        "testHomeScreenMenuDoesNotPublishCustomQuickActions",),
     "SearchHistoryOnlyTests": (
         "test_LegacyCategoryAndInvalidIndicesOpenDirectHistoryWithoutPager",
         "test_HistorySelectionAndCoordinateDirectionTargetRemainIntact",

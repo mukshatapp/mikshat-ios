@@ -9,6 +9,7 @@ import math
 import os
 from pathlib import Path
 import plistlib
+import re
 import shutil
 import signal
 import struct
@@ -19,6 +20,12 @@ import time
 ROOT = Path(__file__).resolve().parents[3]
 BUNDLE = "com.mikshat.maps.debug"
 CASE = "testSelectedPointStaysAttachedAndResponsiveWhileTheSamePageRotatesRepeatedly"
+CASES = {
+    "MikshatMapSceneLayoutTests": (CASE,),
+    "MikshatVehicleRoutingEntryTests": (
+        "testMapSelectionGoToBuildsVehicleRouteWithSaudiMapAndRenderer",
+        "testSearchSelectionGoToBuildsVehicleRouteWithSaudiMapAndRenderer"),
+}
 FIXTURE = {
     "country": "Saudi Arabia_North",
     "version": 260714,
@@ -237,6 +244,20 @@ def verify_records(records, captures):
             "scope": "Active Metal simulator, verified Saudi map backdrop, synthetic selected point; not a physical-device or real-stream identity claim"}
 
 
+def native_result(log):
+    native = load_module("rotation_native_results", ROOT / "mikshat/tests/weather-data/verify-native-results.py")
+    native.EXPECTED_CLASSES = {name: len(methods) for name, methods in CASES.items()}
+    log = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", log)
+    result = native.analyze(log)
+    expected = {(name, method) for name, methods in CASES.items() for method in methods}
+    observed = {identity for event in native.CASE_EVENT.finditer(log)
+                if (identity := native.case_identity(event[2])) is not None}
+    result["missingCases"] = sorted(f"{name}.{method}" for name, method in expected - observed)
+    result["unexpectedCases"] = sorted(f"{name}.{method}" for name, method in observed - expected)
+    result["passed"] = result["passed"] and observed == expected
+    return result
+
+
 def verify(options):
     output = options.output_dir.resolve()
     container = Path(simctl("get_app_container", options.udid, BUNDLE, "data").stdout.strip())
@@ -247,15 +268,13 @@ def verify(options):
     captures = [entry for entry in captures if Path(entry.get("file", "")).is_file()
                 and Path(entry["file"]).read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"]
     report = verify_records(records, captures)
-    native = load_module("rotation_native_results", ROOT / "mikshat/tests/weather-data/verify-native-results.py")
-    native.EXPECTED_CLASSES = {"MikshatMapSceneLayoutTests": 1}
-    report["nativeExecution"] = native.analyze((output / "xcodebuild-renderer.log").read_text(errors="replace"))
+    report["nativeExecution"] = native_result((output / "xcodebuild-renderer.log").read_text(errors="replace"))
     report["testStepOutcome"] = options.test_outcome
     report["passed"] = report["passed"] and report["nativeExecution"]["passed"] and options.test_outcome == "success"
     (output / "summary.json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report), flush=True)
     if not report["passed"]:
-        raise SystemExit("Active Metal, the exact twelve rotations, screenshots, and one passing native case must all be established")
+        raise SystemExit("Active Metal, the exact twelve rotations, screenshots, and all three native cases must pass")
 
 
 def main():

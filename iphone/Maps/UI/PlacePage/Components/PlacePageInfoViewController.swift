@@ -125,8 +125,9 @@ class PlacePageInfoViewController: UIViewController {
     }
 
     // Strip website url only when the value is displayed, to avoid issues when it's opened or edited.
-    createLinkItem(placePageInfoData.website,
-                   displayed: placePageInfoData.website.map { stripUrl(str: $0) },
+    let website = PlacePageSourceMetadata.websiteForDisplay(placePageInfoData.website)
+    createLinkItem(website,
+                   displayed: website.map { stripUrl(str: $0) },
                    icon: UIImage(resource: .icPlacepageWebsite)) { $0.didPressWebsite() }
     createLinkItem(placePageInfoData.heritageWebsite,
                    displayed: placePageInfoData.heritageWebsite.map { stripUrl(str: $0) },

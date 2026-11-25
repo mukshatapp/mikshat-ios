@@ -24,4 +24,9 @@ final class MainSceneDelegateTests: XCTestCase {
   func testManifestDoesNotEnableMultipleScenes() throws {
     XCTAssertNotEqual(try manifest["UIApplicationSupportsMultipleScenes"] as? Bool, true)
   }
+
+  func testHomeScreenMenuDoesNotPublishCustomQuickActions() {
+    XCTAssertNil(Bundle.main.object(forInfoDictionaryKey: "UIApplicationShortcutItems"))
+    XCTAssertTrue(UIApplication.shared.shortcutItems?.isEmpty ?? true)
+  }
 }

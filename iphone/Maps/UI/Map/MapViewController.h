@@ -29,8 +29,6 @@
 
 - (void)migrateOAuthCredentials;
 
-- (void)performAction:(NSString * _Nonnull)action;
-
 - (void)openMenu;
 - (void)closeCurrentView;
 - (void)openSettings;

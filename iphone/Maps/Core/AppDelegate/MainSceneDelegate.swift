@@ -57,9 +57,6 @@ final class MainSceneDelegate: UIResponder, UIWindowSceneDelegate {
       where userActivity.activityType != NSUserActivityTypeBrowsingWeb || userActivity.webpageURL == nil {
       self.scene(scene, continue: userActivity)
     }
-    if let shortcutItem = connectionOptions.shortcutItem {
-      self.windowScene(windowScene, performActionFor: shortcutItem, completionHandler: { _ in })
-    }
   }
 
   func sceneDidDisconnect(_: UIScene) {
@@ -72,7 +69,7 @@ final class MainSceneDelegate: UIResponder, UIWindowSceneDelegate {
   // UIApplication notifications; forwarding them per scene would background the framework while
   // CarPlay keeps the app in the foreground.
 
-  // MARK: - URL / user activity / shortcut forwarding
+  // MARK: - URL / user activity forwarding
 
   func scene(_: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
     for context in URLContexts where !CarPlayService.shared.handleOpenCarPlayURL(context.url) {
@@ -82,11 +79,5 @@ final class MainSceneDelegate: UIResponder, UIWindowSceneDelegate {
 
   func scene(_: UIScene, continue userActivity: NSUserActivity) {
     _ = MapsAppDelegate.theApp().handleUserActivity(userActivity)
-  }
-
-  func windowScene(_: UIWindowScene,
-                   performActionFor shortcutItem: UIApplicationShortcutItem,
-                   completionHandler: @escaping (Bool) -> Void) {
-    MapsAppDelegate.theApp().handleShortcutItem(shortcutItem, completionHandler: completionHandler)
   }
 }

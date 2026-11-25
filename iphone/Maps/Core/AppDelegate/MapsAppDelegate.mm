@@ -146,6 +146,9 @@ using namespace osm_auth_ios;
 {
   NSLog(@"application:didFinishLaunchingWithOptions: %@", launchOptions);
 
+  // Dynamic home-screen actions survive app upgrades; clear any published by older versions.
+  application.shortcutItems = @[];
+
   [MWMSettings applyMikshatMapDefaults];
   [self observeApplicationLifecycle];
   InitLocalizedStrings();
@@ -165,15 +168,9 @@ using namespace osm_auth_ios;
     [MikshatSubscriptions start];
   }
 
-  // Launch URLs, user activities and quick actions arrive with the scene connection options in
+  // Launch URLs and user activities arrive with the scene connection options in
   // MainSceneDelegate; launchOptions carries none of them for a scene-based app.
   return YES;
-}
-
-- (void)handleShortcutItem:(UIApplicationShortcutItem *)shortcutItem completionHandler:(void (^)(BOOL))completionHandler
-{
-  [self.mapViewController performAction:shortcutItem.type];
-  completionHandler(YES);
 }
 
 - (void)runBackgroundTasks:(NSArray<BackgroundFetchTask *> * _Nonnull)tasks

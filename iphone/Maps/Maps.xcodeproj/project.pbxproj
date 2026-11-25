@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A46210000000000000000001 /* PlacePageSourceMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = A46210000000000000000002 /* PlacePageSourceMetadata.swift */; };
+		A46210000000000000000003 /* PlacePageSourceMetadataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A46210000000000000000004 /* PlacePageSourceMetadataTests.swift */; };
+		A46210000000000000000005 /* MikshatRoutingEntryTests.mm in Sources */ = {isa = PBXBuildFile; fileRef = A46210000000000000000006 /* MikshatRoutingEntryTests.mm */; };
 		A61500500000000000000004 /* SimulatorWindowingSetupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A61500500000000000000003 /* SimulatorWindowingSetupTests.swift */; };
 		A61400200000000000000001 /* MikshatResponsivePresentationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A61400200000000000000002 /* MikshatResponsivePresentationTests.swift */; };
 		A61400100000000000000001 /* MikshatResponsiveUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A61400100000000000000002 /* MikshatResponsiveUITests.swift */; };
@@ -812,6 +815,9 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A46210000000000000000002 /* PlacePageSourceMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacePageSourceMetadata.swift; sourceTree = "<group>"; };
+		A46210000000000000000004 /* PlacePageSourceMetadataTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacePageSourceMetadataTests.swift; sourceTree = "<group>"; };
+		A46210000000000000000006 /* MikshatRoutingEntryTests.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = MikshatRoutingEntryTests.mm; sourceTree = "<group>"; };
 		A61500500000000000000002 /* MikshatSimulatorSetupUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MikshatSimulatorSetupUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A61500500000000000000003 /* SimulatorWindowingSetupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimulatorWindowingSetupTests.swift; sourceTree = "<group>"; };
 		A61400200000000000000002 /* MikshatResponsivePresentationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tests/UI/SearchOnMapTests/MikshatResponsivePresentationTests.swift; sourceTree = SOURCE_ROOT; };
@@ -2018,6 +2024,7 @@
 		E79F77A472014212B40FDE97 /* PlacePageTests */ = {
 			isa = PBXGroup;
 			children = (
+				A46210000000000000000004 /* PlacePageSourceMetadataTests.swift */,
 				E8C536FD39F5842BE26742A9 /* ActionBarViewControllerTests.swift */,
 				ED1A0C0F2E9B10A400C0FFEE /* OpeningHoursTests.swift */,
 				4584F20AAF794B9683B14087 /* PlacePageUserDescriptionWebViewTests.swift */,
@@ -2993,6 +3000,7 @@
 		ED82C4322F90180300FA103D /* PlacePage */ = {
 			isa = PBXGroup;
 			children = (
+				A46210000000000000000002 /* PlacePageSourceMetadata.swift */,
 				ED82C40B2F90180300FA103D /* Components */,
 				ED82C40E2F90180300FA103D /* DirectionView */,
 				ED82C4202F90180300FA103D /* PlacePageLayout */,
@@ -3987,6 +3995,7 @@
 		AA01B2C3D4E5F60718293A03 /* Routing */ = {
 			isa = PBXGroup;
 			children = (
+				A46210000000000000000006 /* MikshatRoutingEntryTests.mm */,
 				A13811000000000000000001 /* TransportTransitWrappingTests.swift */,
 				A13812000000000000000001 /* TransportTransitRTLTests.swift */,
 				A13813000000000000000001 /* TransportRulerAppearanceTests.swift */,
@@ -4471,6 +4480,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A46210000000000000000001 /* PlacePageSourceMetadata.swift in Sources */,
 				66B8E47CF9C2DF46E0B129E6 /* MikshatSupplementaryMaps.swift in Sources */,
 				810B8AECC8C78FE64501460E /* MikshatSearchHistory.swift in Sources */,
 				ED82BCB22F900F8200FA103D /* main.mm in Sources */,
@@ -4986,6 +4996,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A46210000000000000000003 /* PlacePageSourceMetadataTests.swift in Sources */,
+				A46210000000000000000005 /* MikshatRoutingEntryTests.mm in Sources */,
 				C924A14196D49D01DD0CAE97 /* MikshatSupplementaryMapsTests.swift in Sources */,
 				A46170000000000000000001 /* MWMSettingsDefaultsTests.mm in Sources */,
 				A46170000000000000000004 /* MikshatLocalizationTests.swift in Sources */,

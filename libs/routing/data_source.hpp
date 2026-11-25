@@ -100,7 +100,14 @@ public:
   template <class FnT>
   void ForEachStreet(FnT && fn, m2::RectD const & rect)
   {
-    m_dataSource.ForEachInRect(fn, rect, scales::GetUpperScale());
+    m_dataSource.ForEachInRect([&](FeatureType & feature)
+    {
+      // Display-only maps have no routing country ID. Exclude them before a
+      // road-graph callback asks the country hierarchy for their vehicle model.
+      auto const & file = feature.GetID().m_mwmId.GetInfo()->GetLocalFile().GetCountryFile();
+      if (!m_numMwmIDs || m_numMwmIDs->ContainsFile(file))
+        fn(feature);
+    }, rect, scales::GetUpperScale());
   }
 
   // Scans features of a single MWM covered by the aggregated |covering| (built at GetUpperScale()).
