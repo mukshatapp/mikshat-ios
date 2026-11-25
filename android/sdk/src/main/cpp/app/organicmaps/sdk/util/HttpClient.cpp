@@ -357,14 +357,33 @@ HttpClient::RequestHandle HttpClient::RunHttpRequestAsync(CompletionHandler hand
   if (jni::HandleJavaException(env.get()))
     return handle;
 
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  static jmethodID const httpParamsConstructor =
+      jni::GetConstructorID(env.get(), g_httpParamsClazz, "(Ljava/lang/String;)V");
+#else
   static jmethodID const httpParamsConstructor =
       jni::GetConstructorID(env.get(), g_httpParamsClazz, "(Ljava/lang/String;I)V");
+#endif
 
   auto const timeoutMillisec = static_cast<jint>(m_timeoutSec * 1000);
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  jni::ScopedLocalRef<jobject> const httpParamsObject(
+      env.get(), env->NewObject(g_httpParamsClazz, httpParamsConstructor, jniUrl.get()));
+#else
   jni::ScopedLocalRef<jobject> const httpParamsObject(
       env.get(), env->NewObject(g_httpParamsClazz, httpParamsConstructor, jniUrl.get(), timeoutMillisec));
+#endif
   if (jni::HandleJavaException(env.get()))
     return handle;
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  // The preserved Java model takes only the URL; retain the requested timeout explicitly.
+  static jfieldID const timeoutField = env->GetFieldID(g_httpParamsClazz, "timeoutMillisec", "I");
+  if (jni::HandleJavaException(env.get()))
+    return handle;
+  env->SetIntField(httpParamsObject.get(), timeoutField, timeoutMillisec);
+  if (jni::HandleJavaException(env.get()))
+    return handle;
+#endif
 
   static jfieldID const requestDataField = env->GetFieldID(g_httpParamsClazz, "requestData", "[B");
   if (!m_bodyData.empty())

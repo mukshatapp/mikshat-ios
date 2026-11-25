@@ -56,6 +56,8 @@
 @green4: #090F0A;
 @green5: #090F0A;
 @green6: #2F4000;
+@protected_area_fill: #B388E8;
+@protected_area_border: #B388E8;
 
 @leisure: #262222;
 
@@ -176,3 +178,7 @@
 @shield_text_halo: #000000;
 @shield: #999999;
 @shield_outline: #303030;
+
+/* Preserve Mukshat's approved daytime sand; night colors retain the base theme. */
+@mukshat_beach_sand: #28281A;
+@mukshat_desert: #191007;

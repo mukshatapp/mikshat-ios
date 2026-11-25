@@ -387,6 +387,12 @@ landuse-military-danger_area                        # area z10- (also has icon z
 amenity-prison                                      # area z12- (also has icon z16-, caption(optional) z16-)
 boundary-national_park                              # area z10- (also has icon z12-, caption(optional) z12-)
 boundary-protected_area-1                           # area z10- (also has icon z12-, caption(optional) z12-)
+boundary-protected_area                             # protected-area fill and boundary
+boundary-protected_area-2                           # protected-area fill and boundary
+boundary-protected_area-3                           # protected-area fill and boundary
+boundary-protected_area-4                           # protected-area fill and boundary
+boundary-protected_area-5                           # protected-area fill and boundary
+boundary-protected_area-6                           # protected-area fill and boundary
 leisure-nature_reserve                              # area z10- (also has icon z12-, caption(optional) z12-)
 === 15
 

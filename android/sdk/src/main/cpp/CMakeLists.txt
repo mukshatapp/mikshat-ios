@@ -100,6 +100,7 @@ if (MUKSHAT_LEGACY_SDK_ABI)
   target_compile_definitions(storage PRIVATE MUKSHAT_BUNDLED_DESERT_MAPS)
   target_compile_definitions(drape_frontend PRIVATE MUKSHAT_LEGACY_SDK_ABI)
   target_compile_definitions(map PRIVATE MUKSHAT_LEGACY_SDK_ABI)
+  target_compile_definitions(indexer PRIVATE MUKSHAT_LEGACY_SDK_ABI)
 endif()
 
 
@@ -148,3 +149,4 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 )
 
 #target_link_options(${PROJECT_NAME} PRIVATE "-fuse-ld=gold")
+

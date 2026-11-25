@@ -59,6 +59,8 @@
 @green5: #B0C270;
 @forest: #AABF65;
 @green6: #888C38;
+@protected_area_fill: #7E3FB2;
+@protected_area_border: #7E3FB2;
 @flowers: #B3C471;
 
 /* 4.LANDUSE */
@@ -210,3 +212,7 @@
 @label_isoline100: #496149;
 @label_isoline50: #567556;
 @label_isoline10: #567556;
+
+/* Preserve Mukshat's approved daytime sand; night colors retain the base theme. */
+@mukshat_beach_sand: #EBA426;
+@mukshat_desert: #EBA426;

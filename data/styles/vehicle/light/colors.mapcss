@@ -87,6 +87,8 @@
 @green4: #C6D9AB;
 @green5: #C6D9AB;
 @green6: #888C38;
+@protected_area_fill: #7E3FB2;
+@protected_area_border: #7E3FB2;
 
 @leisure: #FAEFE1;
 
@@ -154,3 +156,7 @@
 @water_label: #4499Bb;
 @park_label: #3A7921;
 @halo_park_label: #FFFFFF;
+
+/* Preserve Mukshat's approved daytime sand; night colors retain the base theme. */
+@mukshat_beach_sand: #EBA426;
+@mukshat_desert: #EBA426;

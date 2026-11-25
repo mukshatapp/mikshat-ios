@@ -78,9 +78,12 @@ std::pair<int, int> DataHeader::GetScaleRange() const
   {
   case MapType::World: return {low, worldH};
   case MapType::WorldCoasts: return {low, high};
-  default:
-    ASSERT_EQUAL(type, MapType::Country, ());
+  default: ASSERT_EQUAL(type, MapType::Country, ());
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+    return {worldH, high};
+#else
     return {worldH + 1, high};
+#endif
 
     // Uncomment this to test countries drawing in all scales.
     // return {1, high};

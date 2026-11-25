@@ -1,6 +1,6 @@
 #include "drape_frontend/apply_feature_functors.hpp"
-#include "drape_frontend/protected_area_presentation.hpp"
 #include "drape_frontend/apply_feature_params.hpp"
+#include "drape_frontend/protected_area_presentation.hpp"
 
 #include "drape_frontend/area_shape.hpp"
 #include "drape_frontend/color_constants.hpp"
@@ -13,6 +13,10 @@
 #include "drape_frontend/text_shape.hpp"
 
 #include "indexer/road_shields_parser.hpp"
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+#include "indexer/feature.hpp"
+#include "indexer/ftypes_matcher.hpp"
+#endif
 
 #include "geometry/clipping.hpp"
 #include "geometry/mercator.hpp"
@@ -514,6 +518,18 @@ void ApplyAreaFeature::operator()(PointT const & p1, PointT const & p2, PointT c
   if (fabs(crossProduct) < kEmptyTriangleS)
     return;
 
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  if (m_isProtectedArea)
+  {
+    if (!m_protectedBoundary)
+    {
+      auto const & tile = m_params.m_tileRect;
+      m_protectedBoundary.emplace(tile.minX(), tile.minY(), tile.maxX(), tile.maxY());
+    }
+    m_protectedBoundary->AddTriangle({p1.x, p1.y}, {p2.x, p2.y}, {p3.x, p3.y});
+  }
+#endif
+
   if (m_isBuilding)
   {
     /// @todo I suppose that we don't intersect triangles with tile rect because of _simple_
@@ -645,6 +661,40 @@ void ApplyAreaFeature::CalculateBuildingOutline(bool calculateNormals, BuildingO
   }
 }
 
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+bool ApplyAreaFeature::IsProtectedArea(FeatureType & f)
+{
+  static ftypes::BaseCheckerEx const reserves(
+      {{"boundary", "national_park"}, {"boundary", "protected_area"}, {"leisure", "nature_reserve"}});
+  return reserves(feature::TypesHolder(f));
+}
+
+void ApplyAreaFeature::ProcessProtectedAreaBorder(drule::LineDef const & borderRule, double areaDepth)
+{
+  if (!m_protectedBoundary || borderRule.width <= 0.0)
+    return;
+  drule::LineRule lineRule;
+  static_cast<drule::LineDef &>(lineRule) = borderRule;
+  LineViewParams params;
+  ExtractLineParams(lineRule, m_params.m_vparams.GetVisualScale(), params);
+  params.m_rank = m_f.GetRank();
+  params.m_tileCenter = m_params.m_tileRect.Center();
+  params.m_baseGtoPScale = m_params.m_currentScaleGtoP;
+  params.m_depthLayer = DepthLayer::GeometryLayer;
+  // Keep the border just above its own translucent fill, within the renderer's valid depth range.
+  params.m_depth = std::min(areaDepth + 1.0, double(dp::kMaxDepth));
+  params.m_zoomLevel = m_params.m_tileKey.m_zoomLevel;
+  for (auto const & path : m_protectedBoundary->GetPaths())
+  {
+    std::vector<m2::PointD> points;
+    points.reserve(path.size());
+    for (auto const & point : path)
+      points.emplace_back(point.x, point.y);
+    m_params.m_insertShape(make_unique_dp<LineShape>(m2::SharedSpline(std::move(points)), params));
+  }
+}
+#endif
+
 void ApplyAreaFeature::ProcessAreaRules(drule::AreaRule const * areaRule, drule::AreaRule const * hatchingRule,
                                         std::string_view hatchKey, std::string_view patternKey)
 {
@@ -657,6 +707,10 @@ void ApplyAreaFeature::ProcessAreaRules(drule::AreaRule const * areaRule, drule:
   {
     ASSERT(hatchingRule->priority >= drule::kBasePriorityFg || hatchKey == kProtectedAreaFillOverlay,
            (m_f.DebugString()));
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+    if (hatchKey == kProtectedAreaFillOverlay && hatchingRule->priority < drule::kBasePriorityBgTop)
+      areaDepth = drule::CalcAreaBySizeDepth(m_f);
+#endif
     ProcessRule(*hatchingRule, areaDepth, hatchKey, {});
   }
 
@@ -713,6 +767,10 @@ void ApplyAreaFeature::ProcessRule(drule::AreaRule const & areaRule, double area
   // see ProcessAreaRules: isHatching first, - !isHatching last.
   m_params.m_insertShape(
       make_unique_dp<AreaShape>(!isHatching ? std::move(m_triangles) : m_triangles, std::move(outline), params));
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  if (hatchKey == kProtectedAreaFillOverlay && areaRule.border)
+    ProcessProtectedAreaBorder(*areaRule.border, params.m_depth);
+#endif
 }
 
 ApplyLineFeatureGeometry::ApplyLineFeatureGeometry(Params const & params, FeatureType & f,

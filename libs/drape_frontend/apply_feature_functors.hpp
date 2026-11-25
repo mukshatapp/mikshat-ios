@@ -5,6 +5,10 @@
 #include "drape_frontend/shape_view_params.hpp"
 #include "drape_frontend/stylist.hpp"
 
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+#include "drape_frontend/protected_area_boundary.hpp"
+#endif
+
 #include "drape/drape_diagnostics.hpp"
 #include "drape/pointers.hpp"
 
@@ -15,6 +19,7 @@
 #include "geometry/point2d.hpp"
 #include "geometry/spline.hpp"
 
+#include <optional>
 #include <vector>
 
 namespace dp
@@ -88,6 +93,9 @@ public:
     , m_isBuilding(isBuilding)
     , m_isMwmBorder(isMwmBorder)
     , m_areaOpacity(areaOpacity)
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+    , m_isProtectedArea(!isBuilding && IsProtectedArea(f))
+#endif
   {
     m_posZ = posZ;
   }
@@ -125,6 +133,11 @@ private:
                    std::string_view patternKey);
   void ProcessBuildingPolygon(PointT const & p1, PointT const & p2, PointT const & p3, double crossProduct);
 
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  static bool IsProtectedArea(FeatureType & f);
+  void ProcessProtectedAreaBorder(drule::LineDef const & borderRule, double areaDepth);
+#endif
+
   /// @todo Factor out to a separate outline-building component.
   /// @{
   void CalculateBuildingOutline(bool calculateNormals, BuildingOutline & outline);
@@ -148,6 +161,10 @@ private:
   // Multiplier applied to area-fill alpha. 1.0 means opaque (normal map); in Satellite mode it is the
   // user-configured "area objects" opacity (0 -> fully hidden, geometry skipped before reaching here).
   float const m_areaOpacity;
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  bool const m_isProtectedArea;
+  std::optional<ProtectedAreaBoundary> m_protectedBoundary;
+#endif
 };
 
 class ApplyLineFeatureGeometry : public BaseApplyFeature

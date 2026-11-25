@@ -490,6 +490,12 @@ amenity-prison                                      # area z12- (also has icon z
 boundary-aboriginal_lands                           # line z8- and area z8-16 (also has caption z8-16)
 boundary-national_park                              # line z8- and area z8-17 (also has icon z10-17, caption z8-9, caption(optional) z11-17)
 boundary-protected_area-1                           # line z8- and area z8-17 (also has icon z10-17, caption z8-9, caption(optional) z11-17)
+boundary-protected_area                             # protected-area fill and boundary
+boundary-protected_area-2                           # protected-area fill and boundary
+boundary-protected_area-3                           # protected-area fill and boundary
+boundary-protected_area-4                           # protected-area fill and boundary
+boundary-protected_area-5                           # protected-area fill and boundary
+boundary-protected_area-6                           # protected-area fill and boundary
 leisure-nature_reserve                              # area z8-17 (also has icon z10-17, caption z9, caption(optional) z11-17)
 === 20
 

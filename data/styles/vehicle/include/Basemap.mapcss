@@ -153,12 +153,27 @@ area|z17-[leisure=garden][garden:type=residential],
 area|z12-[natural=bare_rock],
 {fill-color: @barerock;}
 
-/* Next types are hardcoded to have a hatching-style fill, see drape_frontend/stylist.cpp */
+/* Protected areas use a solid translucent overlay with a separate boundary. */
 area|z10-[leisure=nature_reserve],
 area|z10-[boundary=national_park],
-area|z10-[boundary=protected_area][protect_class=1],
-{fill-opacity: 0.2; fill-color: @green6;}
+area|z10-[boundary=protected_area]
+{fill-color: @protected_area_fill; fill-opacity: 0.2;
+ casing-width: 1.5; casing-color: @protected_area_border; casing-opacity: 1;}
+area|z14-[leisure=nature_reserve],
+area|z14-[boundary=national_park],
+area|z14-[boundary=protected_area]
+{casing-width: 2;}
 
+line|z10-[leisure=nature_reserve],
+line|z10-[boundary=national_park],
+line|z10-[boundary=protected_area]
+{width: 1.5; color: @protected_area_border; opacity: 1;}
+line|z14-[leisure=nature_reserve],
+line|z14-[boundary=national_park],
+line|z14-[boundary=protected_area]
+{width: 2;}
+
+/* Other territories retain their native hatching. */
 area|z10-[landuse=military][military=danger_area],
 {fill-opacity: 1.0; fill-color: @military;}
 
@@ -184,8 +199,12 @@ area|z10-[natural=beach],
 area|z10-[leisure=beach_resort],
 {fill-color: @beach;fill-opacity: 0.35;}
 
+/* Keep the approved desert/sandy-beach palette and early sand visibility. */
+area|z7-[natural=beach][surface=sand]
+{fill-color: @mukshat_beach_sand; fill-opacity: 0.35;}
+
 area|z0-[natural=desert],
-{fill-color: @desert;}
+{fill-color: @mukshat_desert;}
 
 /* 6.WATER */
 
