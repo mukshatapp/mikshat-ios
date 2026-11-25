@@ -71,6 +71,14 @@ workflows:
     name: Mikshat iOS - signed TestFlight build
     instance_type: mac_mini_m2
     max_build_duration: 120
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: release/4.6.21
+          include: true
+          source: true
+      cancel_previous_builds: true
     integrations:
       app_store_connect: Mikshat-Codemagic
     environment:
@@ -213,6 +221,11 @@ workflows:
       - build/metal-preflight/summary.json
       - build/rotation-verification/rotation-diagnostics.zip
       - build/rotation-verification/summary.json
+      - build/vehicle-routing-verification/*.json
+      - build/vehicle-routing-verification/*.jsonl
+      - build/vehicle-routing-verification/*.log
+      - build/vehicle-routing-verification/screenshots/captures.jsonl
+      - build/vehicle-routing-verification/native-stacks/**
       - build/ios/xcarchive/*.xcarchive/dSYMs/*.dSYM
     publishing:
       app_store_connect:
