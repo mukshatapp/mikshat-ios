@@ -3,8 +3,11 @@
 #include "geometry/latlon.hpp"
 #include "geometry/point2d.hpp"
 
+#include "base/assert.hpp"
+
 #include <cmath>
 #include <functional>
+#include <string>
 
 namespace location
 {
@@ -19,6 +22,21 @@ enum TLocationError
   EUnknown
 };
 
+inline std::string DebugPrint(TLocationError error)
+{
+  switch (error)
+  {
+  case ENoError: return "ENoError";
+  case ENotSupported: return "ENotSupported";
+  case EDenied: return "EDenied";
+  case EGPSIsOff: return "EGPSIsOff";
+  case ETimeout: return "ETimeout";
+  case EUnknown: return "EUnknown";
+  }
+  UNREACHABLE();
+}
+
+// Values are stored in GPS track backups; append new sources without renumbering.
 enum TLocationSource
 {
   EUndefined,
@@ -29,7 +47,8 @@ enum TLocationSource
   ETizen,  // Deprecated but left here for backward compatibility.
   EGeoClue2,
   EPredictor,
-  EUser
+  EUser,
+  EGeoClue
 };
 
 /// Our structure ALWAYS has valid lat, lon and horizontal accuracy.

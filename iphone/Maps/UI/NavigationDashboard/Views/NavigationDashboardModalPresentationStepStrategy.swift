@@ -136,7 +136,9 @@ final class NavigationDashboardModalPresentationStepStrategy: ModalPresentationS
     case .halfScreen:
       frame.origin.y = max(bounds.height * Constants.halfScreenOriginFactorPortrait, safe.minY + Constants.topInset)
     case .compact:
-      frame.origin.y = compactHeight > 0 ? bounds.maxY - compactHeight : bounds.height * Constants.halfScreenHeightFactorPortrait
+      frame.origin.y = compactHeight > 0
+        ? max(bounds.maxY - compactHeight, safe.minY + Constants.topInset)
+        : bounds.height * Constants.halfScreenHeightFactorPortrait
     case .estimates:
       let height = estimatesHeight > 0 ? estimatesHeight : compactHeight
       frame.origin.y = height > 0 ? bounds.maxY - height : bounds.height * Constants.halfScreenHeightFactorPortrait

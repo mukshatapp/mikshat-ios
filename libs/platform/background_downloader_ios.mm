@@ -6,12 +6,13 @@
 // How many seconds to wait before the request fails.
 static constexpr NSTimeInterval kTimeoutIntervalInSeconds = 10;
 
-// Use the original full URL: Drive files share /download and differ only by query,
-// and redirects can change the current URL. Resume data belongs to this request.
+// Resume data and restoration follow the original full URL, including its query, across redirects.
 static NSString * DownloadIdentity(NSURLSessionTask * task)
 {
   return task.originalRequest.URL.absoluteString ?: task.currentRequest.URL.absoluteString;
 }
+
+NSErrorDomain const BackgroundDownloaderHttpErrorDomain = @"app.omaps.http";
 
 @interface TaskInfo : NSObject
 
@@ -59,8 +60,7 @@ static NSString * DownloadIdentity(NSURLSessionTask * task)
   {
     // A background task restored after an app relaunch can reach here before it is re-attached
     // (which sets taskDescription), so derive the save path from the URL. That only works for the
-    // official CDN layout (maps/<v>/<f>.mwm); for any other layout (e.g. a custom ?map-download-server
-    // with a base path) bail out instead of letting GetFilePathByUrl abort on a CHECK.
+    // official maps/diffs/terrain layout. Custom base paths cannot be resolved here.
     std::string const urlPath = task.currentRequest.URL.path.UTF8String;
     if (!downloader::IsUrlSupported(urlPath))
       return nil;
@@ -84,6 +84,14 @@ static NSString * DownloadIdentity(NSURLSessionTask * task)
 /// different mirror (CDN fallback or ?map-download-server) would ignore the newly selected server.
 @property(nonatomic, strong) NSMutableDictionary * resumeData;
 @property(nonatomic, strong) MapFileSaveStrategy * saveStrategy;
+/// Identifiers of the tasks cancelled in this session, until their final callback: such a task may still
+/// deliver its file after a newer attempt has taken over (and maybe already finished) the destination.
+@property(nonatomic, strong) NSMutableSet<NSNumber *> * cancelledTasks;
+/// The destination paths requested in this session. A task of the previous app session that isn't attached
+/// must not write there, even after the requested attempt has finished and Storage validates its file.
+/// Never removed: the downloader doesn't know when Storage is done with the file, and only the tasks missing
+/// from |tasks| are checked, so the requests of this session are never blocked.
+@property(nonatomic, strong) NSMutableSet<NSString *> * claimedPaths;
 
 - (void)removeAliasesForTaskIdentifier:(NSUInteger)taskIdentifier;
 
@@ -113,29 +121,41 @@ static NSString * DownloadIdentity(NSURLSessionTask * task)
         [NSURLSessionConfiguration backgroundSessionConfigurationWithIdentifier:name];
     configuration.sessionSendsLaunchEvents = YES;
     configuration.timeoutIntervalForRequest = kTimeoutIntervalInSeconds;
-    _session = [NSURLSession sessionWithConfiguration:configuration delegate:self delegateQueue:nil];
+    // The main delegate queue serializes the session callbacks with the requests and cancellations.
+    _session = [NSURLSession sessionWithConfiguration:configuration
+                                             delegate:self
+                                        delegateQueue:NSOperationQueue.mainQueue];
     _tasks = [NSMutableDictionary dictionary];
     _saveStrategy = saveStrategy;
     _restoredTasks = [NSMutableDictionary dictionary];
     _taskAliases = [NSMutableDictionary dictionary];
     _resumeData = [NSMutableDictionary dictionary];
+    _cancelledTasks = [NSMutableSet set];
+    _claimedPaths = [NSMutableSet set];
 
     [_session getAllTasksWithCompletionHandler:^(NSArray<__kindof NSURLSessionTask *> * _Nonnull downloadTasks) {
       dispatch_async(dispatch_get_main_queue(), ^{
+        // The snapshot can be older than the requests and cancellations made since it was taken.
         for (NSURLSessionTask * downloadTask in downloadTasks)
         {
-          if (downloadTask.state == NSURLSessionTaskStateCanceling ||
+          if (self.tasks[@(downloadTask.taskIdentifier)] ||
+              [self.cancelledTasks containsObject:@(downloadTask.taskIdentifier)] ||
+              downloadTask.state == NSURLSessionTaskStateCanceling ||
               downloadTask.state == NSURLSessionTaskStateCompleted)
             continue;
-          TaskInfo * info = [self.tasks objectForKey:@(downloadTask.taskIdentifier)];
-          if (info)
+
+          if ([self isSupersededTask:downloadTask])
+          {
+            [downloadTask cancel];
+            [self.cancelledTasks addObject:@(downloadTask.taskIdentifier)];
             continue;
+          }
 
           NSString * urlString = DownloadIdentity(downloadTask);
 
           BOOL isTaskReplaced = NO;
           // Replacing task with another one which was added into queue earlier (on previous application session).
-          for (id key in self.tasks)
+          for (id key in self.tasks.allKeys)
           {
             TaskInfo * info = [self.tasks objectForKey:key];
             if (![DownloadIdentity(info.task) isEqualToString:urlString])
@@ -154,11 +174,11 @@ static NSString * DownloadIdentity(NSURLSessionTask * task)
             self.taskAliases[replacedId] = restoredId;
 
             [info.task cancel];
+            [self.cancelledTasks addObject:replacedId];
             [self.tasks removeObjectForKey:@(info.task.taskIdentifier)];
             isTaskReplaced = YES;
             break;
           }
-
           if (!isTaskReplaced)
             [self.restoredTasks setObject:downloadTask forKey:urlString];
         }
@@ -174,6 +194,7 @@ static NSString * DownloadIdentity(NSURLSessionTask * task)
                    completion:(DownloadCompleteBlock)completion
                      progress:(DownloadProgressBlock)progress
 {
+  [self.claimedPaths addObject:[NSURL fileURLWithPath:filePath].path];
   NSUInteger taskIdentifier;
   NSURLSessionTask * restoredTask = [self.restoredTasks objectForKey:url.absoluteString];
   if (restoredTask)
@@ -207,6 +228,7 @@ static NSString * DownloadIdentity(NSURLSessionTask * task)
   if (info)
   {
     [info.task cancel];
+    [self.cancelledTasks addObject:@(taskIdentifier)];
     [self.resumeData removeObjectForKey:DownloadIdentity(info.task)];
     [self.tasks removeObjectForKey:@(taskIdentifier)];
   }
@@ -218,6 +240,7 @@ static NSString * DownloadIdentity(NSURLSessionTask * task)
       if (restoredTask.taskIdentifier == taskIdentifier)
       {
         [restoredTask cancel];
+        [self.cancelledTasks addObject:@(taskIdentifier)];
         [self.resumeData removeObjectForKey:DownloadIdentity(restoredTask)];
         [self.restoredTasks removeObjectForKey:key];
         break;
@@ -239,10 +262,16 @@ static NSString * DownloadIdentity(NSURLSessionTask * task)
   // Fast enumeration over an NSDictionary yields its keys, not its values: self.tasks is keyed by
   // task identifier and restoredTasks by full URL. Iterate allValues to cancel the task objects.
   for (TaskInfo * info in self.tasks.allValues)
+  {
     [info.task cancel];
+    [self.cancelledTasks addObject:@(info.task.taskIdentifier)];
+  }
 
   for (NSURLSessionTask * restoredTask in self.restoredTasks.allValues)
+  {
     [restoredTask cancel];
+    [self.cancelledTasks addObject:@(restoredTask.taskIdentifier)];
+  }
 
   [self.tasks removeAllObjects];
   [self.restoredTasks removeAllObjects];
@@ -250,12 +279,34 @@ static NSString * DownloadIdentity(NSURLSessionTask * task)
   [self.resumeData removeAllObjects];
 }
 
+/// A cancelled task, or a task of the previous app session whose destination this session requested or already
+/// exists: its result must not touch the destination, the resume data or the callbacks of its owner.
+- (BOOL)isSupersededTask:(NSURLSessionTask *)task
+{
+  if ([self.cancelledTasks containsObject:@(task.taskIdentifier)])
+    return YES;
+  if (self.tasks[@(task.taskIdentifier)])
+    return NO;
+  NSURL * destinationUrl = [self.saveStrategy getLocationForTask:task];
+  // An existing destination is a complete download that Storage may reuse and validate without a request.
+  return destinationUrl && ([self.claimedPaths containsObject:destinationUrl.path] ||
+                            [[NSFileManager defaultManager] fileExistsAtPath:destinationUrl.path]);
+}
+
+- (void)forgetRestoredTask:(NSURLSessionTask *)task
+{
+  NSString * urlString = DownloadIdentity(task);
+  if (self.restoredTasks[urlString] == task)
+    [self.restoredTasks removeObjectForKey:urlString];
+}
+
 #pragma mark - NSURLSessionDownloadDelegate implementation
 
 - (void)finishDownloading:(NSURLSessionTask *)downloadTask error:(nullable NSError *)error
 {
+  [self forgetRestoredTask:downloadTask];
+
   NSString * urlString = DownloadIdentity(downloadTask);
-  [self.restoredTasks removeObjectForKey:urlString];
   if (error && error.userInfo && error.userInfo[NSURLSessionDownloadTaskResumeData])
     self.resumeData[urlString] = error.userInfo[NSURLSessionDownloadTaskResumeData];
   else
@@ -275,35 +326,51 @@ static NSString * DownloadIdentity(NSURLSessionTask * task)
                  downloadTask:(NSURLSessionDownloadTask *)downloadTask
     didFinishDownloadingToURL:(NSURL *)location
 {
-  NSError * error;
+  // The downloaded file is deleted when this method returns.
+  if ([self isSupersededTask:downloadTask])
+  {
+    [[NSFileManager defaultManager] removeItemAtURL:location.filePathURL error:nil];
+    [self forgetRestoredTask:downloadTask];
+    return;
+  }
+
   // Check for HTTP errors.
   NSInteger statusCode = ((NSHTTPURLResponse *)downloadTask.response).statusCode;
   NSString * mimeType = downloadTask.response.MIMEType.lowercaseString;
   // 206 for resumed downloads.
+  NSError * error = nil;
   if ((statusCode != 200 && statusCode != 206) || [mimeType isEqualToString:@"text/html"] ||
       [mimeType isEqualToString:@"application/xhtml+xml"])
   {
     LOG(LWARNING,
         ("Failed to download", downloadTask.originalRequest.URL.absoluteString, "HTTP statusCode:", statusCode));
-    error = [[NSError alloc] initWithDomain:@"app.omaps.http" code:statusCode userInfo:nil];
+    error = [[NSError alloc] initWithDomain:BackgroundDownloaderHttpErrorDomain code:statusCode userInfo:nil];
     [[NSFileManager defaultManager] removeItemAtURL:location.filePathURL error:nil];
   }
   else
   {
-    NSURL * destinationUrl = [self.saveStrategy getLocationForTask:downloadTask];
-    if (destinationUrl != nil)
-    {
-      [[NSFileManager defaultManager] moveItemAtURL:location.filePathURL toURL:destinationUrl error:&error];
-    }
-    else
-    {
-      LOG(LWARNING,
-          ("Can't resolve a save path for a restored download:", downloadTask.currentRequest.URL.absoluteString));
-      error = [[NSError alloc] initWithDomain:@"app.omaps.http" code:500 userInfo:nil];
-      [[NSFileManager defaultManager] removeItemAtURL:location.filePathURL error:nil];
-    }
+    error = [self saveDownloadedFile:location forTask:downloadTask];
   }
-  dispatch_async(dispatch_get_main_queue(), ^{ [self finishDownloading:downloadTask error:error]; });
+  [self finishDownloading:downloadTask error:error];
+}
+
+- (nullable NSError *)saveDownloadedFile:(NSURL *)location forTask:(NSURLSessionTask *)downloadTask
+{
+  NSURL * destinationUrl = [self.saveStrategy getLocationForTask:downloadTask];
+  if (destinationUrl == nil)
+  {
+    LOG(LWARNING,
+        ("Can't resolve a save path for a restored download:", downloadTask.currentRequest.URL.absoluteString));
+    [[NSFileManager defaultManager] removeItemAtURL:location.filePathURL error:nil];
+    return [[NSError alloc] initWithDomain:BackgroundDownloaderHttpErrorDomain code:500 userInfo:nil];
+  }
+
+  // A restored file may arrive after Storage checks for an existing .ready file.
+  // Allow the accepted task to publish its completed download.
+  NSError * error = nil;
+  [[NSFileManager defaultManager] removeItemAtURL:destinationUrl error:nil];
+  [[NSFileManager defaultManager] moveItemAtURL:location.filePathURL toURL:destinationUrl error:&error];
+  return error;
 }
 
 - (void)URLSession:(NSURLSession *)session
@@ -312,28 +379,26 @@ static NSString * DownloadIdentity(NSURLSessionTask * task)
             totalBytesWritten:(int64_t)totalBytesWritten
     totalBytesExpectedToWrite:(int64_t)totalBytesExpectedToWrite
 {
-  dispatch_async(dispatch_get_main_queue(), ^{
-    TaskInfo * info = [self.tasks objectForKey:@(downloadTask.taskIdentifier)];
-    if (!info)
-      return;
+  TaskInfo * info = [self.tasks objectForKey:@(downloadTask.taskIdentifier)];
+  if (info)
     info.progress(totalBytesWritten, totalBytesExpectedToWrite);
-  });
 }
 
 - (void)URLSession:(NSURLSession *)session task:(NSURLSessionTask *)downloadTask didCompleteWithError:(NSError *)error
 {
-  dispatch_async(dispatch_get_main_queue(), ^{
-    if (error && error.code != NSURLErrorCancelled)
-      [self finishDownloading:downloadTask error:error];
-  });
+  // The final callback of a task (after didFinishDownloadingToURL): a cancelled one can't save anymore.
+  BOOL const superseded = [self isSupersededTask:downloadTask];
+  [self.cancelledTasks removeObject:@(downloadTask.taskIdentifier)];
+  if (superseded)
+    [self forgetRestoredTask:downloadTask];
+  else if (error && error.code != NSURLErrorCancelled)
+    [self finishDownloading:downloadTask error:error];
 }
 
 - (void)URLSessionDidFinishEventsForBackgroundURLSession:(NSURLSession *)session
 {
-  dispatch_async(dispatch_get_main_queue(), ^{
-    if (self.backgroundCompletionHandler != nil)
-      self.backgroundCompletionHandler();
-  });
+  if (self.backgroundCompletionHandler != nil)
+    self.backgroundCompletionHandler();
 }
 
 @end

@@ -6,6 +6,7 @@ extension NavigationDashboard {
     private let searchManager: SearchOnMapManager
     private var routeElevationActivePointDistance: Double?
     private var presentationStep: NavigationDashboardModalPresentationStep = .hidden
+    private var isValid = true
 
     weak var delegate: MWMRoutePreviewDelegate?
 
@@ -20,7 +21,15 @@ extension NavigationDashboard {
       super.init()
     }
 
+    func invalidate() {
+      guard isValid else { return }
+      isValid = false
+      // Closing frame callbacks are ignored after retirement.
+      mapViewController.updateVisibleAreaInsets(for: self, insets: .zero, updatingViewport: true)
+    }
+
     func process(_ request: Request) {
+      guard isValid else { return }
       let response = resolve(request)
       presenter.process(response)
     }
@@ -146,12 +155,13 @@ extension NavigationDashboard {
     }
 
     fileprivate func clearRouteElevationActivePoint() {
+      guard isValid else { return }
       routeElevationActivePointDistance = nil
       router.resetRouteElevationActivePoint()
     }
 
     fileprivate func restoreRouteElevationActivePoint() {
-      guard let routeElevationActivePointDistance else { return }
+      guard isValid, let routeElevationActivePointDistance else { return }
       router.setRouteElevationActivePointDistance(routeElevationActivePointDistance)
     }
   }
@@ -161,6 +171,7 @@ extension NavigationDashboard {
 
 extension NavigationDashboard.Interactor: ElevationProfileViewControllerDelegate {
   func updateMapPoint(distance: Double) {
+    guard isValid else { return }
     routeElevationActivePointDistance = distance
     router.setRouteElevationActivePointDistance(distance)
   }
@@ -214,8 +225,8 @@ extension NavigationDashboard.Interactor: NavigationDashboardView {
   }
 
   func stateClosed() {
+    clearRouteElevationActivePoint()
     process(.updateState(.closed))
-    process(.stopNavigation)
   }
 
   func onRouteStart() {
@@ -241,6 +252,7 @@ extension NavigationDashboard.Interactor: NavigationDashboardView {
   }
 
   private func buildElevationInfoIfNeeded() {
+    guard isValid else { return }
     guard let elevationInfo = router.routeElevationProfileData() else {
       clearRouteElevationActivePoint()
       process(.updateElevationInfo(nil, activePointDistance: nil))

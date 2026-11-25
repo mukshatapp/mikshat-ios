@@ -13,7 +13,7 @@ namespace df
 {
 enum class DepthLayer : uint8_t
 {
-  // Do not change the order.
+  // Keep kStateExtensions in sync with this order.
   GeometryLayer = 0,
   Geometry3dLayer,
   UserLineLayer,
@@ -28,6 +28,10 @@ enum class DepthLayer : uint8_t
   /// - displacing (with each others only) Bookmark titles
   SearchMarkLayer,
   GuiLayer,
+  // Drawn right after UserLineLayer, see FrontendRenderer::RenderScene().
+  SelectedUserLineLayer,
+  // The render order is set in FrontendRenderer::RenderScene, which draws this layer under UserLineLayer.
+  UserAreaLayer,
   LayersCount
 };
 
@@ -69,6 +73,8 @@ inline std::string DebugPrint(DepthLayer layer)
   case DepthLayer::RoutingMarkLayer: return "RoutingMarkLayer";
   case DepthLayer::SearchMarkLayer: return "SearchMarkLayer";
   case DepthLayer::GuiLayer: return "GuiLayer";
+  case DepthLayer::SelectedUserLineLayer: return "SelectedUserLineLayer";
+  case DepthLayer::UserAreaLayer: return "UserAreaLayer";
   case DepthLayer::LayersCount: CHECK(false, ("Try to output LayersCount"));
   }
   CHECK(false, ("Unknown layer"));

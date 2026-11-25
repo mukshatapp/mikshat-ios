@@ -38,6 +38,7 @@ public:
 
   CountryId const & GetCountryId() const;
   int64_t GetDataVersion() const { return m_currentDataVersion; }
+  platform::CountryFile const & GetCountryFile() const { return m_countryFile; }
 
   std::string GetRelativeUrl() const;
   std::string GetFileDownloadPath() const;

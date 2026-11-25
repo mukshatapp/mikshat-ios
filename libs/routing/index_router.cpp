@@ -809,6 +809,8 @@ RouterResultCode IndexRouter::DoCalculateRoute(Checkpoints const & checkpoints, 
       }
     }
 
+    SetServiceEndings(startFakeEnding, &finishFakeEnding, *graph);
+
     uint32_t const fakeNumerationStart = starter ? starter->GetNumFakeSegments() + startIdx : startIdx;
     IndexGraphStarter subrouteStarter(startFakeEnding, finishFakeEnding, fakeNumerationStart,
                                       isStartSegmentStrictForward, *graph);
@@ -1214,6 +1216,30 @@ RouterResultCode IndexRouter::CalculateSubrouteLeapsOnlyMode(Checkpoints const &
   return RouterResultCode::NoError;
 }
 
+void IndexRouter::SetServiceEndings(FakeEnding const & start, FakeEnding const * finish, WorldGraph & graph)
+{
+  // Only the car routing has the turn penalty, see EdgeEstimator::GetTurnPenaltyFactor().
+  if (m_vehicleType != VehicleType::Car)
+    return;
+
+  auto const getServiceEnding = [&graph](FakeEnding const * ending) -> std::optional<ms::LatLon>
+  {
+    if (!ending || ending->m_projections.empty())
+      return {};
+
+    // The projections are sorted by the distance to the ending.
+    auto const & segment = ending->m_projections.front().m_segment;
+    if (IndexGraphStarter::IsGuidesSegment(segment))
+      return {};
+
+    auto const type = graph.GetIndexGraph(segment.GetMwmId()).GetRoadGeometry(segment.GetFeatureId()).GetHighwayType();
+    if (!type || !IsServiceOrLivingStreet(*type))
+      return {};
+    return ending->m_originJunction.GetLatLon();
+  };
+  m_estimator->SetServiceEndings({getServiceEnding(&start), getServiceEnding(finish)});
+}
+
 RouterResultCode IndexRouter::AdjustRoute(Checkpoints const & checkpoints, m2::PointD const & startDirection,
                                           RouterDelegate const & delegate, Route & route)
 {
@@ -1240,18 +1266,25 @@ RouterResultCode IndexRouter::AdjustRoute(Checkpoints const & checkpoints, m2::P
   CHECK(!steps.empty(), ());
 
   FakeEnding dummy{};
-  IndexGraphStarter starter(MakeFakeEnding(startSegments, pointFrom, *graph), dummy, m_lastFakeEdges->GetNumFakeEdges(),
-                            bestSegmentIsAlmostCodirectional, *graph);
+  auto const startEnding = MakeFakeEnding(startSegments, pointFrom, *graph);
+  SetServiceEndings(startEnding, nullptr /* finish */, *graph);
+  IndexGraphStarter starter(startEnding, dummy, m_lastFakeEdges->GetNumFakeEdges(), bestSegmentIsAlmostCodirectional,
+                            *graph);
 
   starter.Append(*m_lastFakeEdges);
 
+  // The wave looks for a way to the previous route near the new start, and its edges have the transition
+  // penalties. So the previous route edges get them too, but only in the mwm of the start: the wave doesn't
+  // go far, and the edges of the other mwms would load their graphs.
+  NumMwmId const startMwmId = startSegments.front().GetMwmId();
   std::vector<SegmentEdge> prevEdges;
   CHECK_LESS_OR_EQUAL(rebuiltSubroute.GetEndSegmentIdx(), steps.size(), ());
   for (size_t i = rebuiltSubroute.GetBeginSegmentIdx(); i < rebuiltSubroute.GetEndSegmentIdx(); ++i)
   {
-    auto const & step = steps[i];
-    prevEdges.emplace_back(step.GetSegment(),
-                           starter.CalcSegmentWeight(step.GetSegment(), EdgeEstimator::Purpose::Weight));
+    auto const & segment = steps[i].GetSegment();
+    bool const withPenalties = i > rebuiltSubroute.GetBeginSegmentIdx() && segment.GetMwmId() == startMwmId;
+    prevEdges.emplace_back(segment, withPenalties ? starter.CalcRouteEdgeWeight(steps[i - 1].GetSegment(), segment)
+                                                  : starter.CalcSegmentWeight(segment, EdgeEstimator::Purpose::Weight));
   }
 
   using Visitor = JunctionVisitor<IndexGraphStarter>;
@@ -1911,24 +1944,11 @@ RouterResultCode IndexRouter::RedressRoute(std::vector<Segment> const & segments
 #ifdef DEBUG
   if (!m_guides.IsActive())
   {
-    auto const isPassThroughAllowed = [&worldGraph](Segment const & s)
-    { return worldGraph.IsPassThroughAllowed(s.GetMwmId(), s.GetFeatureId()); };
-
     auto const & rSegments = route.GetRouteSegments();
     ASSERT_EQUAL(segsCount, rSegments.size(), ());
     for (size_t i = 0; i < segsCount; ++i)
-    {
       if (segments[i].IsRealSegment())
-      {
         ASSERT_EQUAL(segments[i], rSegments[i].GetSegment(), ());
-
-        if (i > 0 && segments[i - 1].IsRealSegment() &&
-            isPassThroughAllowed(segments[i - 1]) != isPassThroughAllowed(segments[i]))
-        {
-          LOG(LDEBUG, ("Change pass-through point:", mercator::ToLatLon(rSegments[i - 1].GetJunction().GetPoint())));
-        }
-      }
-    }
   }
 #endif
 

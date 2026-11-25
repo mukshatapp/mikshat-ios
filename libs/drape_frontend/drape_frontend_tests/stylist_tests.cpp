@@ -136,7 +136,6 @@ void TestSameRules(df::Stylist const & actual, df::Stylist const & expected)
                   expected.m_areaOutlineRules.begin(), expected.m_areaOutlineRules.end()),
        ());
 }
-}  // namespace
 
 UNIT_CLASS_TEST(StyleSnapshotFixture, Stylist_MikshatNamedFayda)
 {
@@ -478,3 +477,4 @@ UNIT_CLASS_TEST(StyleSnapshotFixture, Stylist_ExplicitStyleIgnoresGlobalSwitches
     }
   }
 }
+}  // namespace

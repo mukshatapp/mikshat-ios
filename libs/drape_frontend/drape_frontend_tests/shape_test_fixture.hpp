@@ -5,6 +5,7 @@
 
 #include "drape/batcher.hpp"
 #include "drape/framebuffer.hpp"
+#include "drape/oglcontext.hpp"
 #include "drape/render_bucket.hpp"
 #include "drape/render_state.hpp"
 #include "drape/texture_manager.hpp"
@@ -22,6 +23,23 @@
 
 namespace df::test_support
 {
+/// Lightweight OGLContext wrapper that assumes a GL context is already current
+/// (e.g., set up by RunTestInOpenGLOffscreenEnvironment).
+class CurrentOGLContext : public dp::OGLContext
+{
+public:
+  void MakeCurrent() override {}
+  void DoneCurrent() override {}
+  void Present() override;
+
+  void SetFramebuffer(ref_ptr<dp::BaseFramebuffer>) override {}
+  void ForgetFramebuffer(ref_ptr<dp::BaseFramebuffer>) override {}
+  void ApplyFramebuffer(std::string const &) override {}
+};
+
+/// Initializes texMng with the real colors, patterns and fonts.
+void InitTextureManager(ref_ptr<dp::GraphicsContext> context, dp::TextureManager & texMng);
+
 /// GPU-based test fixture for MapShape subclasses.
 /// Renders shapes through the real OpenGL shader pipeline to an offscreen FBO.
 ///
@@ -49,9 +67,14 @@ public:
   /// Cache user lines into the current batch. Only valid inside the Render() callback.
   void AddUserLines(TileKey const & tileKey, TracksSource const & source,
                     UserLinesRenderCollection const & renderParams);
+  /// Caches user areas in a batch of the tile, as the backend does.
+  void AddUserAreas(TileKey const & tileKey, UserAreasToCache const & areas);
 
   /// Sets the scale from world coordinates to pixels. Must be called before Render().
   void SetWorldToPixelScale(float scale) { m_worldToPixelScale = scale; }
+  void SetBackgroundColor(dp::Color color) { m_backgroundColor = color; }
+  /// Sets the world point in the image center for tiles of user areas, the center of the first one by default.
+  void SetViewCenter(m2::PointD const & center) { m_viewCenter = center; }
 
   /// Opt in to real glyph uploads and the production protected-fill screen policy.
   /// Isolated labels are made visible without running the map collision engine.
@@ -67,6 +90,9 @@ public:
   /// The last rendered frame; valid after Render() returns.
   QImage const & GetLastImage() const { return m_lastImage; }
 
+  /// Only valid inside the Render() callback.
+  ref_ptr<dp::TextureManager> GetTextureManager() const { return make_ref(m_texMng); }
+
 private:
   void Init(uint32_t width, uint32_t height);
   void Flush();
@@ -77,12 +103,16 @@ private:
   {
     dp::RenderState m_state;
     drape_ptr<dp::RenderBucket> m_bucket;
+    /// Of the tile center from the view center, in pixels.
+    glsl::vec2 m_tileShift = {0, 0};
   };
 
   uint32_t m_width = 0;
   uint32_t m_height = 0;
   float m_worldToPixelScale = 1.0f;
   std::optional<ScreenBase> m_screen;
+  dp::Color m_backgroundColor = dp::Color::White();
+  std::optional<m2::PointD> m_viewCenter;
   drape_ptr<dp::Framebuffer> m_framebuffer;
 
   std::unique_ptr<dp::GraphicsContext> m_context;

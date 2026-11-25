@@ -369,7 +369,7 @@ void GetPreferredNames(NameParamsIn const & in, NameParamsOut & out)
 
   LangsBufferT mwmLangCodes;
   in.regionData.GetLanguages(mwmLangCodes);
-  secondaryCodes.insert(secondaryCodes.end(), mwmLangCodes.begin(), mwmLangCodes.end());
+  secondaryCodes.append(mwmLangCodes);
 
   secondaryCodes.push_back(StrUtf8::kEnglishCode);
 
@@ -502,11 +502,16 @@ std::string FormatElevation(std::string_view elevation)
   {
     double value;
     if (strings::to_double(elevation, value))
-      return std::string{kMountainSymbol} + platform::Distance::FormatAltitude(value);
+      return FormatElevation(value);
     else
       LOG(LWARNING, ("Invalid elevation metadata:", elevation));
   }
   return {};
+}
+
+std::string FormatElevation(double elevation)
+{
+  return std::string{kMountainSymbol} + platform::Distance::FormatAltitude(elevation);
 }
 
 std::string FormatCapacity(std::string_view capacity, TypesHolder const & types)

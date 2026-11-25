@@ -10,11 +10,13 @@ set(SRC
   editor_notes_tests.cpp
   extrapolator_tests.cpp
   feature_getters_tests.cpp
+  framework_track_tests.cpp
   framework_viewport_tests.cpp
   gps_track_collection_test.cpp
   gps_track_filter_test.cpp
   gps_track_storage_test.cpp
   gps_track_test.cpp
+  isolines_manager_tests.cpp
   kmz_unarchive_test.cpp
   mwm_url_tests.cpp
   power_manager_tests.cpp
@@ -27,6 +29,7 @@ set(SRC
   transliteration_test.cpp
   relation_track_tests.cpp
   routing_manager_tests.cpp
+  terrain_provider_tests.cpp
   track_tests.cpp
   transit_display_tests.cpp
   transit_rendering_tests.cpp

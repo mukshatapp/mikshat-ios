@@ -78,10 +78,18 @@ UNIT_TEST(Russia_Ufa_UstKatav)
                                    FromLatLon(54.9228, 58.1469), 160565);
 }
 
-UNIT_TEST(RussiaMoscowNoServiceCrossing)
+// By the service road, like OSRM, GraphHopper and Valhalla: the way around is 3140 m.
+UNIT_TEST(RussiaMoscowServiceCrossing)
 {
   CalculateRouteAndTestRouteLength(GetVehicleComponents(VehicleType::Car), FromLatLon(55.77787, 37.70405), {0., 0.},
-                                   FromLatLon(55.77682, 37.70391), 3140.);
+                                   FromLatLon(55.77682, 37.70391), 211.634);
+}
+
+UNIT_TEST(RussiaNskServiceEndpoints)
+{
+  // Service-road endpoints must allow the direct route along the public street, улица Забалуева.
+  CalculateRouteAndTestRouteLength(GetVehicleComponents(VehicleType::Car), FromLatLon(54.989101, 82.814544), {0., 0.},
+                                   FromLatLon(54.988947, 82.80889), 425.484);
 }
 
 UNIT_TEST(PriceIslandLoadCrossGeometryTest)
@@ -592,7 +600,7 @@ UNIT_TEST(USA_NorthCarolina_CrossMWMs)
 UNIT_TEST(Cyprus_NoUTurnFromFake)
 {
   CalculateRouteAndTestRouteLength(GetVehicleComponents(VehicleType::Car), FromLatLon(34.70639, 33.1184951), {0., 0.},
-                                   FromLatLon(34.7065239, 33.1184222), 384.238);
+                                   FromLatLon(34.7065239, 33.1184222), 394.096);
 
   CalculateRouteAndTestRouteLength(GetVehicleComponents(VehicleType::Car), FromLatLon(34.7068976, 33.1199084), {0., 0.},
                                    FromLatLon(34.7070505, 33.1198391), 670.077);
@@ -636,10 +644,19 @@ UNIT_TEST(Hawaii_KeepH1)
 }
 
 // https://github.com/organicmaps/organicmaps/issues/1668
+/// @todo Fails: the finish projection onto the parking service road is 2 m closer than onto Большая Серпуховская,
+/// and 2 m of the 0.01 km/h offroad weight outweigh the 3 min detour through the parking.
 UNIT_TEST(Russia_Moscow_KeepPrimary)
 {
   CalculateRouteAndTestRouteLength(GetVehicleComponents(VehicleType::Car), FromLatLon(55.7083688, 37.6213856), {0., 0.},
                                    FromLatLon(55.724623, 37.62588), 1921.88);
+}
+
+UNIT_TEST(Russia_Moscow_KeepPrimary_WayBack)
+{
+  // Like OSRM and GraphHopper, without the 6.3 km detour of Valhalla.
+  CalculateRouteAndTestRouteLength(GetVehicleComponents(VehicleType::Car), FromLatLon(55.724623, 37.62588), {0., 0.},
+                                   FromLatLon(55.7083688, 37.6213856), 4199.75);
 }
 
 // https://github.com/organicmaps/organicmaps/issues/1727
@@ -712,7 +729,7 @@ UNIT_TEST(USA_Birmingham_AL_KeyWest_FL_NoMotorway)
   CalculateRouteAndTestRouteLength(GetVehicleComponents(VehicleType::Car), start, {0., 0.}, finish, 1'471'410);
 
   RoutingOptionSetter optionsGuard(RoutingOptions::Motorway);
-  CalculateRouteAndTestRouteLength(GetVehicleComponents(VehicleType::Car), start, {0., 0.}, finish, 1'495'860);
+  CalculateRouteAndTestRouteLength(GetVehicleComponents(VehicleType::Car), start, {0., 0.}, finish, 1'531'210);
 }
 
 UNIT_TEST(Turkey_Salarialaca_Sanliurfa)
@@ -888,8 +905,9 @@ UNIT_TEST(USA_UseDirt_WithMaxspeed)
   CalculateRouteAndTestRouteLength(GetVehicleComponents(VehicleType::Car), FromLatLon(46.5361985, -111.943183),
                                    {0., 0.}, FromLatLon(46.4925409, -112.105446), 20906.5);
 
+  // Big Belt Drive instead of the service road between two parts of Timber Trail Drive.
   CalculateRouteAndTestRouteLength(GetVehicleComponents(VehicleType::Car), FromLatLon(46.7336967, -111.926), {0., 0.},
-                                   FromLatLon(46.7467037, -111.917147), 3527.79);
+                                   FromLatLon(46.7467037, -111.917147), 3324.62);
 
   CalculateRouteAndTestRouteLength(GetVehicleComponents(VehicleType::Car), FromLatLon(42.3889581, 19.7812567), {0., 0.},
                                    FromLatLon(42.3878106, 19.7831402), 247.139);
@@ -898,8 +916,9 @@ UNIT_TEST(USA_UseDirt_WithMaxspeed)
 // https://github.com/organicmaps/organicmaps/issues/8507
 UNIT_TEST(Norway_MotorVehicleBackward_No)
 {
+  // Hausmanns gate instead of the service road with a tunnel between Trondheimsveien and Korsgata.
   CalculateRouteAndTestRouteLength(GetVehicleComponents(VehicleType::Car), FromLatLon(59.91734, 10.75949), {0., 0.},
-                                   FromLatLon(59.91877, 10.75936), 1091.88);
+                                   FromLatLon(59.91877, 10.75936), 1519.57);
 
   CalculateRouteAndTestRouteLength(GetVehicleComponents(VehicleType::Car), FromLatLon(59.919597, 10.759392), {0., 0.},
                                    FromLatLon(59.92056, 10.759317), 419);
@@ -958,9 +977,7 @@ UNIT_TEST(Colombia_MotorVehicle_Conditional_No)
 
 UNIT_TEST(Belarus_Kopyl_Minsk)
 {
-  // Use P23 ASAP.
-  // OSRM makes a shorter but strange route here:
-  // https://www.openstreetmap.org/directions?engine=fossgis_osrm_car&route=53.131897%2C27.018889%3B53.57253%2C27.47209
+  /// @todo OM now uses secondary H8544 (longer) instead of primary P61.
   CalculateRouteAndTestRouteLength(GetVehicleComponents(VehicleType::Car), FromLatLon(53.131897, 27.018889), {0., 0.},
                                    FromLatLon(53.57253, 27.47209), 82109);
 }
@@ -1001,6 +1018,46 @@ UNIT_TEST(Russia_Nsk_NoPassThrough)
   // Detour route via "Порт-Артурская" avoiding pass through service
   CalculateRouteAndTestRouteLength(GetVehicleComponents(VehicleType::Car), FromLatLon(54.9886261, 82.8091597), {0., 0.},
                                    FromLatLon(54.9924478, 82.8082036), 1254.17);
+  // Direct route via "Магаданская" between the start and the finish on service roads
+  CalculateRouteAndTestRouteLength(GetVehicleComponents(VehicleType::Car), FromLatLon(55.074347, 82.939134), {0., 0.},
+                                   FromLatLon(55.076779, 82.935965), 389.916);
+}
+
+// https://github.com/organicmaps/organicmaps/issues/3715
+UNIT_TEST(USA_Salem_CustomersParking)
+{
+  // Around the customers parking, like GraphHopper and Valhalla.
+  CalculateRouteAndTestRouteLength(GetVehicleComponents(VehicleType::Car), FromLatLon(44.9435, -123.0331), {0., 0.},
+                                   FromLatLon(44.9423, -123.0332), 489.673);
+  /// @todo The way back is 589 m around the parking: its passage costs two turn penalties.
+  /// GraphHopper and Valhalla go 179 m through the parking, OSRM 294 m.
+}
+
+// https://github.com/organicmaps/organicmaps/issues/7081
+UNIT_TEST(UK_Scotland_Biggar_KeepMainRoad)
+{
+  // The main road, not the longer residential one, like OSRM, GraphHopper and Valhalla.
+  CalculateRouteAndTestRouteLength(GetVehicleComponents(VehicleType::Car), FromLatLon(55.49446, -3.69184), {0., 0.},
+                                   FromLatLon(55.49042, -3.69469), 535.159);
+  CalculateRouteAndTestRouteLength(GetVehicleComponents(VehicleType::Car), FromLatLon(55.49042, -3.69469), {0., 0.},
+                                   FromLatLon(55.49446, -3.69184), 535.159);
+}
+
+/// @todo Fails: 847 m by two residential streets, OSRM, GraphHopper and Valhalla keep the primary road (870 m).
+/// It is not about service roads: the turn penalty doesn't apply to the residential streets.
+UNIT_TEST(Cyprus_Episkopi_KeepPrimary)
+{
+  CalculateRouteAndTestRouteLength(GetVehicleComponents(VehicleType::Car), FromLatLon(34.665564, 32.906134), {0., 0.},
+                                   FromLatLon(34.663808, 32.897648), 870.);
+}
+
+UNIT_TEST(Cyprus_Larnaca_Roundabout)
+{
+  // The way back is long by the one-way roads, like OSRM, GraphHopper and Valhalla.
+  CalculateRouteAndTestRouteLength(GetVehicleComponents(VehicleType::Car), FromLatLon(34.905396, 33.568956), {0., 0.},
+                                   FromLatLon(34.907287, 33.564954), 521.9);
+  CalculateRouteAndTestRouteLength(GetVehicleComponents(VehicleType::Car), FromLatLon(34.907287, 33.564954), {0., 0.},
+                                   FromLatLon(34.905396, 33.568956), 12927.4);
 }
 
 // The destination (43.5298373, 5.44563164) lies on Rue de la Treille. The route must
