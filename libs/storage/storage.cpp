@@ -2729,7 +2729,7 @@ StatusAndError Storage::GetNodeStatusInfo(CountryTree::Node const & node,
   return {result, NodeErrorCode::NoError};
 }
 
-void Storage::GetNodeAttrs(CountryId const & countryId, NodeAttrs & nodeAttrs) const
+void Storage::GetNodeAttrs(CountryId const & countryId, NodeAttrs & nodeAttrs, bool withTerrain) const
 {
   ASSERT(!countryId.empty(), ());
   CHECK_THREAD_CHECKER(m_threadChecker, ());
@@ -2757,21 +2757,25 @@ void Storage::GetNodeAttrs(CountryId const & countryId, NodeAttrs & nodeAttrs) c
   nodeAttrs.m_downloadingProgress =
       CalculateProgress(*node, GetQueuedMapSizes(m_downloader->GetQueue()), includeInstalled);
 
-  auto const terrain = GetTerrainAttrs(countryId);
-  auto const combinedStatus = GetEffectiveStatus(statusAndErr, terrain);
-  nodeAttrs.m_status = combinedStatus.status;
-  nodeAttrs.m_error = combinedStatus.error;
-  auto const progress = GetDownloadingProgress(countryId).GetCombined();
-  if (progress.m_bytesTotal > 0)
-    nodeAttrs.m_downloadingProgress = progress;
-  else
+  auto const terrain = withTerrain ? GetTerrainAttrs(countryId) : TerrainAttrs{};
+  auto progress = nodeAttrs.m_downloadingProgress;
+  if (withTerrain)
   {
-    nodeAttrs.m_downloadingProgress.m_bytesDownloaded += terrain.m_downloadedSize;
-    nodeAttrs.m_downloadingProgress.m_bytesTotal += terrain.m_downloadedSize;
+    auto const combinedStatus = GetEffectiveStatus(statusAndErr, terrain);
+    nodeAttrs.m_status = combinedStatus.status;
+    nodeAttrs.m_error = combinedStatus.error;
+    progress = GetDownloadingProgress(countryId).GetCombined();
+    if (progress.m_bytesTotal > 0)
+      nodeAttrs.m_downloadingProgress = progress;
+    else
+    {
+      nodeAttrs.m_downloadingProgress.m_bytesDownloaded += terrain.m_downloadedSize;
+      nodeAttrs.m_downloadingProgress.m_bytesTotal += terrain.m_downloadedSize;
+    }
+    // The full coverage, also of the not installed leafs of a folder.
+    for (auto const index : GetCoveringBlocks(countryId, false /* installedOnly */))
+      nodeAttrs.m_mwmSize += m_terrainGrid.GetBlock(index).m_size;
   }
-  // The full coverage, also of the not installed leafs of a folder.
-  for (auto const index : GetCoveringBlocks(countryId, false /* installedOnly */))
-    nodeAttrs.m_mwmSize += m_terrainGrid.GetBlock(index).m_size;
 
   nodeAttrs.m_downloadSize = 0;
   switch (nodeAttrs.m_status)
@@ -2782,15 +2786,15 @@ void Storage::GetNodeAttrs(CountryId const & countryId, NodeAttrs & nodeAttrs) c
   case NodeStatus::OnDiskOutOfDate:
   {
     UpdateInfo info;
-    GetUpdateInfo(countryId, info);
+    GetUpdateInfo(countryId, info, withTerrain);
     nodeAttrs.m_downloadSize = info.m_totalDownloadSizeInBytes;
     break;
   }
   case NodeStatus::NotDownloaded:
-  case NodeStatus::Partly: nodeAttrs.m_downloadSize = GetDownloadSize({countryId}); break;
+  case NodeStatus::Partly: nodeAttrs.m_downloadSize = GetDownloadSize({countryId}, withTerrain); break;
   case NodeStatus::Error:
   {
-    auto const failedTerrain = GetFailedTerrainRegions();
+    auto const failedTerrain = withTerrain ? GetFailedTerrainRegions() : CountriesSet{};
     CountriesSet terrainRegions;
     CountriesSet visited;
     ForEachInSubtree(countryId, [&](CountryId const & id, bool groupNode)
@@ -2862,14 +2866,16 @@ void Storage::GetNodeAttrs(CountryId const & countryId, NodeAttrs & nodeAttrs) c
   });
 }
 
-void Storage::GetNodeStatuses(CountryId const & countryId, NodeStatuses & nodeStatuses) const
+void Storage::GetNodeStatuses(CountryId const & countryId, NodeStatuses & nodeStatuses, bool withTerrain) const
 {
   CHECK_THREAD_CHECKER(m_threadChecker, ());
 
   CountryTree::Node const * const node = m_countries.FindFirst(countryId);
   CHECK(node, (countryId));
 
-  auto const statusAndErr = GetEffectiveStatus(GetNodeStatus(*node), GetTerrainAttrs(countryId));
+  auto statusAndErr = GetNodeStatus(*node);
+  if (withTerrain)
+    statusAndErr = GetEffectiveStatus(statusAndErr, GetTerrainAttrs(countryId));
   nodeStatuses.m_status = statusAndErr.status;
   nodeStatuses.m_error = statusAndErr.error;
   nodeStatuses.m_groupNode = (node->ChildrenCount() != 0);
@@ -2939,9 +2945,9 @@ downloader::Progress Storage::CalculateProgress(CountryTree::Node const & subtre
   return result;
 }
 
-void Storage::UpdateNode(CountryId const & countryId)
+void Storage::UpdateNode(CountryId const & countryId, bool withTerrain)
 {
-  ForEachInSubtree(countryId, [this](CountryId const & descendantId, bool groupNode)
+  ForEachInSubtree(countryId, [this, withTerrain](CountryId const & descendantId, bool groupNode)
   {
     if (groupNode)
       return;
@@ -2960,8 +2966,11 @@ void Storage::UpdateNode(CountryId const & countryId)
     }
 
     if (isDownload)
-      DownloadNode(descendantId, true /* isUpdate */);
+      DownloadNode(descendantId, true /* isUpdate */, withTerrain);
   });
+  if (!withTerrain)
+    return;
+
   CountriesSet regions;
   ForEachTerrainBlockToUpdate(countryId, [&](CountryId const & id, uint32_t) { regions.insert(id); });
   DownloadTerrain(regions);
@@ -3054,7 +3063,7 @@ void Storage::CancelTerrainOwners(CountriesSet const & subtree)
   NotifyStatusChangedForHierarchy(toNotify);
 }
 
-void Storage::RetryDownloadNode(CountryId const & countryId)
+void Storage::RetryDownloadNode(CountryId const & countryId, bool withTerrain)
 {
   // Retry each file type separately to preserve map-only routing requests.
   ForEachInSubtree(countryId, [this](CountryId const & descendantId, bool groupNode)
@@ -3065,6 +3074,9 @@ void Storage::RetryDownloadNode(CountryId const & countryId)
       DownloadNode(descendantId, isUpdateRequest, false /* withTerrain */);
     }
   });
+  if (!withTerrain)
+    return;
+
   auto const failed = GetFailedTerrainRegions();
   CountriesSet regions;
   ForEachInSubtree(countryId, [&](CountryId const & id, bool groupNode)
@@ -3075,7 +3087,7 @@ void Storage::RetryDownloadNode(CountryId const & countryId)
   DownloadTerrain(regions);
 }
 
-bool Storage::GetUpdateInfo(CountryId const & countryId, UpdateInfo & updateInfo) const
+bool Storage::GetUpdateInfo(CountryId const & countryId, UpdateInfo & updateInfo, bool withTerrain) const
 {
   CHECK_THREAD_CHECKER(m_threadChecker, ());
 
@@ -3114,6 +3126,8 @@ bool Storage::GetUpdateInfo(CountryId const & countryId, UpdateInfo & updateInfo
   }
   updateInfo = {};
   node->ForEachInSubtree(updateInfoAccumulator);
+  if (!withTerrain)
+    return true;
 
   std::set<uint32_t> blocks;
   CountriesSet regions;

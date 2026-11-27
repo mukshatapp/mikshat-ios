@@ -23,6 +23,28 @@ static constexpr int kBookmark = 2;
 static constexpr int kMyPosition = 3;
 static constexpr int kSearch = 4;
 static constexpr int kTrack = 5;
+
+jint ToJavaRoadWarningMarkType(RoadWarningMarkType type)
+{
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  // The retained SDK predates trail warnings and uses ordinal 6 for UNKNOWN.
+  switch (type)
+  {
+  case RoadWarningMarkType::Toll: return 0;
+  case RoadWarningMarkType::Ferry: return 1;
+  case RoadWarningMarkType::Dirty: return 2;
+  case RoadWarningMarkType::Steps: return 3;
+  case RoadWarningMarkType::Gate: return 4;
+  case RoadWarningMarkType::LiftGate: return 5;
+  case RoadWarningMarkType::DifficultTrail:
+  case RoadWarningMarkType::ExpertTrail:
+  case RoadWarningMarkType::Count: return 6;
+  }
+  UNREACHABLE();
+#else
+  return static_cast<jint>(type);
+#endif
+}
 }  // namespace
 
 jobject CreateMapObject(JNIEnv * env, place_page::Info const & info, int mapObjectType, double lat, double lon,
@@ -62,7 +84,7 @@ jobject CreateMapObject(JNIEnv * env, place_page::Info const & info, int mapObje
     static_cast<jint>(info.GetOpeningMode()),
     jni::ToJavaString(env, info.GetWikiDescription()),
     jni::ToJavaString(env, info.GetOSMDescription()),
-    static_cast<jint>(info.GetRoadType()),
+    ToJavaRoadWarningMarkType(info.GetRoadType()),
     jrawTypes
   );
   // clang-format on

@@ -17,15 +17,27 @@ std::map<TransitType, std::string> const kTransitSymbols = {{TransitType::Subway
                                                             {TransitType::Train, "transit_train"},
                                                             {TransitType::Tram, "transit_tram"},
                                                             {TransitType::Bus, "transit_bus"},
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+                                                            {TransitType::Ferry, "ship"},
+                                                            {TransitType::CableTram, "transit_tram"},
+                                                            {TransitType::AerialLift, "cable-car"},
+                                                            {TransitType::Funicular, "funicular"},
+#else
                                                             {TransitType::Ferry, "transit_ferry"},
                                                             {TransitType::CableTram, "transit_cable_tram"},
                                                             {TransitType::AerialLift, "transit_aerial_lift"},
                                                             {TransitType::Funicular, "transit_funicular"},
+#endif
                                                             // Trolleybuses reuse the bus icon (no dedicated
                                                             // trolleybus symbol; cities don't distinguish them).
                                                             {TransitType::Trolleybus, "transit_bus"},
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+                                                            {TransitType::AirService, "airport"},
+                                                            {TransitType::WaterService, "ship"}};
+#else
                                                             {TransitType::AirService, "transit_air_service"},
                                                             {TransitType::WaterService, "transit_water_service"}};
+#endif
 
 std::string DebugPrint(TransitType type)
 {

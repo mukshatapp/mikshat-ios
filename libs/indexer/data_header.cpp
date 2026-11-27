@@ -80,7 +80,8 @@ std::pair<int, int> DataHeader::GetScaleRange() const
   case MapType::WorldCoasts: return {low, high};
   default: ASSERT_EQUAL(type, MapType::Country, ());
 #if defined(MUKSHAT_LEGACY_SDK_ABI)
-    return {worldH, high};
+    // Reserve geometry is needed at the Saudi 50 km ruler reference (draw scale 8).
+    return {worldH - 1, high};
 #else
     return {worldH + 1, high};
 #endif

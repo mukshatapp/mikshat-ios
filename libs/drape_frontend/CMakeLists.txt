@@ -122,6 +122,7 @@ set(SRC
   path_text_shape.hpp
   poi_symbol_shape.cpp
   poi_symbol_shape.hpp
+  mukshat_geographic_presentation.hpp
   protected_area_boundary.hpp
   postprocess_renderer.cpp
   postprocess_renderer.hpp

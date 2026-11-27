@@ -50,7 +50,7 @@ leisure-miniature_golf                              # area z12-
 === 90
 
 landuse-grass                                       # area z12-
-natural-grassland                                   # area z12-
+natural-grassland                                   # area z12- (also has caption z9-)
 natural-heath                                       # area z12-
 === 80
 
@@ -60,7 +60,7 @@ landuse-farmyard                                    # area z14-
 landuse-allotments                                  # area z12-
 landuse-farmland                                    # area z14-
 landuse-field                                       # area z12-
-landuse-meadow                                      # area z12-
+landuse-meadow                                      # area z12- (also has caption z9-)
 landuse-orchard                                     # area z12-
 landuse-recreation_ground                           # area z12-
 landuse-village_green                               # area z12-
@@ -105,7 +105,7 @@ aeroway-aerodrome-international                     # area z10- (also has icon z
 leisure-beach_resort                                # area z10- (also has caption z15-)
 natural-beach                                       # area z10- (also has caption z15-)
 natural-beach-gravel                                # area z10- (also has caption z15-)
-natural-beach-sand                                  # area z10- (also has caption z15-)
+natural-beach-sand                                  # area z7- (also has caption z15-)
 natural-desert                                      # area z1- (also has caption z14-)
 natural-glacier                                     # area z1-
 === 30

@@ -14,6 +14,7 @@
 
 #include "indexer/road_shields_parser.hpp"
 #if defined(MUKSHAT_LEGACY_SDK_ABI)
+#include "drape_frontend/mukshat_geographic_presentation.hpp"
 #include "indexer/feature.hpp"
 #include "indexer/ftypes_matcher.hpp"
 #endif
@@ -150,6 +151,9 @@ void CaptionDefToFontDecl(drule::CaptionDef const * capRule, double visScale, dp
 {
   params.m_color = ToDrapeColor(capRule->color);
   params.m_size = static_cast<float>(std::max(kMinVisibleFontSize, capRule->height * visScale));
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  params.m_size *= mukshat::kCaptionSizeFactor;
+#endif
 
   if (capRule->stroke_color != 0)
     params.m_outlineColor = ToDrapeColor(capRule->stroke_color);
@@ -327,6 +331,55 @@ void CalculateRoadShieldPositions(std::vector<double> const & offsets, m2::Share
 }
 }  // namespace
 
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+namespace
+{
+bool IsMukshatUnpavedRoad(FeatureType & f)
+{
+  static ftypes::BaseCheckerEx const unpaved(
+      {{"highway", "track"}, {"psurface", "unpaved_good"}, {"psurface", "unpaved_bad"}});
+  return unpaved(feature::TypesHolder(f));
+}
+}  // namespace
+
+void BaseApplyFeature::ApplyGeographicNameColor(dp::FontDecl & font) const
+{
+  static ftypes::BaseCheckerEx const reserves(
+      {{"boundary", "national_park"}, {"boundary", "protected_area"}, {"leisure", "nature_reserve"}});
+  auto const types = feature::TypesHolder(m_f);
+  if (reserves(types))
+  {
+    font.m_color = GetColorConstant("MukshatReserveText");
+    return;
+  }
+  if (IsMukshatUnpavedRoad(m_f))
+  {
+    font.m_color = GetColorConstant("MukshatDirtRoad");
+    return;
+  }
+  static ftypes::BaseCheckerEx const genericLandform({{"place", "locality"},
+                                                      {"natural", "wetland"},
+                                                      {"natural", "grassland"},
+                                                      {"landuse", "meadow"},
+                                                      {"natural", "scrub"},
+                                                      {"natural", "water"}});
+  if (!genericLandform(types))
+    return;
+  auto kind = mukshat::ClassifyGeographicName(m_f.GetName(StringUtf8Multilang::kDefaultCode));
+  if (kind == mukshat::GeographicNameKind::Other)
+  {
+    static auto const arabic = StringUtf8Multilang::GetLangIndex("ar");
+    kind = mukshat::ClassifyGeographicName(m_f.GetName(arabic));
+  }
+  switch (kind)
+  {
+  case mukshat::GeographicNameKind::Depression: font.m_color = GetColorConstant("MukshatFaydaText"); break;
+  case mukshat::GeographicNameKind::Watercourse: font.m_color = GetColorConstant("MukshatWaterText"); break;
+  case mukshat::GeographicNameKind::Other: break;
+  }
+}
+#endif
+
 void BaseApplyFeature::FillCommonParams(CommonOverlayViewParams & p) const
 {
   p.m_rank = m_f.GetRank();
@@ -347,6 +400,9 @@ void ApplyPointFeature::ExtractCaptionParams(drule::CaptionDef const * primary, 
 
   dp::FontDecl decl;
   CaptionDefToFontDecl(primary, visScale, decl);
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  ApplyGeographicNameColor(decl);
+#endif
   titleDecl.m_primaryTextFont = decl;
   titleDecl.m_anchor = GetAnchor(primary->offset_x, primary->offset_y);
   // TODO(pastk) : remove offsets processing as de-facto "text-offset: *" is used to define anchors only.
@@ -358,6 +414,9 @@ void ApplyPointFeature::ExtractCaptionParams(drule::CaptionDef const * primary, 
     ASSERT(secondary != nullptr, ());
     dp::FontDecl auxDecl;
     CaptionDefToFontDecl(secondary, visScale, auxDecl);
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+    ApplyGeographicNameColor(auxDecl);
+#endif
     titleDecl.m_secondaryTextFont = auxDecl;
     // Secondary captions are optional always.
     titleDecl.m_secondaryOptional = true;
@@ -682,7 +741,7 @@ void ApplyAreaFeature::ProcessProtectedAreaBorder(drule::LineDef const & borderR
   params.m_baseGtoPScale = m_params.m_currentScaleGtoP;
   params.m_depthLayer = DepthLayer::GeometryLayer;
   // Keep the border just above its own translucent fill, within the renderer's valid depth range.
-  params.m_depth = std::min(areaDepth + 1.0, double(dp::kMaxDepth));
+  params.m_depth = std::min(areaDepth + mukshat::kReserveBorderDepthOffset, double(dp::kMaxDepth));
   params.m_zoomLevel = m_params.m_tileKey.m_zoomLevel;
   for (auto const & path : m_protectedBoundary->GetPaths())
   {
@@ -844,6 +903,13 @@ void ApplyLineFeatureGeometry::ProcessRule(drule::LineRule const & lineRule)
     LineViewParams params;
     params.m_tileCenter = m_params.m_tileRect.Center();
     ExtractLineParams(lineRule, visScale, params);
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+    if (IsMukshatUnpavedRoad(m_f))
+    {
+      params.m_color = GetColorConstant("MukshatDirtRoad");
+      params.m_pattern.clear();
+    }
+#endif
     params.m_depth = depth;
     params.m_rank = m_f.GetRank();
     params.m_baseGtoPScale = m_params.m_currentScaleGtoP;
@@ -1026,6 +1092,9 @@ void ApplyLineFeatureAdditional::ProcessAdditionalLineRules(drule::PathTextRule 
 
     dp::FontDecl fontDecl;
     CaptionDefToFontDecl(m_captionRule, visScale, fontDecl);
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+    ApplyGeographicNameColor(fontDecl);
+#endif
     PathTextViewParams params;
     FillCommonParams(params);
     params.m_depthLayer = DepthLayer::OverlayLayer;

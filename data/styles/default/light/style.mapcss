@@ -6,9 +6,14 @@
 @import("../include/Roads_label.mapcss");
 @import("../include/Icons.mapcss");
 @import("../include/Subways.mapcss");
+@import("../../mukshat/Geography.mapcss");
 
 colors
 {
+  MukshatFaydaText-color: @mukshat_fayda_text;
+  MukshatWaterText-color: @mukshat_water_text;
+  MukshatDirtRoad-color: @mukshat_dirt_road;
+  MukshatReserveText-color: @protected_area_border;
   GuiText-color: #4D4D4D;
   GuiText-opacity: 0.86;
   MyPositionAccuracy-color: #000000;

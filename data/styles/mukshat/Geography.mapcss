@@ -1,0 +1,116 @@
+/* Saudi reference ruler: z8 ~50 km, z9 ~20 km, z10 ~10 km.
+ * Ruler labels round ground distance; these are nominal integer draw scales.
+ */
+
+area|z8-[leisure=nature_reserve],
+area|z8-[boundary=national_park],
+area|z8-[boundary=protected_area]
+{fill-color: @protected_area_fill; fill-opacity: 0.2;
+ casing-width: 1.5; casing-color: @protected_area_border; casing-opacity: 1;}
+
+area|z9[leisure=nature_reserve],
+area|z9[boundary=national_park],
+area|z9[boundary=protected_area]
+{fill-opacity: 0.12;}
+
+area|z10-[leisure=nature_reserve],
+area|z10-[boundary=national_park],
+area|z10-[boundary=protected_area]
+{fill-opacity: 0.04;}
+
+area|z14-[leisure=nature_reserve],
+area|z14-[boundary=national_park],
+area|z14-[boundary=protected_area]
+{casing-width: 2;}
+
+line|z8-[leisure=nature_reserve],
+line|z8-[boundary=national_park],
+line|z8-[boundary=protected_area]
+{width: 1.5; color: @protected_area_border; opacity: 1; dashes: none;}
+
+line|z14-[leisure=nature_reserve],
+line|z14-[boundary=national_park],
+line|z14-[boundary=protected_area]
+{width: 2;}
+
+node|z8-[leisure=nature_reserve],
+node|z8-[boundary=national_park],
+node|z8-[boundary=protected_area],
+area|z8-[leisure=nature_reserve],
+area|z8-[boundary=national_park],
+area|z8-[boundary=protected_area]
+{text: name; font-size: 11; text-color: @protected_area_border;
+ text-position: center; text-offset: 1; text-halo-radius: 1;
+ text-halo-color: @label_halo_light; text-halo-opacity: 0.8;}
+
+line|z8-[leisure=nature_reserve],
+line|z8-[boundary=national_park],
+line|z8-[boundary=protected_area]
+{text: name; font-size: 11; text-color: @protected_area_border;
+ text-position: line; text-halo-radius: 1;
+ text-halo-color: @label_halo_light; text-halo-opacity: 0.8;}
+
+/* Rural names become available at the 20 km reference scale. */
+node|z9-[place=locality],
+node|z9-[place=hamlet],
+node|z9-[place=village],
+node|z9-[natural=peak],
+node|z9-[natural=volcano],
+node|z9-[natural=saddle],
+node|z9-[natural=cave_entrance],
+node|z9-[natural=rock],
+node|z9-[man_made=cairn],
+node|z9-[man_made=water_well],
+node|z9-[amenity=drinking_water],
+node|z9-[amenity=water_point],
+node|z9-[tourism=camp_site],
+node|z9-[tourism=picnic_site],
+node|z9-[tourism=viewpoint],
+node|z9-[historic=archaeological_site],
+node|z9-[historic=ruins]
+{text: name; text-color: @label_dark; text-offset: 1;
+ text-halo-radius: 1; text-halo-color: @label_halo_light; text-halo-opacity: 0.8;}
+
+node|z9-[natural=wetland],
+area|z9-[natural=wetland],
+node|z9-[natural=grassland],
+area|z9-[natural=grassland],
+node|z9-[landuse=meadow],
+area|z9-[landuse=meadow]
+{text: name; text-color: @mukshat_fayda_text; text-offset: 1;
+ text-halo-radius: 1; text-halo-color: @label_halo_light; text-halo-opacity: 0.8;}
+
+/* Names stored as generic locality features are classified by the native
+ * Mukshat geographic-label helper, without rewriting the map data.
+ */
+/* Unpaved surfaces on other highway types are recognized by the native
+ * psurface checker; track geometry is also fully defined in the style.
+ */
+line|z9-[highway=track],
+line|z9-[waterway=river],
+line|z9-[waterway=stream],
+line|z9-[waterway=canal],
+line|z9-[waterway=fish_pass]
+{width: eval(any(prop("width"), 1));}
+
+line|z9-[highway=track]
+{color: @mukshat_dirt_road; opacity: 1; dashes: none;
+ casing-color: @mukshat_dirt_road; casing-opacity: 1; casing-dashes: none;
+ text: name; text-position: line; text-color: @mukshat_dirt_road;
+ text-halo-radius: 1; text-halo-color: @label_halo_light; text-halo-opacity: 0.8;}
+
+line|z9-[highway=track]::*
+{color: @mukshat_dirt_road; opacity: 1; dashes: none;
+ casing-color: @mukshat_dirt_road; casing-opacity: 1; casing-dashes: none;}
+
+line|z9-[waterway=river],
+line|z9-[waterway=stream],
+line|z9-[waterway=canal],
+line|z9-[waterway=fish_pass]
+{color: @mukshat_water_text; opacity: 1; dashes: none;
+ casing-dashes: none; text: name; text-position: line;  text-color: @mukshat_water_text; text-halo-radius: 1;
+ text-halo-color: @label_halo_light; text-halo-opacity: 0.8;}
+
+/* Preserve hidden underground waterways. */
+line[waterway][tunnel]
+{width: 0; text: none;}

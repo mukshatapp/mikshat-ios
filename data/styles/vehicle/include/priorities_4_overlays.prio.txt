@@ -13,6 +13,17 @@
 # - BG-top: water (linear and areal)
 # - BG-by-size: landcover areas sorted by their size
 
+natural-peak                                        # caption z9-
+natural-volcano                                     # caption z9-
+natural-volcano-active                              # caption z9-
+=== 5400
+
+natural-cave_entrance                               # caption z9-
+=== 4650
+
+natural-saddle                                      # caption z9-
+=== 4500
+
 highway-speed_camera                                # icon z13-
 === 4400
 
@@ -143,6 +154,7 @@ place-city-capital-4                                # caption z4-
 place-sea                                           # caption z4-
 === 3550
 
+amenity-drinking_water                              # caption z9-
 place-city-capital                                  # caption z4-
 place-city-capital-10                               # caption z4-
 place-city-capital-11                               # caption z4-
@@ -181,7 +193,8 @@ railway-station-subway-spb                          # icon z11-16 (also has capt
 === 3100
 
 aeroway-aerodrome                                   # icon z14- (also has caption(optional) z14-, area z10-)
-place-village                                       # caption z11-
+man_made-water_well                                 # caption z9-
+place-village                                       # caption z9-
 === 3050
 
 railway-station                                     # icon z12- (also has caption(optional) z13-)
@@ -197,15 +210,29 @@ railway-station-light_rail-berlin                   # icon z13- (also has captio
 railway-station-light_rail-london                   # icon z13- (also has caption(optional) z15-)
 railway-station-light_rail-porto                    # icon z13- (also has caption(optional) z15-)
 railway-station-monorail                            # icon z13- (also has caption(optional) z14-)
+waterway-canal                                      # pathtext z9- (also has line z9-)
+waterway-canal-intermittent                         # pathtext z9- (also has line z9-)
+waterway-fish_pass                                  # pathtext z9- (also has line z9-)
+waterway-fish_pass-intermittent                     # pathtext z9- (also has line z9-)
+waterway-stream                                     # pathtext z9- (also has line z9-)
+waterway-stream-intermittent                        # pathtext z9- (also has line z9-)
 === 2900
 
 barrier-toll_booth                                  # icon z12- (also has caption(optional) z14-)
+natural-rock                                        # caption z9-
 === 2850
 
 junction                                            # caption z17-
 junction-circular                                   # caption z17-
 junction-roundabout                                 # caption z17-
 === 2800
+
+highway-track                                       # pathtext z9- (also has line z9-)
+highway-track-area                                  # pathtext z9- (also has line z9-)
+highway-track-bridge                                # pathtext z9- (also has line z9-)
+highway-track-no-access                             # pathtext z9- (also has line z9-)
+highway-track-tunnel                                # pathtext z9- (also has line z9-)
+=== 2780
 
 barrier-lift_gate                                   # icon z16- (also has caption(optional) z16-)
 === 2750
@@ -228,7 +255,7 @@ shop-caravan                                        # icon z17-
 
 highway-rest_area                                   # icon z14- (also has caption(optional) z14-, area z14-)
 highway-services                                    # icon z12- (also has caption(optional) z13-, area z12-)
-tourism-camp_site                                   # icon z16- (also has caption(optional) z16-)
+tourism-camp_site                                   # icon z16- and caption z9-15 (also has caption(optional) z16-)
 tourism-caravan_site                                # icon z16- (also has caption(optional) z16-)
 === 2570
 
@@ -253,15 +280,15 @@ amenity-parking-street_side                         # icon z17- (also has area z
 amenity-parking-street_side-fee                     # icon z15- (also has area z15-)
 === 2520
 
-boundary-national_park                              # icon z12- (also has caption(optional) z12-, area z10-)
-boundary-protected_area                             # icon z12- (also has caption(optional) z12-)
-boundary-protected_area-1                           # icon z12- (also has caption(optional) z12-, area z10-)
-boundary-protected_area-2                           # icon z12- (also has caption(optional) z12-)
-boundary-protected_area-3                           # icon z12- (also has caption(optional) z12-)
-boundary-protected_area-4                           # icon z12- (also has caption(optional) z12-)
-boundary-protected_area-5                           # icon z12- (also has caption(optional) z12-)
-boundary-protected_area-6                           # icon z12- (also has caption(optional) z12-)
-leisure-nature_reserve                              # icon z12- (also has caption(optional) z12-, area z10-)
+boundary-national_park                              # icon z12- and caption z8-11 (also has caption(optional) z12-, line z8-, area z8-)
+boundary-protected_area                             # icon z12- and caption z8-11 (also has caption(optional) z12-, line z8-, area z8-)
+boundary-protected_area-1                           # icon z12- and caption z8-11 (also has caption(optional) z12-, line z8-, area z8-)
+boundary-protected_area-2                           # icon z12- and caption z8-11 (also has caption(optional) z12-, line z8-, area z8-)
+boundary-protected_area-3                           # icon z12- and caption z8-11 (also has caption(optional) z12-, line z8-, area z8-)
+boundary-protected_area-4                           # icon z12- and caption z8-11 (also has caption(optional) z12-, line z8-, area z8-)
+boundary-protected_area-5                           # icon z12- and caption z8-11 (also has caption(optional) z12-, line z8-, area z8-)
+boundary-protected_area-6                           # icon z12- and caption z8-11 (also has caption(optional) z12-, line z8-, area z8-)
+leisure-nature_reserve                              # icon z12- and caption z8-11 (also has caption(optional) z12-, line z8-, area z8-)
 === 2500
 
 historic-castle                                     # icon z12- (also has caption(optional) z15-)
@@ -438,13 +465,16 @@ historic-monument                                   # icon z13- (also has captio
 man_made-communications_tower                       # icon z15- (also has caption(optional) z16-)
 === 1950
 
-place-hamlet                                        # caption z13-
+place-hamlet                                        # caption z9-
 === 1900
 
-place-locality                                      # caption z13-
+place-locality                                      # caption z9-
 === 1850
 
-tourism-viewpoint                                   # icon z14- (also has caption(optional) z15-)
+landuse-meadow                                      # caption z9- (also has area z12-)
+natural-grassland                                   # caption z9- (also has area z12-)
+tourism-picnic_site                                 # caption z9-
+tourism-viewpoint                                   # icon z14- and caption z9-13 (also has caption(optional) z14-)
 === 1800
 
 railway-halt                                        # icon z14- (also has caption(optional) z14-)
@@ -456,8 +486,8 @@ tourism-theme_park                                  # icon z14- (also has captio
 shop-supermarket                                    # icon z14- (also has caption(optional) z14-)
 === 1650
 
-waterway-river                                      # pathtext z11- (also has line z10-)
-waterway-river-intermittent                         # pathtext z11- (also has line z10-)
+waterway-river                                      # pathtext z9- (also has line z9-)
+waterway-river-intermittent                         # pathtext z9- (also has line z9-)
 === 1550
 
 natural-water                                       # caption z10- (also has area z1-)
@@ -495,6 +525,7 @@ historic-memorial                                   # icon z15- (also has captio
 historic-memorial-sculpture                         # icon z15- (also has caption(optional) z15-)
 historic-memorial-statue                            # icon z15- (also has caption(optional) z15-)
 historic-memorial-war_memorial                      # icon z15- (also has caption(optional) z15-)
+man_made-water_well-drinking_water_no               # caption z9-
 tourism-attraction                                  # icon z15- (also has caption(optional) z15-)
 === 1200
 
@@ -521,7 +552,7 @@ amenity-hospital                                    # icon z15- (also has captio
 leisure-beach_resort                                # caption z15- (also has area z10-)
 natural-beach                                       # caption z15- (also has area z10-)
 natural-beach-gravel                                # caption z15- (also has area z10-)
-natural-beach-sand                                  # caption z15- (also has area z10-)
+natural-beach-sand                                  # caption z15- (also has area z7-)
 === 900
 
 amenity-charging_station-bicycle                    # icon z16- (also has caption(optional) z16-)
@@ -563,8 +594,8 @@ waterway-lock_gate                                  # icon z16-
 amenity-conference_centre                           # icon z16-
 amenity-events_venue                                # icon z16-
 amenity-exhibition_centre                           # icon z16-
-amenity-water_point                                 # icon z16-
-amenity-water_point-drinking_water_no               # icon z18-
+amenity-water_point                                 # icon z16- and caption z9-15 (also has caption(optional) z16-)
+amenity-water_point-drinking_water_no               # icon z18- and caption z9-17 (also has caption(optional) z18-)
 building-train_station                              # caption z18- (also has area z15-)
 railway-subway_entrance                             # icon z16- (also has caption(optional) z17-)
 railway-subway_entrance-adana                       # icon z16- (also has caption(optional) z17-)
@@ -699,9 +730,9 @@ amenity-parking_entrance-private                    # icon z19-
 emergency-emergency_ward_entrance                   # icon z18- (also has caption(optional) z18-)
 === 500
 
-natural-wetland                                     # caption z16- (also has area z11-)
-natural-wetland-bog                                 # caption z16- (also has area z11-)
-natural-wetland-marsh                               # caption z16- (also has area z11-)
+natural-wetland                                     # caption z9- (also has area z11-)
+natural-wetland-bog                                 # caption z9- (also has area z11-)
+natural-wetland-marsh                               # caption z9- (also has area z11-)
 === 450
 
 railway-tram_stop                                   # icon z17- (also has caption(optional) z17-)
@@ -711,8 +742,8 @@ historic-memorial-cross                             # icon z17- (also has captio
 === 350
 
 amenity-arts_centre                                 # icon z17- (also has caption(optional) z17-)
-historic-archaeological_site                        # icon z17- (also has caption(optional) z17-)
-historic-ruins                                      # icon z17- (also has caption(optional) z17-)
+historic-archaeological_site                        # icon z17- and caption z9-16 (also has caption(optional) z17-)
+historic-ruins                                      # icon z17- and caption z9-16 (also has caption(optional) z17-)
 === 300
 
 amenity-fast_food                                   # icon z17- (also has caption(optional) z17-)
@@ -812,7 +843,7 @@ entrance-main                                       # icon z18- (also has captio
 
 # highway-rest_area                                 # caption(optional) z14- (also has icon z14-, area z14-)
 # highway-services                                  # caption(optional) z13- (also has icon z12-, area z12-)
-# tourism-camp_site                                 # caption(optional) z16- (also has icon z16-)
+# tourism-camp_site                                 # caption(optional) z16- (also has icon z16-, caption z9-15)
 # tourism-caravan_site                              # caption(optional) z16- (also has icon z16-)
 # === -7430
 
@@ -826,15 +857,15 @@ entrance-main                                       # icon z18- (also has captio
 # amenity-parking-underground-fee                   # caption(optional) z16- (also has icon z15-)
 # === -7450
 
-# boundary-national_park                            # caption(optional) z12- (also has icon z12-, area z10-)
-# boundary-protected_area                           # caption(optional) z12- (also has icon z12-)
-# boundary-protected_area-1                         # caption(optional) z12- (also has icon z12-, area z10-)
-# boundary-protected_area-2                         # caption(optional) z12- (also has icon z12-)
-# boundary-protected_area-3                         # caption(optional) z12- (also has icon z12-)
-# boundary-protected_area-4                         # caption(optional) z12- (also has icon z12-)
-# boundary-protected_area-5                         # caption(optional) z12- (also has icon z12-)
-# boundary-protected_area-6                         # caption(optional) z12- (also has icon z12-)
-# leisure-nature_reserve                            # caption(optional) z12- (also has icon z12-, area z10-)
+# boundary-national_park                            # caption(optional) z12- (also has icon z12-, caption z8-11, line z8-, area z8-)
+# boundary-protected_area                           # caption(optional) z12- (also has icon z12-, caption z8-11, line z8-, area z8-)
+# boundary-protected_area-1                         # caption(optional) z12- (also has icon z12-, caption z8-11, line z8-, area z8-)
+# boundary-protected_area-2                         # caption(optional) z12- (also has icon z12-, caption z8-11, line z8-, area z8-)
+# boundary-protected_area-3                         # caption(optional) z12- (also has icon z12-, caption z8-11, line z8-, area z8-)
+# boundary-protected_area-4                         # caption(optional) z12- (also has icon z12-, caption z8-11, line z8-, area z8-)
+# boundary-protected_area-5                         # caption(optional) z12- (also has icon z12-, caption z8-11, line z8-, area z8-)
+# boundary-protected_area-6                         # caption(optional) z12- (also has icon z12-, caption z8-11, line z8-, area z8-)
+# leisure-nature_reserve                            # caption(optional) z12- (also has icon z12-, caption z8-11, line z8-, area z8-)
 # === -7500
 
 # historic-castle                                   # caption(optional) z15- (also has icon z12-)
@@ -989,7 +1020,7 @@ entrance-main                                       # icon z18- (also has captio
 # man_made-communications_tower                     # caption(optional) z16- (also has icon z15-)
 # === -8050
 
-# tourism-viewpoint                                 # caption(optional) z15- (also has icon z14-)
+# tourism-viewpoint                                 # caption(optional) z14- (also has icon z14-, caption z9-13)
 # === -8200
 
 # railway-halt                                      # caption(optional) z14- (also has icon z14-)
@@ -1070,6 +1101,8 @@ entrance-main                                       # icon z18- (also has captio
 # amenity-place_of_worship-taoist                   # caption(optional) z17- (also has icon z16-)
 # === -9350
 
+# amenity-water_point                               # caption(optional) z16- (also has icon z16-, caption z9-15)
+# amenity-water_point-drinking_water_no             # caption(optional) z18- (also has icon z18-, caption z9-17)
 # railway-subway_entrance                           # caption(optional) z17- (also has icon z16-)
 # railway-subway_entrance-adana                     # caption(optional) z17- (also has icon z16-)
 # railway-subway_entrance-algiers                   # caption(optional) z17- (also has icon z16-)
@@ -1209,8 +1242,8 @@ entrance-main                                       # icon z18- (also has captio
 # === -9650
 
 # amenity-arts_centre                               # caption(optional) z17- (also has icon z17-)
-# historic-archaeological_site                      # caption(optional) z17- (also has icon z17-)
-# historic-ruins                                    # caption(optional) z17- (also has icon z17-)
+# historic-archaeological_site                      # caption(optional) z17- (also has icon z17-, caption z9-16)
+# historic-ruins                                    # caption(optional) z17- (also has icon z17-, caption z9-16)
 # === -9700
 
 # amenity-fast_food                                 # caption(optional) z17- (also has icon z17-)
@@ -1237,6 +1270,9 @@ entrance-main                                       # icon z18- (also has captio
 # leisure-park-no-access                            # caption(optional) z14- (also has icon z14-, area z10-)
 # leisure-park-private                              # caption(optional) z14- (also has icon z14-, area z10-)
 # === -9900
+
+man_made-cairn                                      # caption z9-
+=== -9950
 
 # entrance-main                                     # caption(optional) z18- (also has icon z18-)
 # === -9980

@@ -216,3 +216,8 @@
 /* Preserve Mukshat's approved daytime sand; night colors retain the base theme. */
 @mukshat_beach_sand: #28281A;
 @mukshat_desert: #191007;
+
+/* Mukshat geographic label and unpaved-road palette. */
+@mukshat_fayda_text: #81C784;
+@mukshat_water_text: #64B5F6;
+@mukshat_dirt_road: #A9754F;

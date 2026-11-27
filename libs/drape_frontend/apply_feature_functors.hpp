@@ -52,6 +52,9 @@ public:
 
 protected:
   void FillCommonParams(CommonOverlayViewParams & p) const;
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  void ApplyGeographicNameColor(dp::FontDecl & font) const;
+#endif
   double PriorityToDepth(int priority, drule::TypeT ruleType, double areaDepth) const;
 
   Params const & m_params;

@@ -7,6 +7,7 @@ set(SRC
   message_queue_tests.cpp
   my_position_controller_tests.cpp
   navigator_test.cpp
+  mukshat_geographic_presentation_tests.cpp
   protected_area_boundary_tests.cpp
   path_text_test.cpp
   read_metaline_task_tests.cpp

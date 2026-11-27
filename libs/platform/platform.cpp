@@ -205,6 +205,11 @@ void Platform::GetFontNames(FilesList & res) const
   if (!hasSystemCJK)
     res.push_back("fonts/02_droidsans-fallback.ttf");
 
+#ifdef MUKSHAT_BUNDLED_DESERT_MAPS
+  // Last position lets the app font's whitelist override system-font preferences.
+  res.push_back("fonts/00_Tajawal-Medium.ttf");
+#endif
+
   LOG(LINFO, ("Available font files:", (res)));
 }
 

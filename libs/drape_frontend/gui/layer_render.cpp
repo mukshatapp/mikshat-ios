@@ -50,7 +50,11 @@ void LayerRenderer::Render(ref_ptr<dp::GraphicsContext> context, ref_ptr<gpu::Pr
 
   for (auto & r : m_renderers)
   {
+#ifdef MUKSHAT_LEGACY_SDK_ABI
+    if (routingActive && r.first == gui::WIDGET_COMPASS)
+#else
     if (routingActive && (r.first == gui::WIDGET_COMPASS || r.first == gui::WIDGET_RULER))
+#endif
       continue;
 
     r.second->Render(context, mng, screen);

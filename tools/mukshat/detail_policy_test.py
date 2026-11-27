@@ -48,7 +48,7 @@ int main() {
  assert((feature::DataHeader{T::World,17}.GetScaleRange()==std::pair<int,int>{0,9}));
  assert((feature::DataHeader{T::WorldCoasts,17}.GetScaleRange()==std::pair<int,int>{0,17}));
 #if defined(MUKSHAT_LEGACY_SDK_ABI)
- assert((feature::DataHeader{T::Country,17}.GetScaleRange()==std::pair<int,int>{9,17}));
+ assert((feature::DataHeader{T::Country,17}.GetScaleRange()==std::pair<int,int>{8,17}));
  const std::array<int,6> expected{4,12,13,17,17,17};
 #else
  assert((feature::DataHeader{T::Country,17}.GetScaleRange()==std::pair<int,int>{10,17}));

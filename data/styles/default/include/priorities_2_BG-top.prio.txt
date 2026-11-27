@@ -42,19 +42,30 @@ natural-water-intermittent                          # area z1- (also has caption
 === 20
 
 natural-strait                                      # line z13- (also has caption z13-)
-waterway-canal                                      # line z13- (also has pathtext z13-)
-waterway-canal-intermittent                         # line z13- (also has pathtext z13-)
+waterway-canal                                      # line z9- (also has pathtext z9-)
+waterway-canal-intermittent                         # line z9- (also has pathtext z9-)
 waterway-ditch                                      # line z13-
 waterway-ditch-intermittent                         # line z13-
 waterway-drain                                      # line z13-
 waterway-drain-intermittent                         # line z13-
-waterway-fish_pass                                  # line z13- (also has pathtext z13-)
-waterway-fish_pass-intermittent                     # line z13- (also has pathtext z13-)
-waterway-river                                      # line z10- (also has pathtext z11-)
-waterway-river-intermittent                         # line z10- (also has pathtext z11-)
-waterway-stream                                     # line z13- (also has pathtext z13-)
-waterway-stream-intermittent                        # line z13- (also has pathtext z13-)
+waterway-fish_pass                                  # line z9- (also has pathtext z9-)
+waterway-fish_pass-intermittent                     # line z9- (also has pathtext z9-)
+waterway-river                                      # line z9- (also has pathtext z9-)
+waterway-river-intermittent                         # line z9- (also has pathtext z9-)
+waterway-stream                                     # line z9- (also has pathtext z9-)
+waterway-stream-intermittent                        # line z9- (also has pathtext z9-)
 === 10
 
 natural-tree_row                                    # line z17-
 === 5
+
+boundary-national_park                              # line z8- and area z8- (also has icon z11-17, caption z8-10,18-, caption(optional) z11-17)
+boundary-protected_area                             # line z8- and area z8- (also has icon z11-17, caption z8-10,18-, caption(optional) z11-17)
+boundary-protected_area-1                           # line z8- and area z8- (also has icon z11-17, caption z8-10,18-, caption(optional) z11-17)
+boundary-protected_area-2                           # line z8- and area z8- (also has icon z11-17, caption z8-10,18-, caption(optional) z11-17)
+boundary-protected_area-3                           # line z8- and area z8- (also has icon z11-17, caption z8-10,18-, caption(optional) z11-17)
+boundary-protected_area-4                           # line z8- and area z8- (also has icon z11-17, caption z8-10,18-, caption(optional) z11-17)
+boundary-protected_area-5                           # line z8- and area z8- (also has icon z11-17, caption z8-10,18-, caption(optional) z11-17)
+boundary-protected_area-6                           # line z8- and area z8- (also has icon z11-17, caption z8-10,18-, caption(optional) z11-17)
+leisure-nature_reserve                              # line z8- and area z8- (also has icon z11-17, caption z8-10,18-, caption(optional) z11-17)
+=== 1

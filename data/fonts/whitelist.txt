@@ -24,3 +24,4 @@ Latin-1_Supplement fonts/07_roboto_medium.ttf
 Malayalam /system/fonts/NotoSansMalayalam-Regular.ttf
 Malayalam fonts/00_NotoSansMalayalam-Regular.ttf
 Miscellaneous_Symbols fonts/organic_maps_emoji.ttf
+* fonts/00_Tajawal-Medium.ttf

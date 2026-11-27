@@ -1728,6 +1728,24 @@ UNIT_TEST(Storage_TerrainUpdatesUseCombinedStatusAndActions)
     auto downloader = std::make_unique<PendingTerrainDownloader>();
     auto const & queue = downloader->GetQueue();
     storage.SetDownloaderForTesting(std::move(downloader));
+    for (auto const & id : {CountryId("West"), CountryId("East")})
+    {
+      NodeAttrs mapsOnly;
+      storage.GetNodeAttrs(id, mapsOnly, false /* withTerrain */);
+      TEST_EQUAL(mapsOnly.m_status, NodeStatus::OnDisk, (id));
+      TEST_EQUAL(mapsOnly.m_mwmSize, id == "West" ? 100 : 200, (id));
+      TEST_EQUAL(mapsOnly.m_localMwmSize, mapsOnly.m_mwmSize, (id));
+      TEST_EQUAL(mapsOnly.m_downloadSize, 0, (id));
+      NodeStatuses statuses;
+      storage.GetNodeStatuses(id, statuses, false /* withTerrain */);
+      TEST_EQUAL(statuses.m_status, NodeStatus::OnDisk, (id));
+      Storage::UpdateInfo mapsUpdate;
+      TEST(storage.GetUpdateInfo(id, mapsUpdate, false /* withTerrain */), (id));
+      TEST_EQUAL(mapsUpdate.m_numberOfMwmFilesToUpdate, 0, (id));
+      TEST_EQUAL(mapsUpdate.m_totalDownloadSizeInBytes, 0, (id));
+    }
+    storage.UpdateNode(storage.GetRootId(), false /* withTerrain */);
+    TEST(queue.IsEmpty(), ());
     storage.UpdateNode(storage.GetRootId());
     storage.DownloadNode("West");
     TEST_EQUAL(queue.Count(), 1, ());
@@ -2169,6 +2187,11 @@ UNIT_TEST(Storage_TerrainLeafAndFolderSizes)
       TEST_EQUAL(attrs.m_localMwmSize, complete ? 640 : 330, (id, complete));
       TEST_EQUAL(attrs.m_mwmSize, 640, (id, complete));
       TEST_EQUAL(attrs.m_downloadSize, complete ? 0 : 300, (id, complete));
+      storage.GetNodeAttrs(id, attrs, false /* withTerrain */);
+      TEST_EQUAL(attrs.m_mwmSize, 600, (id, complete));
+      TEST_EQUAL(attrs.m_localMwmSize, complete ? 600 : 300, (id, complete));
+      TEST_EQUAL(attrs.m_downloadSize, complete ? 0 : 300, (id, complete));
+      TEST_EQUAL(attrs.m_status, complete ? NodeStatus::OnDisk : NodeStatus::Partly, (id, complete));
     }
     storage.GetNodeAttrs("West", attrs);
     TEST_EQUAL(attrs.m_status, NodeStatus::OnDisk, ());
@@ -2712,6 +2735,13 @@ UNIT_TEST(Storage_TerrainRetry)
     TEST_EQUAL(policy.m_calls, 1, (status));
     TEST(policy.m_regions.contains(owner->first), (status));
 
+    // Map-only consumers do not turn a terrain failure into a map retry.
+    storage.RetryDownloadNode(retryId, false /* withTerrain */);
+    TEST_EQUAL(storage.GetTerrainAttrs(owner->first).m_status, Storage::TerrainStatus::Failed, ());
+    storage.GetNodeAttrs(owner->first, attrs, false /* withTerrain */);
+    TEST_EQUAL(attrs.m_status, NodeStatus::OnDisk, ());
+    TEST(!storage.IsDownloadInProgress(), ());
+
     // Explicit retry requeues terrain before the auto-retry fires.
     storage.RetryDownloadNode(retryId);
     storage.GetNodeAttrs(owner->first, attrs);
@@ -2978,6 +3008,16 @@ UNIT_TEST(Storage_MapAndTerrainDownloadingProgressAreIndependent)
   check(0, 0, kMegabyte, 4 * kMegabyte);
   storage.DownloadNode("West");
   check(0, 2 * kMegabyte, kMegabyte, 4 * kMegabyte);
+  NodeAttrs mapsOnly;
+  storage.GetNodeAttrs("West", mapsOnly, false /* withTerrain */);
+  TEST_EQUAL(mapsOnly.m_mwmSize, 2 * kMegabyte, ());
+  TEST_EQUAL(mapsOnly.m_downloadingProgress.m_bytesTotal, 2 * kMegabyte, ());
+  TEST_EQUAL(mapsOnly.m_downloadingProgress.m_bytesDownloaded, 0, ());
+  NodeAttrs combined;
+  storage.GetNodeAttrs("West", combined);
+  TEST_EQUAL(combined.m_mwmSize, 6 * kMegabyte, ());
+  TEST_EQUAL(combined.m_downloadingProgress.m_bytesTotal, 6 * kMegabyte, ());
+  TEST_EQUAL(combined.m_downloadingProgress.m_bytesDownloaded, kMegabyte, ());
   storage.CancelTerrain("West");
   check(0, 2 * kMegabyte, 0, 0);
   pending.Start();

@@ -530,11 +530,12 @@ public:
 
   /// \brief Gets all the attributes for a node by its |countryId|.
   /// \param |nodeAttrs| is filled with attributes in this method.
-  void GetNodeAttrs(CountryId const & countryId, NodeAttrs & nodeAttrs) const;
+  /// Set |withTerrain| to false for map-only consumers without terrain controls.
+  void GetNodeAttrs(CountryId const & countryId, NodeAttrs & nodeAttrs, bool withTerrain = true) const;
 
   /// \brief Gets a short list of node attributes by its |countriId|.
   /// \note This method works quicklier than GetNodeAttrs().
-  void GetNodeStatuses(CountryId const & countryId, NodeStatuses & nodeStatuses) const;
+  void GetNodeStatuses(CountryId const & countryId, NodeStatuses & nodeStatuses, bool withTerrain = true) const;
 
   std::string GetNodeLocalName(CountryId const & countryId) const { return m_countryNameGetter(countryId); }
 
@@ -550,7 +551,7 @@ public:
   /// \brief Updates one node. It works for leaf and group mwms.
   /// \note If you want to update all the maps and this update is without changing
   /// borders or hierarchy just call UpdateNode(GetRootId()).
-  void UpdateNode(CountryId const & countryId);
+  void UpdateNode(CountryId const & countryId, bool withTerrain = true);
 
   /// \brief If the downloading a new node is in process cancels downloading the node and deletes
   /// the downloaded part of the map. If the map is in queue, remove the map from the queue.
@@ -566,7 +567,7 @@ public:
   /// In case of a group mwm this method retries downloading all mwm in m_failedCountries list
   /// which in the subtree with root |countryId|.
   /// It means the call RetryDownloadNode(GetRootId()) retries all the failed mwms.
-  void RetryDownloadNode(CountryId const & countryId);
+  void RetryDownloadNode(CountryId const & countryId, bool withTerrain = true);
 
   struct UpdateInfo
   {
@@ -583,7 +584,7 @@ public:
 
   /// \brief Get information for the update button: what UpdateNode(countryId) would download.
   /// \return true if updateInfo is filled correctly and false otherwise.
-  bool GetUpdateInfo(CountryId const & countryId, UpdateInfo & updateInfo) const;
+  bool GetUpdateInfo(CountryId const & countryId, UpdateInfo & updateInfo, bool withTerrain = true) const;
 
   /// @name This functions should be called from 'main' thread only to avoid races.
   /// @{

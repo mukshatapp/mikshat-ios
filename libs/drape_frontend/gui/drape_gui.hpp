@@ -60,7 +60,11 @@ public:
 private:
   RulerHelper m_rulerHelper;
 
+#ifdef MUKSHAT_LEGACY_SDK_ABI
+  CopyrightState m_copyrightState = CopyrightState::Hidden;
+#else
   CopyrightState m_copyrightState = CopyrightState::Pending;
+#endif
 
   Shape::TTapHandler m_onCompassTappedHandler;
 

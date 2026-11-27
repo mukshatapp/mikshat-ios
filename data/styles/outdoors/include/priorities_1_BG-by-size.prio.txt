@@ -57,7 +57,7 @@ highway-services                                    # area z14- (also has icon z
 landuse-retail                                      # area z15-
 leisure-resort                                      # area z15- (also has icon z16-, caption(optional) z16-)
 leisure-water_park                                  # area z16- (also has icon z16-, caption(optional) z16-)
-tourism-camp_site                                   # area z13- (also has icon z13-, caption(optional) z13-)
+tourism-camp_site                                   # area z13- (also has icon z13-, caption z9-12, caption(optional) z13-)
 tourism-theme_park                                  # area z16- (also has icon z14-, caption(optional) z14-)
 === 170
 
@@ -74,7 +74,7 @@ natural-scrub                                       # area z12-
 === 130
 
 landuse-grass                                       # area z12-
-natural-grassland                                   # area z12-
+natural-grassland                                   # area z12- (also has caption z9-)
 natural-heath                                       # area z12-
 === 120
 
@@ -108,7 +108,7 @@ landuse-farmyard                                    # area z10- (also has captio
 landuse-allotments                                  # area z12- (also has caption z15-)
 landuse-farmland                                    # area z10- (also has caption z15-)
 landuse-field                                       # area z12-
-landuse-meadow                                      # area z12-
+landuse-meadow                                      # area z12- (also has caption z9-)
 landuse-orchard                                     # area z12- (also has caption z15-)
 landuse-recreation_ground                           # area z12- (also has caption z15-)
 landuse-village_green                               # area z12-
@@ -163,7 +163,7 @@ landuse-education                                   # area z15-
 leisure-beach_resort                                # area z10- (also has icon z16-, caption(optional) z16-)
 natural-beach                                       # area z10- (also has caption z14-)
 natural-beach-gravel                                # area z10- (also has caption z14-)
-natural-beach-sand                                  # area z10- (also has caption z14-)
+natural-beach-sand                                  # area z7- (also has caption z14-)
 natural-desert                                      # area z1- (also has caption z14-)
 natural-glacier                                     # area z1-
 === 30

@@ -25,6 +25,12 @@
 
 namespace
 {
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+constexpr bool kWithTerrain = false;
+#else
+constexpr bool kWithTerrain = true;
+#endif
+
 enum ItemCategory : uint32_t
 {
   NEAR_ME,
@@ -176,7 +182,7 @@ JNIEXPORT jobject Java_app_organicmaps_sdk_downloader_MapManager_nativeGetUpdate
                                                                                      jstring root)
 {
   storage::Storage::UpdateInfo info;
-  if (!GetStorage().GetUpdateInfo(GetRootId(env, root), info))
+  if (!GetStorage().GetUpdateInfo(GetRootId(env, root), info, kWithTerrain))
     return nullptr;
 
   static jclass const infoClass = jni::GetGlobalClassRef(env, "app/organicmaps/sdk/downloader/UpdateInfo");
@@ -258,8 +264,10 @@ static void UpdateItem(JNIEnv * env, jobject item, storage::NodeAttrs const & at
 #if defined(MUKSHAT_LEGACY_SDK_ABI)
   env->SetLongField(item, ciBuilder.m_DownloadedBytes, progress.m_bytesDownloaded);
   env->SetLongField(item, ciBuilder.m_BytesToDownload, progress.m_bytesTotal);
-  env->SetFloatField(item, ciBuilder.m_Progress, progress.m_bytesTotal == 0 ? 0.0f :
-      static_cast<float>(100.0 * progress.m_bytesDownloaded / progress.m_bytesTotal));
+  env->SetFloatField(item, ciBuilder.m_Progress,
+                     progress.m_bytesTotal == 0
+                         ? 0.0f
+                         : static_cast<float>(100.0 * progress.m_bytesDownloaded / progress.m_bytesTotal));
 #else
   env->CallVoidMethod(item, ciBuilder.m_updateProgress, static_cast<jlong>(progress.m_bytesDownloaded),
                       static_cast<jlong>(progress.m_bytesTotal));
@@ -276,7 +284,7 @@ static void PutItemsToList(
   storage::NodeAttrs attrs;
   for (storage::CountryId const & child : children)
   {
-    GetStorage().GetNodeAttrs(child, attrs);
+    GetStorage().GetNodeAttrs(child, attrs, kWithTerrain);
 
     if (predicate && !predicate(child, attrs))
       continue;
@@ -325,7 +333,7 @@ JNIEXPORT void Java_app_organicmaps_sdk_downloader_MapManager_nativeGetAttribute
   auto const countryId = jni::ToNativeString(env, static_cast<jstring>(id.get()));
 
   storage::NodeAttrs attrs;
-  GetStorage().GetNodeAttrs(countryId, attrs);
+  GetStorage().GetNodeAttrs(countryId, attrs, kWithTerrain);
 
   UpdateItem(env, item, attrs);
 }
@@ -334,7 +342,7 @@ JNIEXPORT void Java_app_organicmaps_sdk_downloader_MapManager_nativeGetAttribute
 JNIEXPORT jint Java_app_organicmaps_sdk_downloader_MapManager_nativeGetStatus(JNIEnv * env, jclass clazz, jstring root)
 {
   storage::NodeStatuses ns;
-  GetStorage().GetNodeStatuses(jni::ToNativeString(env, root), ns);
+  GetStorage().GetNodeStatuses(jni::ToNativeString(env, root), ns, kWithTerrain);
   return static_cast<jint>(ns.m_status);
 }
 
@@ -348,7 +356,7 @@ JNIEXPORT jboolean Java_app_organicmaps_sdk_downloader_MapManager_nativeHasLates
 JNIEXPORT jint Java_app_organicmaps_sdk_downloader_MapManager_nativeGetError(JNIEnv * env, jclass clazz, jstring root)
 {
   storage::NodeStatuses ns;
-  GetStorage().GetNodeStatuses(jni::ToNativeString(env, root), ns);
+  GetStorage().GetNodeStatuses(jni::ToNativeString(env, root), ns, kWithTerrain);
   return static_cast<jint>(ns.m_error);
 }
 
@@ -403,7 +411,7 @@ static void EndBatchingCallbacks(JNIEnv * env)
     for (storage::CountryId const & countryId : key.second)
     {
       storage::NodeStatuses ns;
-      GetStorage().GetNodeStatuses(countryId, ns);
+      GetStorage().GetNodeStatuses(countryId, ns, kWithTerrain);
 
       // Create StorageCallbackData instance…
       SLR const id(env, jni::ToJavaString(env, countryId));
@@ -444,7 +452,7 @@ JNIEXPORT void Java_app_organicmaps_sdk_downloader_MapManager_nativeDownload(JNI
 JNIEXPORT void Java_app_organicmaps_sdk_downloader_MapManager_nativeRetry(JNIEnv * env, jclass clazz, jstring root)
 {
   StartBatchingCallbacks();
-  GetStorage().RetryDownloadNode(jni::ToNativeString(env, root));
+  GetStorage().RetryDownloadNode(jni::ToNativeString(env, root), kWithTerrain);
   EndBatchingCallbacks(env);
 }
 
@@ -452,7 +460,7 @@ JNIEXPORT void Java_app_organicmaps_sdk_downloader_MapManager_nativeRetry(JNIEnv
 JNIEXPORT void Java_app_organicmaps_sdk_downloader_MapManager_nativeUpdate(JNIEnv * env, jclass clazz, jstring root)
 {
   StartBatchingCallbacks();
-  GetStorage().UpdateNode(GetRootId(env, root));
+  GetStorage().UpdateNode(GetRootId(env, root), kWithTerrain);
   EndBatchingCallbacks(env);
 }
 
@@ -517,9 +525,8 @@ static void ProgressChangedCallback(std::shared_ptr<jobject> const & listenerRef
   JNIEnv * env = jni::GetEnv();
 #if defined(MUKSHAT_LEGACY_SDK_ABI)
   jmethodID const methodID = jni::GetMethodID(env, *listenerRef, "onProgress", "(Ljava/lang/String;JJ)V");
-  env->CallVoidMethod(*listenerRef, methodID,
-      jni::TScopedLocalRef(env, jni::ToJavaString(env, countryId)).get(),
-      static_cast<jlong>(progress.m_mwmDownloaded), static_cast<jlong>(progress.m_mwmTotal));
+  env->CallVoidMethod(*listenerRef, methodID, jni::TScopedLocalRef(env, jni::ToJavaString(env, countryId)).get(),
+                      static_cast<jlong>(progress.m_mwmDownloaded), static_cast<jlong>(progress.m_mwmTotal));
 #else
   jmethodID const methodID = jni::GetMethodID(
       env, *listenerRef, "onProgress", "(Ljava/lang/String;Lapp/organicmaps/sdk/downloader/MapManager$Progress;)V");

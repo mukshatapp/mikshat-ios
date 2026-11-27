@@ -1,0 +1,17 @@
+{
+  "schema": 1,
+  "consumer": "Retained Mukshat5.2/26112504 SDK Java enum and MapObject constructor",
+  "road_warning_java_ordinals": {
+    "TOLL": 0,
+    "FERRY": 1,
+    "DIRTY": 2,
+    "STEPS": 3,
+    "GATE": 4,
+    "LIFT_GATE": 5,
+    "UNKNOWN": 6
+  },
+  "road_warning_smali_sha256": "49ae98e413ec048af3fe2ee206d7c9f3f0968d69488c4be695ca6b9275bce628",
+  "map_object_smali_sha256": "2c44da407511d5f08db5deee9f470838f4d673489fa5533830c839e4c7539e26",
+  "constructor_semantic": "RoadWarningMarkType.values()[roadWarnType]",
+  "native_source_base_commit": "37315b5e98fba7eb5661e991a55db54a752fd0a1"
+}
