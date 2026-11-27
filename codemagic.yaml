@@ -75,7 +75,7 @@ workflows:
       events:
         - push
       branch_patterns:
-        - pattern: release/4.6.21
+        - pattern: release/4.6.22
           include: true
           source: true
       cancel_previous_builds: true
@@ -84,14 +84,22 @@ workflows:
     environment:
       xcode: "27.0"
       ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.mikshat.maps
+        provisioning_profiles:
+          - profile: mikshat_carplay_appstore
+            environment_variable: MIKSHAT_CARPLAY_PROFILE
+          - mikshat_widget_appstore
+        certificates:
+          - Mikshat-Codemagic
       vars:
         APP_STORE_APPLE_ID: "6828427541"
         XCODE_WORKSPACE: xcode/omim.xcworkspace
         XCODE_SCHEME: OMaps
-        APP_VERSION: "4.6.21"
+        APP_VERSION: "4.6.22"
     scripts:
+      - name: Verify CarPlay provisioning profile
+        script: |
+          set -euo pipefail
+          python3 mikshat/verify_carplay_signing.py profile "$MIKSHAT_CARPLAY_PROFILE" --output build/carplay-signing/profile.json
       - name: Prepare Mikshat branding and check navigation math
         script: |
           set -euo pipefail
@@ -162,7 +170,7 @@ workflows:
             --scheme "$XCODE_SCHEME" \
             --archive-xcargs "COMPILER_INDEX_STORE_ENABLE=NO MARKETING_VERSION=$APP_VERSION CURRENT_PROJECT_VERSION=$MIKSHAT_BUILD_NUMBER" \
             --config Release "$@" 2>&1 | tee /tmp/mikshat-archive.log
-      - name: Validate versions in signed IPA
+      - name: Validate versions and CarPlay in signed IPA
         script: |
           set -euo pipefail
           python3 - <<'PY'
@@ -170,6 +178,8 @@ workflows:
           import os
           import plistlib
           import re
+          import subprocess
+          import tempfile
           import zipfile
           original_ipas = list(Path("build/ios/ipa").glob("*.ipa"))
           # Only validated files retain the extension collected for publishing.
@@ -211,10 +221,23 @@ workflows:
               errors.append(f"Missing required bundle: {bundle}")
           if errors:
               raise SystemExit("\n".join(errors))
+          with tempfile.TemporaryDirectory(prefix="mikshat-signed-ipa-") as directory:
+              with zipfile.ZipFile(ipas[0]) as archive:
+                  root = Path(directory).resolve()
+                  for name in archive.namelist():
+                      if not (root / name).resolve().is_relative_to(root):
+                          raise SystemExit(f"Unsafe IPA entry: {name}")
+                  archive.extractall(root)
+              apps = list((root / "Payload").glob("*.app"))
+              if len(apps) != 1:
+                  raise SystemExit(f"Expected one signed app, found {len(apps)}")
+              subprocess.run(["python3", "mikshat/verify_carplay_signing.py", "app", str(apps[0]),
+                              "--output", "build/carplay-signing/app.json"], check=True)
           ipas[0].replace(original_ipas[0])
           PY
     artifacts:
       - build/ios/ipa/*.ipa
+      - build/carplay-signing/*.json
       - /tmp/xcodebuild_logs/*.log
       - /tmp/mikshat-archive.log
       - build/metal-preflight/preflight.log
