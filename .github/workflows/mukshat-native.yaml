@@ -40,7 +40,7 @@ jobs:
           python3 tools/mukshat/detail_policy_test.py
           python3 tools/mukshat/placepage_legacy_enum_test.py
           python3 tools/mukshat/maponly_storage_test.py
-          python3 tools/mukshat/test_legacy_gui.py
+          python3 tools/mukshat/test_legacy_gui.py --source-root .
           python3 tools/mukshat/test_legacy_transit_symbols.py --source-root .
           bash tools/mukshat/test_geographic_presentation.sh
           bash tools/mukshat/test_reserve_geometry.sh
