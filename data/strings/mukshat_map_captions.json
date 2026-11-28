@@ -1,0 +1,9 @@
+{
+  "locale": "ar",
+  "scope": "Arabic-only unnamed map captions; independent of Android UI locale",
+  "captions": {
+    "waterway-stream-intermittent": "مسيل",
+    "highway-track": "طريق ترابي",
+    "natural-scrub": "فيضة"
+  }
+}
