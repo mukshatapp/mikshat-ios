@@ -12,6 +12,14 @@
 # - BG-top: water (linear and areal)
 # - BG-by-size: landcover areas sorted by their size
 
+power-line                                          # line z9- (also has line::dash z9-)
+power-minor_line                                    # line z9- (also has line::dash z9-)
+=== 350
+
+power-line::dash                                    # line::dash z9- (also has line z9-)
+power-minor_line::dash                              # line::dash z9- (also has line z9-)
+=== 340
+
 historic-citywalls                                  # line z15-
 === 280
 

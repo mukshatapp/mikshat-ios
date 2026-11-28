@@ -6,6 +6,9 @@
 #include "platform/platform.hpp"
 
 #include "base/buffer_vector.hpp"
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+#include "geometry/mercator.hpp"
+#endif
 
 #include <algorithm>
 #include <functional>
@@ -14,6 +17,18 @@ namespace df
 {
 namespace
 {
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+mukshat::DetailVisibilityMask GetCurrentDetailVisibility(ScreenBase const & screen)
+{
+  // Mirror RulerHelper::Update, including rotation/perspective and the centre latitude.
+  auto const pivot = screen.PixelRect().Center();
+  double const width = mukshat::kMinimumRulerPixelWidth * VisualParams::Instance().GetVisualScale();
+  auto const right = screen.PtoG(pivot);
+  auto const left = screen.PtoG(pivot - m2::PointD(width, 0));
+  return mukshat::GetDetailVisibilityMask(mercator::DistanceOnEarth(left, right));
+}
+#endif
+
 struct LessCoverageCell
 {
   bool operator()(std::shared_ptr<TileInfo> const & l, TileKey const & r) const { return l->GetTileKey() < r; }
@@ -131,7 +146,19 @@ void ReadManager::UpdateCoverage(ScreenBase const & screen, bool have3dBuildings
   m_modeChanged |= (m_have3dBuildings != have3dBuildings);
   m_have3dBuildings = have3dBuildings;
 
-  if (m_modeChanged || forceUpdate || MustDropAllTiles(screen))
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  auto const detailVisibility = GetCurrentDetailVisibility(screen);
+  bool const detailVisibilityChanged = !m_detailVisibilityInitialized || detailVisibility != m_detailVisibility;
+  // Set before enqueuing any task: each EngineContext receives this exact snapshot.
+  m_detailVisibility = detailVisibility;
+  m_detailVisibilityInitialized = true;
+#endif
+
+  if (m_modeChanged || forceUpdate || MustDropAllTiles(screen)
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+      || detailVisibilityChanged
+#endif
+  )
   {
     m_modeChanged = false;
 
@@ -231,7 +258,11 @@ void ReadManager::PushTaskBackForTileKey(TileKey const & tileKey, ref_ptr<dp::Te
   auto context = make_unique_dp<EngineContext>(TileKey(tileKey, m_generationCounter, m_userMarksGenerationCounter),
                                                m_commutator, texMng, metalineMng, m_customFeaturesContext,
                                                m_have3dBuildings && m_allow3dBuildings, m_trafficEnabled,
-                                               m_isolinesEnabled, m_mapLangIndex, m_backgroundMode, m_areaOpacity);
+                                               m_isolinesEnabled, m_mapLangIndex, m_backgroundMode, m_areaOpacity
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+                                               , m_detailVisibility
+#endif
+  );
   std::shared_ptr<TileInfo> tileInfo = std::make_shared<TileInfo>(std::move(context));
   m_tileInfos.insert(tileInfo);
 

@@ -934,6 +934,7 @@ landuse-meadow                                      # caption z9- (also has area
 leisure-golf_course                                 # icon z15- (also has caption(optional) z17-, area z12-)
 leisure-miniature_golf                              # icon z17- (also has caption(optional) z17-, area z14-)
 natural-grassland                                   # caption z9- (also has area z12-)
+natural-scrub                                       # caption z9- (also has area z12-)
 natural-wetland                                     # caption z9- (also has area z11-)
 natural-wetland-bog                                 # caption z9- (also has area z11-)
 natural-wetland-marsh                               # caption z9- (also has area z11-)

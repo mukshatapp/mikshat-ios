@@ -8,6 +8,9 @@
 #include "drape/pointers.hpp"
 
 #include "base/cancellable.hpp"
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+#include "drape_frontend/mukshat_detail_visibility.hpp"
+#endif
 
 namespace dp
 {
@@ -25,7 +28,11 @@ public:
   EngineContext(TileKey tileKey, ref_ptr<ThreadsCommutator> commutator, ref_ptr<dp::TextureManager> texMng,
                 ref_ptr<MetalineManager> metalineMng, CustomFeaturesContextWeakPtr customFeaturesContext,
                 bool is3dBuildingsEnabled, bool isTrafficEnabled, bool isolinesEnabled, int8_t mapLangIndex,
-                dp::BackgroundMode backgroundMode, float areaOpacity);
+                dp::BackgroundMode backgroundMode, float areaOpacity
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+                , mukshat::DetailVisibilityMask detailVisibility = mukshat::kAllDetailVisibility
+#endif
+  );
 
   TileKey const & GetTileKey() const { return m_tileKey; }
   bool Is3dBuildingsEnabled() const { return m_3dBuildingsEnabled; }
@@ -35,6 +42,9 @@ public:
   dp::BackgroundMode GetBackgroundMode() const { return m_backgroundMode; }
   // Area-fill opacity used in Satellite mode (0..1). Only consulted when GetBackgroundMode() == Satellite.
   float GetAreaOpacity() const { return m_areaOpacity; }
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  mukshat::DetailVisibilityMask GetDetailVisibility() const { return m_detailVisibility; }
+#endif
   CustomFeaturesContextWeakPtr GetCustomFeaturesContext() const { return m_customFeaturesContext; }
   ref_ptr<dp::TextureManager> GetTextureManager() const;
   ref_ptr<MetalineManager> GetMetalineManager() const;
@@ -67,5 +77,9 @@ private:
   int8_t m_mapLangIndex;
   dp::BackgroundMode m_backgroundMode;
   float m_areaOpacity;
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  // Immutable per-read snapshot; workers never consult the live viewport.
+  mukshat::DetailVisibilityMask const m_detailVisibility;
+#endif
 };
 }  // namespace df

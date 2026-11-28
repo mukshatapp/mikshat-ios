@@ -473,6 +473,7 @@ place-locality                                      # caption z9-
 
 landuse-meadow                                      # caption z9- (also has area z12-)
 natural-grassland                                   # caption z9- (also has area z12-)
+natural-scrub                                       # caption z9- (also has area z12-)
 tourism-picnic_site                                 # caption z9-
 tourism-viewpoint                                   # icon z14- and caption z9-13 (also has caption(optional) z14-)
 === 1800

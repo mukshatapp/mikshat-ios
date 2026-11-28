@@ -1,6 +1,13 @@
 #include "drape_frontend/stylist.hpp"
 #include "drape_frontend/protected_area_presentation.hpp"
 
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+#include "drape_frontend/mukshat_caption_fallback.hpp"
+#include "drape_frontend/mukshat_feature_detail.hpp"
+
+#include "platform/localization.hpp"
+#endif
+
 #include "indexer/classificator.hpp"
 #include "indexer/classificator_loader.hpp"
 #include "indexer/feature.hpp"
@@ -129,6 +136,23 @@ void CaptionDescription::Init(FeatureType & f, int8_t deviceLang, int zoomLevel,
   }
   m_mainText = out.GetPrimary();
   m_mainTextLang = localizeLang(out.primaryLang);
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  static auto const arabic = StringUtf8Multilang::GetLangIndex("ar");
+  mukshat::PopulateUnnamedCaption(mukshat::ClassifyMapDetail(f), deviceLang, arabic, m_mainText, m_auxText,
+                                 m_mainTextLang, [](std::string_view type)
+  {
+    // These are the existing translated feature-type resources from the
+    // Android consumer. Cache the Arabic-only fallbacks off the hot path.
+    static std::string const stream = platform::GetLocalizedTypeName("waterway-stream-intermittent");
+    static std::string const track = platform::GetLocalizedTypeName("highway-track");
+    static std::string const scrub = platform::GetLocalizedTypeName("natural-scrub");
+    if (type == "waterway-stream-intermittent")
+      return stream;
+    if (type == "highway-track")
+      return track;
+    return scrub;
+  });
+#endif
   ASSERT(m_auxText.empty() || !m_mainText.empty(), ("auxText without mainText"));
 
   uint8_t constexpr kLongCaptionsMaxZoom = 4;

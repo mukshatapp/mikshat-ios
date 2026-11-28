@@ -92,6 +92,10 @@ private:
   int8_t m_mapLangIndex;
   dp::BackgroundMode m_backgroundMode = dp::BackgroundMode::Default;
   float m_areaOpacity = 0.5f;
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  mukshat::DetailVisibilityMask m_detailVisibility = 0;
+  bool m_detailVisibilityInitialized = false;
+#endif
 
   struct LessByTileInfo
   {

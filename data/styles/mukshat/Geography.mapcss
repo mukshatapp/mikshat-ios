@@ -111,6 +111,25 @@ line|z9-[waterway=fish_pass]
  casing-dashes: none; text: name; text-position: line;  text-color: @mukshat_water_text; text-halo-radius: 1;
  text-halo-color: @label_halo_light; text-halo-opacity: 0.8;}
 
+/* Fine-detail types have rules ready before either distance threshold.
+ * The legacy reader filters intermittent streams/power lines at the actual
+ * ruler's 2 km boundary and existing brown roads at its 5 km boundary.
+ * Keeping these available at z9 also covers fractional zoom and latitude
+ * changes without tying visibility to a nominal integer draw scale.
+ */
+node|z9-[natural=scrub],
+area|z9-[natural=scrub]
+{text: name; text-color: @mukshat_fayda_text; text-offset: 1;
+ text-halo-radius: 1; text-halo-color: @label_halo_light; text-halo-opacity: 0.8;}
+
+line|z9-[power=line],
+line|z9-[power=minor_line]
+{color: @powerline; width: 1; opacity: 0.6;}
+
+line|z9-[power=line]::dash,
+line|z9-[power=minor_line]::dash
+{color: @powerline; width: 4; opacity: 0.6; dashes: 1,80;}
+
 /* Preserve hidden underground waterways. */
 line[waterway][tunnel]
 {width: 0; text: none;}

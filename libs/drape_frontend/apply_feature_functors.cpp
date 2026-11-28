@@ -165,6 +165,9 @@ void ShieldRuleToFontDecl(drule::ShieldRule const * shieldRule, double visScale,
 {
   params.m_color = ToDrapeColor(shieldRule->text_color);
   params.m_size = static_cast<float>(std::max(kMinVisibleFontSize, shieldRule->height * visScale));
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  params.m_size *= mukshat::kCaptionIncrementFactor;
+#endif
   if (shieldRule->text_stroke_color != 0)
     params.m_outlineColor = ToDrapeColor(shieldRule->text_stroke_color);
 }
@@ -370,6 +373,12 @@ void BaseApplyFeature::ApplyGeographicNameColor(dp::FontDecl & font) const
   {
     static auto const arabic = StringUtf8Multilang::GetLangIndex("ar");
     kind = mukshat::ClassifyGeographicName(m_f.GetName(arabic));
+  }
+  if (kind == mukshat::GeographicNameKind::Other)
+  {
+    static ftypes::BaseCheckerEx const scrub({{"natural", "scrub"}});
+    if (scrub(types))
+      kind = mukshat::ClassifyGeographicName(m_captions.GetMainText());
   }
   switch (kind)
   {

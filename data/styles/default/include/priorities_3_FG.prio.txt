@@ -41,10 +41,12 @@ aerialway-zip_line                                  # line z13- (also has line::
 historic-citywalls                                  # line z14- (also has pathtext z16-)
 === 360
 
-power-line                                          # line z18- (also has line::dash z18-)
+power-line                                          # line z9- (also has line::dash z9-)
+power-minor_line                                    # line z9- (also has line::dash z9-)
 === 350
 
-power-line::dash                                    # line::dash z18- (also has line z18-)
+power-line::dash                                    # line::dash z9- (also has line z9-)
+power-minor_line::dash                              # line::dash z9- (also has line z9-)
 === 340
 
 highway-cycleway                                    # line z13- (also has pathtext z15-)

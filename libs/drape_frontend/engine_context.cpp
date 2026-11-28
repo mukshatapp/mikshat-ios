@@ -10,7 +10,11 @@ namespace df
 EngineContext::EngineContext(TileKey tileKey, ref_ptr<ThreadsCommutator> commutator, ref_ptr<dp::TextureManager> texMng,
                              ref_ptr<MetalineManager> metalineMng, CustomFeaturesContextWeakPtr customFeaturesContext,
                              bool is3dBuildingsEnabled, bool isTrafficEnabled, bool isolinesEnabled,
-                             int8_t mapLangIndex, dp::BackgroundMode backgroundMode, float areaOpacity)
+                              int8_t mapLangIndex, dp::BackgroundMode backgroundMode, float areaOpacity
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+                              , mukshat::DetailVisibilityMask detailVisibility
+#endif
+)
   : m_tileKey(tileKey)
   , m_commutator(commutator)
   , m_texMng(texMng)
@@ -22,6 +26,9 @@ EngineContext::EngineContext(TileKey tileKey, ref_ptr<ThreadsCommutator> commuta
   , m_mapLangIndex(mapLangIndex)
   , m_backgroundMode(backgroundMode)
   , m_areaOpacity(areaOpacity)
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  , m_detailVisibility(detailVisibility)
+#endif
 {}
 
 ref_ptr<dp::TextureManager> EngineContext::GetTextureManager() const

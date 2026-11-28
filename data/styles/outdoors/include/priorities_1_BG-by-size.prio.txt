@@ -70,7 +70,7 @@ leisure-miniature_golf                              # area z14- (also has icon z
 === 140
 
 landuse-flowerbed                                   # area z16-
-natural-scrub                                       # area z12-
+natural-scrub                                       # area z12- (also has caption z9-)
 === 130
 
 landuse-grass                                       # area z12-

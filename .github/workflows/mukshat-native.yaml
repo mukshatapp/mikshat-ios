@@ -1,7 +1,7 @@
 name: Mukshat native compatibility build
 on:
   push:
-    branches: [codex/mukshat-organic-26112401, codex/mukshat-android-maps-26112504, codex/mukshat-map-ui-fixes-26112801]
+    branches: [codex/mukshat-organic-26112401, codex/mukshat-android-maps-26112504, codex/mukshat-map-ui-fixes-26112801, codex/mukshat-map-details-26112802]
   workflow_dispatch:
 concurrency:
   group: mukshat-native-${{ github.ref }}
@@ -43,6 +43,9 @@ jobs:
           python3 tools/mukshat/test_legacy_gui.py --source-root .
           python3 tools/mukshat/test_legacy_transit_symbols.py --source-root .
           bash tools/mukshat/test_geographic_presentation.sh
+          python3 tools/mukshat/test_detail_visibility.py
+          g++ -std=c++23 -Wall -Wextra -Werror -I libs tools/mukshat/caption_fallback_test.cpp -o /tmp/caption-fallback-test
+          /tmp/caption-fallback-test
           bash tools/mukshat/test_reserve_geometry.sh
       - name: Build native engine for the preserved Mukshat SDK
         env:

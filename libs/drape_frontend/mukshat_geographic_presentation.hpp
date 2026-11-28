@@ -5,7 +5,9 @@
 
 namespace df::mukshat
 {
-inline constexpr float kCaptionSizeFactor = 1.2f;
+inline constexpr float kPreviousCaptionSizeFactor = 1.2f;
+inline constexpr float kCaptionIncrementFactor = 1.15f;
+inline constexpr float kCaptionSizeFactor = kPreviousCaptionSizeFactor * kCaptionIncrementFactor;
 inline constexpr double kReserveBorderDepthOffset = 0.01;
 
 enum class GeographicNameKind

@@ -187,3 +187,5 @@
 @mukshat_fayda_text: #81C784;
 @mukshat_water_text: #64B5F6;
 @mukshat_dirt_road: #A9754F;
+
+@powerline: #333333;

@@ -1,4 +1,7 @@
 #include "drape_frontend/rule_drawer.hpp"
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+#include "drape_frontend/mukshat_feature_detail.hpp"
+#endif
 
 #include "drape_frontend/apply_feature_functors.hpp"
 #include "drape_frontend/clip_splines_builder.hpp"
@@ -419,6 +422,10 @@ void RuleDrawer::operator()(FeatureType & f)
     return;
 
   feature::TypesHolder const types(f);
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  if (!mukshat::CanShow(mukshat::ClassifyMapDetail(f), m_context->GetDetailVisibility()))
+    return;
+#endif
   // m_drawTerrain suppresses the baked isoline features for the WHOLE tile while the
   // dynamic ones cover only the terrain blocks: a tile straddling the coverage border
   // shows a one-tile-wide gap. Accepted: per-feature gating against the mesh rects

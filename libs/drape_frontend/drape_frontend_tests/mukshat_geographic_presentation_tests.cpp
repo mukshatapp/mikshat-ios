@@ -1,5 +1,6 @@
 #include "drape_frontend/mukshat_geographic_presentation.hpp"
 
+#include <cmath>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -51,8 +52,8 @@ UNIT_TEST(Mukshat_NameWordBoundaries)
 
 UNIT_TEST(Mukshat_CaptionAndBorderPresentation)
 {
-  TEST(df::mukshat::kCaptionSizeFactor > 1.0f, ());
-  TEST(df::mukshat::kCaptionSizeFactor <= 1.25f, ());
+  TEST(std::abs(df::mukshat::kCaptionSizeFactor / df::mukshat::kPreviousCaptionSizeFactor - 1.15f) < 1e-6f, ());
+  TEST(std::abs(df::mukshat::kCaptionIncrementFactor - 1.15f) < 1e-6f, ());
   // Lowest reserve BG-top priority1 is0.1 renderer depth units above landcover.
   // Waterway priority10 is1.0 units above landcover; a border stays below it.
   TEST(df::mukshat::kReserveBorderDepthOffset > 0.0, ());
