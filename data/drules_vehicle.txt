@@ -7324,24 +7324,39 @@ type natural-saddle
   z20
     caption primary[height=10 color=#00333333/#00888888 stroke=#33FFFFFF/#33060600 dy=1] priority=4500
 type natural-scrub
+  z9
+    caption primary[height=10 color=#00246B38/#0081C784 stroke=#33FFFFFF/#33060600 dy=1] priority=1800
+  z10
+    caption primary[height=10 color=#00246B38/#0081C784 stroke=#33FFFFFF/#33060600 dy=1] priority=1800
+  z11
+    caption primary[height=10 color=#00246B38/#0081C784 stroke=#33FFFFFF/#33060600 dy=1] priority=1800
   z12
     area color=#00C6D9AB/#00090F0A priority=-1930
+    caption primary[height=10 color=#00246B38/#0081C784 stroke=#33FFFFFF/#33060600 dy=1] priority=1800
   z13
     area color=#00C6D9AB/#00090F0A priority=-1930
+    caption primary[height=10 color=#00246B38/#0081C784 stroke=#33FFFFFF/#33060600 dy=1] priority=1800
   z14
     area color=#00C6D9AB/#00090F0A priority=-1930
+    caption primary[height=10 color=#00246B38/#0081C784 stroke=#33FFFFFF/#33060600 dy=1] priority=1800
   z15
     area color=#00C6D9AB/#00090F0A priority=-1930
+    caption primary[height=10 color=#00246B38/#0081C784 stroke=#33FFFFFF/#33060600 dy=1] priority=1800
   z16
     area color=#00C6D9AB/#00090F0A priority=-1930
+    caption primary[height=10 color=#00246B38/#0081C784 stroke=#33FFFFFF/#33060600 dy=1] priority=1800
   z17
     area color=#00C6D9AB/#00090F0A priority=-1930
+    caption primary[height=10 color=#00246B38/#0081C784 stroke=#33FFFFFF/#33060600 dy=1] priority=1800
   z18
     area color=#00C6D9AB/#00090F0A priority=-1930
+    caption primary[height=10 color=#00246B38/#0081C784 stroke=#33FFFFFF/#33060600 dy=1] priority=1800
   z19
     area color=#00C6D9AB/#00090F0A priority=-1930
+    caption primary[height=10 color=#00246B38/#0081C784 stroke=#33FFFFFF/#33060600 dy=1] priority=1800
   z20
     area color=#00C6D9AB/#00090F0A priority=-1930
+    caption primary[height=10 color=#00246B38/#0081C784 stroke=#33FFFFFF/#33060600 dy=1] priority=1800
 type natural-volcano
   z9
     caption primary[height=10 color=#00333333/#00888888 stroke=#33FFFFFF/#33060600 dy=1] priority=5400
@@ -8858,6 +8873,80 @@ type post_office-post_partner
   z20
     symbol name=mail-m priority=200
     caption primary[height=11 color=#00444444/#00666666 dy=1 optional] priority=-9800
+type power-line
+  z9
+    line width=4 color=#66969586/#66333333 join=bevel cap=butt dash=[1,80] priority=340
+    line width=1 color=#66969586/#66333333 join=bevel cap=butt priority=350
+  z10
+    line width=4 color=#66969586/#66333333 join=bevel cap=butt dash=[1,80] priority=340
+    line width=1 color=#66969586/#66333333 join=bevel cap=butt priority=350
+  z11
+    line width=4 color=#66969586/#66333333 join=bevel cap=butt dash=[1,80] priority=340
+    line width=1 color=#66969586/#66333333 join=bevel cap=butt priority=350
+  z12
+    line width=4 color=#66969586/#66333333 join=bevel cap=butt dash=[1,80] priority=340
+    line width=1 color=#66969586/#66333333 join=bevel cap=butt priority=350
+  z13
+    line width=4 color=#66969586/#66333333 join=round cap=butt dash=[1,80] priority=340
+    line width=1 color=#66969586/#66333333 join=round cap=butt priority=350
+  z14
+    line width=4 color=#66969586/#66333333 join=round cap=butt dash=[1,80] priority=340
+    line width=1 color=#66969586/#66333333 join=round cap=butt priority=350
+  z15
+    line width=4 color=#66969586/#66333333 join=round cap=butt dash=[1,80] priority=340
+    line width=1 color=#66969586/#66333333 join=round cap=butt priority=350
+  z16
+    line width=4 color=#66969586/#66333333 join=round cap=round dash=[1,80] priority=340
+    line width=1 color=#66969586/#66333333 join=round cap=round priority=350
+  z17
+    line width=4 color=#66969586/#66333333 join=round cap=round dash=[1,80] priority=340
+    line width=1 color=#66969586/#66333333 join=round cap=round priority=350
+  z18
+    line width=4 color=#66969586/#66333333 join=round cap=round dash=[1,80] priority=340
+    line width=1 color=#66969586/#66333333 join=round cap=round priority=350
+  z19
+    line width=4 color=#66969586/#66333333 join=round cap=round dash=[1,80] priority=340
+    line width=1 color=#66969586/#66333333 join=round cap=round priority=350
+  z20
+    line width=4 color=#66969586/#66333333 join=round cap=round dash=[1,80] priority=340
+    line width=1 color=#66969586/#66333333 join=round cap=round priority=350
+type power-minor_line
+  z9
+    line width=4 color=#66969586/#66333333 join=bevel cap=butt dash=[1,80] priority=340
+    line width=1 color=#66969586/#66333333 join=bevel cap=butt priority=350
+  z10
+    line width=4 color=#66969586/#66333333 join=bevel cap=butt dash=[1,80] priority=340
+    line width=1 color=#66969586/#66333333 join=bevel cap=butt priority=350
+  z11
+    line width=4 color=#66969586/#66333333 join=bevel cap=butt dash=[1,80] priority=340
+    line width=1 color=#66969586/#66333333 join=bevel cap=butt priority=350
+  z12
+    line width=4 color=#66969586/#66333333 join=bevel cap=butt dash=[1,80] priority=340
+    line width=1 color=#66969586/#66333333 join=bevel cap=butt priority=350
+  z13
+    line width=4 color=#66969586/#66333333 join=round cap=butt dash=[1,80] priority=340
+    line width=1 color=#66969586/#66333333 join=round cap=butt priority=350
+  z14
+    line width=4 color=#66969586/#66333333 join=round cap=butt dash=[1,80] priority=340
+    line width=1 color=#66969586/#66333333 join=round cap=butt priority=350
+  z15
+    line width=4 color=#66969586/#66333333 join=round cap=butt dash=[1,80] priority=340
+    line width=1 color=#66969586/#66333333 join=round cap=butt priority=350
+  z16
+    line width=4 color=#66969586/#66333333 join=round cap=round dash=[1,80] priority=340
+    line width=1 color=#66969586/#66333333 join=round cap=round priority=350
+  z17
+    line width=4 color=#66969586/#66333333 join=round cap=round dash=[1,80] priority=340
+    line width=1 color=#66969586/#66333333 join=round cap=round priority=350
+  z18
+    line width=4 color=#66969586/#66333333 join=round cap=round dash=[1,80] priority=340
+    line width=1 color=#66969586/#66333333 join=round cap=round priority=350
+  z19
+    line width=4 color=#66969586/#66333333 join=round cap=round dash=[1,80] priority=340
+    line width=1 color=#66969586/#66333333 join=round cap=round priority=350
+  z20
+    line width=4 color=#66969586/#66333333 join=round cap=round dash=[1,80] priority=340
+    line width=1 color=#66969586/#66333333 join=round cap=round priority=350
 type power-plant
   z15
     area color=#00E1DCE3/#000D0A0D priority=-1960

@@ -12799,24 +12799,39 @@ type natural-scree
   z20
     area color=#00CCC7BA priority=-1920
 type natural-scrub
+  z9
+    caption primary[height=10 color=#00246B38 stroke=#33FFFFFF dy=1] priority=1800
+  z10
+    caption primary[height=10 color=#00246B38 stroke=#33FFFFFF dy=1] priority=1800
+  z11
+    caption primary[height=10 color=#00246B38 stroke=#33FFFFFF dy=1] priority=1800
   z12
     area color=#00BCC87E priority=-1870
+    caption primary[height=10 color=#00246B38 stroke=#33FFFFFF dy=1] priority=1800
   z13
     area color=#00BCC87E priority=-1870
+    caption primary[height=10 color=#00246B38 stroke=#33FFFFFF dy=1] priority=1800
   z14
     area color=#00BCC87E priority=-1870
+    caption primary[height=10 color=#00246B38 stroke=#33FFFFFF dy=1] priority=1800
   z15
     area color=#00BCC87E priority=-1870
+    caption primary[height=10 color=#00246B38 stroke=#33FFFFFF dy=1] priority=1800
   z16
     area color=#00BCC87E priority=-1870
+    caption primary[height=10 color=#00246B38 stroke=#33FFFFFF dy=1] priority=1800
   z17
     area color=#00BCC87E priority=-1870
+    caption primary[height=10 color=#00246B38 stroke=#33FFFFFF dy=1] priority=1800
   z18
     area color=#00BCC87E priority=-1870
+    caption primary[height=10 color=#00246B38 stroke=#33FFFFFF dy=1] priority=1800
   z19
     area color=#00BCC87E priority=-1870
+    caption primary[height=10 color=#00246B38 stroke=#33FFFFFF dy=1] priority=1800
   z20
     area color=#00BCC87E priority=-1870
+    caption primary[height=10 color=#00246B38 stroke=#33FFFFFF dy=1] priority=1800
 type natural-shingle
   z12
     area color=#00CCC7BA priority=-1920
@@ -15176,31 +15191,61 @@ type power-generator-wind
     symbol name=wind_turbine-m priority=120
     caption primary[height=10 color=#00444444 dy=1 optional] priority=-9880
 type power-line
+  z9
+    line width=4 color=#66969586 join=bevel cap=butt dash=[1,80] priority=340
+    line width=1 color=#66969586 join=bevel cap=butt priority=350
+  z10
+    line width=4 color=#66969586 join=bevel cap=butt dash=[1,80] priority=340
+    line width=1 color=#66969586 join=bevel cap=butt priority=350
+  z11
+    line width=4 color=#66969586 join=bevel cap=butt dash=[1,80] priority=340
+    line width=1 color=#66969586 join=bevel cap=butt priority=350
+  z12
+    line width=4 color=#66969586 join=bevel cap=butt dash=[1,80] priority=340
+    line width=1 color=#66969586 join=bevel cap=butt priority=350
   z13
-    line width=4 color=#80969586 join=round cap=round dash=[1,80] priority=340
-    line width=1 color=#99969586 join=round cap=round priority=350
+    line width=4 color=#66969586 join=round cap=butt dash=[1,80] priority=340
+    line width=1 color=#66969586 join=round cap=butt priority=350
   z14
-    line width=4 color=#80969586 join=round cap=round dash=[1,80] priority=340
-    line width=1 color=#99969586 join=round cap=round priority=350
+    line width=4 color=#66969586 join=round cap=butt dash=[1,80] priority=340
+    line width=1 color=#66969586 join=round cap=butt priority=350
   z15
-    line width=4 color=#80969586 join=round cap=round dash=[1,80] priority=340
-    line width=1 color=#99969586 join=round cap=round priority=350
+    line width=4 color=#66969586 join=round cap=butt dash=[1,80] priority=340
+    line width=1 color=#66969586 join=round cap=butt priority=350
   z16
-    line width=4 color=#80969586 join=round cap=round dash=[1,80] priority=340
-    line width=1 color=#99969586 join=round cap=round priority=350
+    line width=4 color=#66969586 join=round cap=round dash=[1,80] priority=340
+    line width=1 color=#66969586 join=round cap=round priority=350
   z17
-    line width=4 color=#80969586 join=round cap=round dash=[1,80] priority=340
-    line width=1 color=#99969586 join=round cap=round priority=350
+    line width=4 color=#66969586 join=round cap=round dash=[1,80] priority=340
+    line width=1 color=#66969586 join=round cap=round priority=350
   z18
-    line width=4 color=#80969586 join=round cap=round dash=[1,80] priority=340
-    line width=1 color=#99969586 join=round cap=round priority=350
+    line width=4 color=#66969586 join=round cap=round dash=[1,80] priority=340
+    line width=1 color=#66969586 join=round cap=round priority=350
   z19
-    line width=4 color=#80969586 join=round cap=round dash=[1,80] priority=340
-    line width=1 color=#99969586 join=round cap=round priority=350
+    line width=4 color=#66969586 join=round cap=round dash=[1,80] priority=340
+    line width=1 color=#66969586 join=round cap=round priority=350
   z20
-    line width=4 color=#80969586 join=round cap=round dash=[1,80] priority=340
-    line width=1 color=#99969586 join=round cap=round priority=350
+    line width=4 color=#66969586 join=round cap=round dash=[1,80] priority=340
+    line width=1 color=#66969586 join=round cap=round priority=350
 type power-minor_line
+  z9
+    line width=4 color=#66969586 join=bevel cap=butt dash=[1,80] priority=340
+    line width=1 color=#66969586 join=bevel cap=butt priority=350
+  z10
+    line width=4 color=#66969586 join=bevel cap=butt dash=[1,80] priority=340
+    line width=1 color=#66969586 join=bevel cap=butt priority=350
+  z11
+    line width=4 color=#66969586 join=bevel cap=butt dash=[1,80] priority=340
+    line width=1 color=#66969586 join=bevel cap=butt priority=350
+  z12
+    line width=4 color=#66969586 join=bevel cap=butt dash=[1,80] priority=340
+    line width=1 color=#66969586 join=bevel cap=butt priority=350
+  z13
+    line width=4 color=#66969586 join=round cap=butt dash=[1,80] priority=340
+    line width=1 color=#66969586 join=round cap=butt priority=350
+  z14
+    line width=4 color=#66969586 join=round cap=butt dash=[1,80] priority=340
+    line width=1 color=#66969586 join=round cap=butt priority=350
   z15
     line width=4 color=#66969586 join=round cap=butt dash=[1,80] priority=340
     line width=1 color=#66969586 join=round cap=butt priority=350
