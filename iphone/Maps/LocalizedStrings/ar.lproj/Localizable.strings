@@ -1653,3 +1653,30 @@
 
 /* Generic feature category for dirt tracks and explicitly unpaved roads; preserve actual road names. */
 "mikshat_dirt_road_type" = "درب";
+
+/* CarPlay action to save the current GPS location to the existing bookmarks. */
+"mikshat_carplay_save_location" = "حفظ الموقع";
+
+/* CarPlay information screen with current journey metrics. */
+"mikshat_carplay_trip_info" = "معلومات الرحلة";
+
+/* CarPlay GPS recenter and follow button. */
+"mikshat_carplay_gps" = "موقعي";
+
+/* Accessibility label for the current CarPlay map orientation. */
+"mikshat_carplay_north_up" = "الشمال أعلى الشاشة";
+
+/* Accessibility label for the current CarPlay map orientation. */
+"mikshat_carplay_heading_up" = "اتجاه السير أعلى الشاشة";
+
+/* CarPlay map panning button. */
+"mikshat_carplay_pan" = "تحريك الخريطة";
+
+/* Direct guidance arrival is approximate and depends on movement speed. */
+"mikshat_carplay_estimated_arrival" = "الوصول التقريبي";
+
+/* CarPlay keeps the existing premium requirement for saving new locations. */
+"mikshat_carplay_subscription_on_phone" = "حفظ مواقع جديدة يتطلب اشتراكًا فعالًا. يمكنك إدارة الاشتراك من الجوال.";
+
+/* CarPlay bookmark creation failed without interrupting the current trip. */
+"mikshat_carplay_save_failed" = "تعذّر حفظ الموقع. حاول مجددًا.";
