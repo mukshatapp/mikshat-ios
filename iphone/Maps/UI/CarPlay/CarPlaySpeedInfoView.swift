@@ -56,7 +56,8 @@ final class CarPlaySpeedInfoView: UIView {
   }
 
   func updateAppearance() {
-    currentSpeedLabel.text = Measure(asSpeed: currentSpeedMps).valueAsString
+    let hasCurrentSpeed = currentSpeedMps.isFinite && currentSpeedMps >= 0
+    currentSpeedLabel.text = hasCurrentSpeed ? Measure(asSpeed: currentSpeedMps).valueAsString : "—"
 
     if isCameraOnRoute {
       speedCamLimitContainer.layer.borderColor = UIColor.speedLimitRed.cgColor
@@ -67,7 +68,7 @@ final class CarPlaySpeedInfoView: UIView {
         speedCamLimitLabel.text = Measure(asSpeed: cameraSpeedLimitMps).valueAsString
         speedCamLimitLabel.textColor = .speedLimitDarkGray
         currentSpeedLabel.textColor = .whitePrimary
-        currentSpeedView.backgroundColor = cameraSpeedLimitMps >= currentSpeedMps ? .speedLimitGreen : .speedLimitRed
+        currentSpeedView.backgroundColor = !hasCurrentSpeed || cameraSpeedLimitMps >= currentSpeedMps ? .speedLimitGreen : .speedLimitRed
       } else {
         speedCamLimitLabel.alpha = 0
         speedCamImageView.alpha = 1
@@ -84,7 +85,7 @@ final class CarPlaySpeedInfoView: UIView {
         speedCamLimitLabel.text = speedLimitMeasure.value == 0 ? "🚀" : speedLimitMeasure.valueAsString
         speedCamLimitLabel.alpha = 1
         speedCamLimitContainer.layer.borderColor = UIColor.speedLimitRed.cgColor
-        if currentSpeedMps > speedLimitMps {
+        if hasCurrentSpeed && currentSpeedMps > speedLimitMps {
           currentSpeedLabel.textColor = .speedLimitRed
         }
       } else {

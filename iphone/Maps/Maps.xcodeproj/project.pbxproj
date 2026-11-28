@@ -7,6 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		83BFAC5485A8EEC6A853B8D8 /* MapTemplateBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4498F1AB6B61A04D66CCE872 /* MapTemplateBuilderTests.swift */; };
+		0D9ADF9C4DC411CFACC76C38 /* CarPlayRouterSharedSessionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB32B50B5F37910165A3FC6A /* CarPlayRouterSharedSessionTests.swift */; };
+		AFC72CFADC91F905A82E7ADE /* CarPlaySharedGuidanceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 668A75B497B484355E508BBB /* CarPlaySharedGuidanceTests.swift */; };
+		974915D7804323123319A054 /* CarPlayTripMetricsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFBF0CFAAA623FDEBB2F6870 /* CarPlayTripMetricsTests.swift */; };
+		3B04AD9FD06B0B0040BC5830 /* CarPlaySharedGuidanceState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B21879376AD8973EA2D8FC58 /* CarPlaySharedGuidanceState.swift */; };
+		4093E4E34B2A3C9BD1C20553 /* CarPlayTripMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9C9B3B0540A9EBDEDB196FE8 /* CarPlayTripMetrics.swift */; };
 		A46210000000000000000001 /* PlacePageSourceMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = A46210000000000000000002 /* PlacePageSourceMetadata.swift */; };
 		A46210000000000000000003 /* PlacePageSourceMetadataTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A46210000000000000000004 /* PlacePageSourceMetadataTests.swift */; };
 		A46210000000000000000005 /* MikshatRoutingEntryTests.mm in Sources */ = {isa = PBXBuildFile; fileRef = A46210000000000000000006 /* MikshatRoutingEntryTests.mm */; };
@@ -822,6 +828,12 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		4498F1AB6B61A04D66CCE872 /* MapTemplateBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapTemplateBuilderTests.swift; sourceTree = "<group>"; };
+		BB32B50B5F37910165A3FC6A /* CarPlayRouterSharedSessionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayRouterSharedSessionTests.swift; sourceTree = "<group>"; };
+		668A75B497B484355E508BBB /* CarPlaySharedGuidanceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySharedGuidanceTests.swift; sourceTree = "<group>"; };
+		BFBF0CFAAA623FDEBB2F6870 /* CarPlayTripMetricsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayTripMetricsTests.swift; sourceTree = "<group>"; };
+		B21879376AD8973EA2D8FC58 /* CarPlaySharedGuidanceState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySharedGuidanceState.swift; sourceTree = "<group>"; };
+		9C9B3B0540A9EBDEDB196FE8 /* CarPlayTripMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayTripMetrics.swift; sourceTree = "<group>"; };
 		A46210000000000000000002 /* PlacePageSourceMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacePageSourceMetadata.swift; sourceTree = "<group>"; };
 		A46210000000000000000004 /* PlacePageSourceMetadataTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlacePageSourceMetadataTests.swift; sourceTree = "<group>"; };
 		A46210000000000000000006 /* MikshatRoutingEntryTests.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = MikshatRoutingEntryTests.mm; sourceTree = "<group>"; };
@@ -1947,6 +1959,10 @@
 		4B4153B92BF970BD00EE4B02 /* CarPlay */ = {
 			isa = PBXGroup;
 			children = (
+				4498F1AB6B61A04D66CCE872 /* MapTemplateBuilderTests.swift */,
+				BB32B50B5F37910165A3FC6A /* CarPlayRouterSharedSessionTests.swift */,
+				668A75B497B484355E508BBB /* CarPlaySharedGuidanceTests.swift */,
+				BFBF0CFAAA623FDEBB2F6870 /* CarPlayTripMetricsTests.swift */,
 				A13418010000000000000003 /* CarPlayManeuverMapperTests.swift */,
 				ED914331300168CF0081DF0B /* CarPlaySceneDelegateTests.swift */,
 				ED1ADA322BC6B1B40029209F /* CarPlayServiceTests.swift */,
@@ -3521,6 +3537,8 @@
 		ED82C6902F90186300FA103D /* CarPlay */ = {
 			isa = PBXGroup;
 			children = (
+				B21879376AD8973EA2D8FC58 /* CarPlaySharedGuidanceState.swift */,
+				9C9B3B0540A9EBDEDB196FE8 /* CarPlayTripMetrics.swift */,
 				ED82C67E2F90186300FA103D /* Template Builders */,
 				ED82C6852F90186300FA103D /* Templates Data */,
 				ED82C6862F90186300FA103D /* CarplayPlaceholderView.swift */,
@@ -4362,7 +4380,13 @@
 		A61500500000000000000007 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = ();
+			files = (
+				83BFAC5485A8EEC6A853B8D8 /* MapTemplateBuilderTests.swift in Sources */,
+				0D9ADF9C4DC411CFACC76C38 /* CarPlayRouterSharedSessionTests.swift in Sources */,
+				AFC72CFADC91F905A82E7ADE /* CarPlaySharedGuidanceTests.swift in Sources */,
+				974915D7804323123319A054 /* CarPlayTripMetricsTests.swift in Sources */,
+				3B04AD9FD06B0B0040BC5830 /* CarPlaySharedGuidanceState.swift in Sources */,
+				4093E4E34B2A3C9BD1C20553 /* CarPlayTripMetrics.swift in Sources */,);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		6741A9411BF340DE002C974C /* Resources */ = {

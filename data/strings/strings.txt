@@ -47382,3 +47382,57 @@ comment = Generic feature category for dirt tracks and explicitly unpaved roads;
 tags = apple-maps,android-sdk,qt
 en = Dirt track
 ar = درب
+
+[mikshat_carplay_save_location]
+comment = CarPlay action to save the current GPS location to the existing bookmarks.
+tags = apple-maps
+en = Save location
+ar = حفظ الموقع
+
+[mikshat_carplay_trip_info]
+comment = CarPlay information screen with current journey metrics.
+tags = apple-maps
+en = Trip information
+ar = معلومات الرحلة
+
+[mikshat_carplay_gps]
+comment = CarPlay GPS recenter and follow button.
+tags = apple-maps
+en = My location
+ar = موقعي
+
+[mikshat_carplay_north_up]
+comment = Accessibility label for the current CarPlay map orientation.
+tags = apple-maps
+en = North up
+ar = الشمال أعلى الشاشة
+
+[mikshat_carplay_heading_up]
+comment = Accessibility label for the current CarPlay map orientation.
+tags = apple-maps
+en = Heading up
+ar = اتجاه السير أعلى الشاشة
+
+[mikshat_carplay_pan]
+comment = CarPlay map panning button.
+tags = apple-maps
+en = Browse map
+ar = تحريك الخريطة
+
+[mikshat_carplay_estimated_arrival]
+comment = Direct guidance arrival is approximate and depends on movement speed.
+tags = apple-maps
+en = Approximate arrival
+ar = الوصول التقريبي
+
+[mikshat_carplay_subscription_on_phone]
+comment = CarPlay keeps the existing premium requirement for saving new locations.
+tags = apple-maps
+en = Saving new locations requires an active subscription. Manage your subscription on your phone.
+ar = حفظ مواقع جديدة يتطلب اشتراكًا فعالًا. يمكنك إدارة الاشتراك من الجوال.
+
+[mikshat_carplay_save_failed]
+comment = CarPlay bookmark creation failed without interrupting the current trip.
+tags = apple-maps
+en = The location could not be saved. Please try again.
+ar = تعذّر حفظ الموقع. حاول مجددًا.

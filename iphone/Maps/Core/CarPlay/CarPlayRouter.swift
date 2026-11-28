@@ -16,9 +16,12 @@ final class CarPlayRouter: NSObject {
 
   private let listenerContainer: ListenerContainer<CarPlayRouterListener>
   private var routeSession: CPNavigationSession?
+  private weak var sessionTemplate: CPMapTemplate?
   private var registeredManeuvers = [CPManeuver]()
   private var initialSpeedCamSettings: SpeedCameraManagerMode
   private var isRoutingPresentationActive = false
+  private(set) var isDirectNavigationSession = false
+  private(set) var isRebuildingForCarPlay = false
   var currentTrip: CPTrip? {
     routeSession?.trip
   }
@@ -55,18 +58,29 @@ final class CarPlayRouter: NSObject {
   }
 
   func completeRouteAndRemovePoints() {
+    if MWMRouter.isMikshatDirectActive() {
+      MikshatNavigationCoordinator.stopDirectNavigation()
+      // A restored core session may not have a phone HUD to dismiss.
+      if MWMRouter.isMikshatDirectActive() {
+        MWMRouter.stopRouting()
+      }
+      previewTrip = nil
+      return
+    }
     let manager = RoutingManager.routingManager
     manager.stopRoutingAndRemoveRoutePoints(true)
     manager.deleteSavedRoutePoints()
-    manager.apply(routeType: .vehicle)
     previewTrip = nil
   }
 
   func rebuildRoute() {
-    guard let trip = previewTrip else { return }
+    guard let trip = previewTrip,
+          matchesCurrentDestination(trip, routeType: .vehicle) else { return }
+    isRebuildingForCarPlay = currentTrip != nil
     do {
       try RoutingManager.routingManager.buildRoute()
     } catch let error as NSError {
+      isRebuildingForCarPlay = false
       listenerContainer.forEach {
         let code = RouterResultCode(rawValue: UInt(error.code)) ?? .internalError
         $0.didFailureBuildRoute(forTrip: trip, code: code, countries: [])
@@ -99,6 +113,7 @@ final class CarPlayRouter: NSObject {
     }
 
     let manager = RoutingManager.routingManager
+    manager.apply(routeType: .vehicle)
     manager.add(routePoint: startPoint)
     manager.add(routePoint: endPoint)
 
@@ -114,6 +129,7 @@ final class CarPlayRouter: NSObject {
 
   func updateStartPointAndRebuild(trip: CPTrip) {
     let manager = RoutingManager.routingManager
+    guard manager.type != .ruler, !MWMRouter.isMikshatDirectActive() else { return }
     previewTrip = trip
     guard let info = trip.userInfo as? [String: MWMRoutePoint] else {
       listenerContainer.forEach {
@@ -141,6 +157,7 @@ final class CarPlayRouter: NSObject {
 
   func startRoute() {
     let manager = RoutingManager.routingManager
+    guard manager.type == .vehicle, !MWMRouter.isMikshatDirectActive() else { return }
     manager.startRoute()
   }
 
@@ -160,19 +177,24 @@ final class CarPlayRouter: NSObject {
   }
 
   func restoreTripPreviewOnCarplay(beforeRootTemplateDidAppear: Bool) {
+    let manager = RoutingManager.routingManager
+    // Connecting a display is not a request to change the phone's selected guidance mode.
+    if manager.type == .ruler || MWMRouter.isMikshatDirectActive() {
+      previewTrip = restoredDirectTrip()
+      return
+    }
     guard MWMRouter.isRestoreProcessCompleted() else {
       DispatchQueue.main.async { [weak self] in
         self?.restoreTripPreviewOnCarplay(beforeRootTemplateDidAppear: false)
       }
       return
     }
-    let manager = RoutingManager.routingManager
     MWMRouter.hideNavigationMapControls()
     guard manager.isRoutingActive,
           let startPoint = manager.startPoint,
           let endPoint = manager.endPoint
     else {
-      completeRouteAndRemovePoints()
+      previewTrip = nil
       return
     }
     let trip = createTrip(startPoint: startPoint,
@@ -196,19 +218,51 @@ final class CarPlayRouter: NSObject {
 
   func restoredNavigationSession() -> (CPTrip, RouteInfo)? {
     let manager = RoutingManager.routingManager
-    if manager.isOnRoute,
+    if !MWMRouter.isMikshatDirectActive(), manager.isOnRoute,
        manager.type == .vehicle,
        let startPoint = manager.startPoint,
        let endPoint = manager.endPoint,
        let routeInfo = manager.routeInfo {
       MWMRouter.hideNavigationMapControls()
-      let trip = createTrip(startPoint: startPoint,
-                            endPoint: endPoint,
-                            routeInfo: routeInfo)
+      let trip: CPTrip
+      if !isDirectNavigationSession, let currentTrip,
+         matchesCurrentDestination(currentTrip, routeType: .vehicle) {
+        trip = currentTrip
+      } else {
+        trip = createTrip(startPoint: startPoint,
+                          endPoint: endPoint,
+                          routeInfo: routeInfo)
+      }
       previewTrip = trip
       return (trip, routeInfo)
     }
     return nil
+  }
+
+  func restoredDirectTrip() -> CPTrip? {
+    guard MWMRouter.isMikshatDirectActive(), MWMRouter.type() == .ruler,
+          let startPoint = MWMRouter.startPoint() ?? MWMRouter.mikshatUserPosition(),
+          let endPoint = MWMRouter.finishPoint() else { return nil }
+    let trip: CPTrip
+    if isDirectNavigationSession, let currentTrip,
+       matchesCurrentDestination(currentTrip, routeType: .ruler) {
+      trip = currentTrip
+    } else {
+      trip = createTrip(startPoint: startPoint, endPoint: endPoint)
+    }
+    previewTrip = trip
+    return trip
+  }
+
+  func matchesCurrentDestination(_ trip: CPTrip, routeType: MWMRouterType) -> Bool {
+    let manager = RoutingManager.routingManager
+    guard manager.type == routeType,
+          (routeType == .ruler) == MWMRouter.isMikshatDirectActive(),
+          let currentEndPoint = manager.endPoint,
+          let info = trip.userInfo as? [String: MWMRoutePoint],
+          let tripEndPoint = info[CPConstants.Trip.end] else { return false }
+    return abs(currentEndPoint.latitude - tripEndPoint.latitude) < 0.000001 &&
+      abs(currentEndPoint.longitude - tripEndPoint.longitude) < 0.000001
   }
 }
 
@@ -216,6 +270,7 @@ final class CarPlayRouter: NSObject {
 
 extension CarPlayRouter {
   func startNavigationSession(forTrip trip: CPTrip, template: CPMapTemplate, isRestoring: Bool = false) {
+    guard matchesCurrentDestination(trip, routeType: .vehicle) else { return }
     guard routeSession == nil else {
       let errorMessage = "Route session is already running."
       LOG(.error, errorMessage)
@@ -223,7 +278,10 @@ extension CarPlayRouter {
       return
     }
     LOG(.info, "Starting a new navigation session")
+    isDirectNavigationSession = false
+    previewTrip = trip
     routeSession = template.startNavigationSession(for: trip)
+    sessionTemplate = template
     resetNavigationMetadata()
     if isRestoring {
       scheduleInitialManeuverRepublish()
@@ -233,10 +291,28 @@ extension CarPlayRouter {
     }
   }
 
+  func startDirectNavigationSession(forTrip trip: CPTrip, template: CPMapTemplate) {
+    guard matchesCurrentDestination(trip, routeType: .ruler) else { return }
+    if isDirectNavigationSession, sessionTemplate === template, let currentTrip,
+       matchesCurrentDestination(currentTrip, routeType: .ruler) {
+      return
+    }
+    cancelNavigationSession()
+    isDirectNavigationSession = true
+    previewTrip = trip
+    routeSession = template.startNavigationSession(for: trip)
+    sessionTemplate = template
+    // Direct guidance keeps the core session and does not publish road maneuvers.
+    routeSession?.upcomingManeuvers = []
+  }
+
   func cancelNavigationSession() {
     LOG(.info, "Сancelling navigation session")
     routeSession?.cancelTrip()
     routeSession = nil
+    sessionTemplate = nil
+    isDirectNavigationSession = false
+    isRebuildingForCarPlay = false
     registeredManeuvers.removeAll()
     RoutingManager.routingManager.resetOnNewTurnCallback()
   }
@@ -251,13 +327,16 @@ extension CarPlayRouter {
     LOG(.info, "Finishing trip")
     routeSession?.finishTrip()
     routeSession = nil
+    sessionTemplate = nil
+    isDirectNavigationSession = false
     registeredManeuvers.removeAll()
     completeRouteAndRemovePoints()
     RoutingManager.routingManager.resetOnNewTurnCallback()
   }
 
   func updateUpcomingManeuvers(reusingPrimaryManeuver primaryManeuver: CPManeuver? = nil) {
-    guard let routeSession,
+    guard !isDirectNavigationSession, let routeSession,
+          matchesCurrentDestination(routeSession.trip, routeType: .vehicle),
           let routeInfo = RoutingManager.routingManager.routeInfo
     else {
       return
@@ -278,7 +357,8 @@ extension CarPlayRouter {
   }
 
   func updateEstimates(_ routeInfo: RouteInfo) {
-    guard let routeSession = routeSession,
+    guard !isDirectNavigationSession, let routeSession = routeSession,
+          matchesCurrentDestination(routeSession.trip, routeType: .vehicle),
           let primaryManeuver = registeredManeuvers.first
     else {
       return
@@ -296,7 +376,8 @@ extension CarPlayRouter {
 
   @available(iOS 17.4, *)
   private func replaceNavigationMetadata(routeInfo: RouteInfo) {
-    guard let routeSession else { return }
+    guard !isDirectNavigationSession, let routeSession,
+          matchesCurrentDestination(routeSession.trip, routeType: .vehicle) else { return }
 
     let maneuvers = createUpcomingManeuvers(routeInfo: routeInfo)
 
@@ -432,7 +513,9 @@ extension CarPlayRouter: RoutingManagerListener {
   }
 
   func processRouteBuilderEvent(with code: RouterResultCode, countries: [String]) {
-    guard isRoutingPresentationActive, let trip = previewTrip else {
+    isRebuildingForCarPlay = false
+    guard isRoutingPresentationActive, !isDirectNavigationSession, let trip = previewTrip,
+          matchesCurrentDestination(trip, routeType: .vehicle) else {
       return
     }
     switch code {
@@ -475,7 +558,8 @@ extension CarPlayRouter: RoutingManagerListener {
   }
 
   func didLocationUpdate(_ notifications: [String]) {
-    guard isRoutingPresentationActive, let trip = previewTrip else { return }
+    guard isRoutingPresentationActive, !isDirectNavigationSession, let trip = previewTrip,
+          matchesCurrentDestination(trip, routeType: .vehicle) else { return }
 
     let manager = RoutingManager.routingManager
     if manager.isRouteFinished {

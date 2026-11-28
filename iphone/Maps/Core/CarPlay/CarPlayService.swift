@@ -1,4 +1,5 @@
 import CarPlay
+import CoreLocation
 import Contacts
 
 private enum RoutingOwner {
@@ -52,6 +53,18 @@ final class CarPlayService: NSObject {
   private weak var visibleCarPlayTemplate: CPTemplate?
   private var currentViewPortState: CPViewPortState = .default
   private var speedState = CarPlaySpeedState()
+  private var sharedGuidance = CarPlaySharedGuidanceState()
+  private var tripMetrics = CarPlayTripMetrics()
+  private var tripSnapshot = CarPlayTripMetrics.Snapshot.empty
+  private var guidanceTimer: Timer?
+  private var directGuidanceObserver: NSObjectProtocol?
+  private weak var tripInformationTemplate: CPInformationTemplate?
+  private var pendingNorthUp: Bool?
+  private var isSavingLocation = false
+
+  var isNorthUp: Bool {
+    UserDefaults.standard.object(forKey: "mikshat_carplay_north_up") as? Bool ?? true
+  }
 
   private var currentPositionMode: MWMMyPositionMode {
     MapViewController.shared()?.currentPositionMode ?? .pendingPosition
@@ -84,7 +97,7 @@ final class CarPlayService: NSObject {
   }
 
   private var isOnRoute: Bool {
-    MWMRouter.isOnRoute()
+    MWMRouter.isOnRoute() || MWMRouter.isMikshatDirectActive()
   }
 
   @objc var carplayLayoutMargins: UIEdgeInsets {
@@ -150,6 +163,7 @@ final class CarPlayService: NSObject {
       restoreCarPlayTemplateUI()
     }
     updatePhoneModeAlert()
+    synchronizeSharedGuidance()
   }
 
   func setupDashboard(scene: CPTemplateApplicationDashboardScene,
@@ -323,6 +337,10 @@ final class CarPlayService: NSObject {
 
     if destination != .device {
       refreshSpeedStateFromRoutingManager()
+      if currentPositionMode == .follow || currentPositionMode == .followAndRotate {
+        pendingNorthUp = isNorthUp
+        reconcileMapOrientation(currentPositionMode)
+      }
     }
     renderSpeedState()
     ThemeManager.invalidate()
@@ -343,9 +361,10 @@ final class CarPlayService: NSObject {
       MWMRouter.subscribeToEvents()
       router.cancelNavigationSession()
       needsCarPlayRoutingRestore = false
-      if hadCurrentTrip {
+      pendingNorthUp = nil
+      if hadCurrentTrip && !MWMRouter.isMikshatDirectActive() {
         MWMRouter.showNavigationMapControls()
-      } else if hadPreviewTrip {
+      } else if hadPreviewTrip && RoutingManager.routingManager.type == .vehicle {
         MWMRouter.rebuild(withBestRouter: true)
       }
     case .carPlay:
@@ -401,6 +420,11 @@ final class CarPlayService: NSObject {
     mapTemplate.mapDelegate = self
     mapTemplate.tripEstimateStyle = rootTemplateStyle
 
+    if MWMRouter.isMikshatDirectActive() {
+      synchronizeSharedGuidance()
+      return
+    }
+
     if let (trip, routeInfo) = router.restoredNavigationSession() {
       MapTemplateBuilder.configureNavigationUI(mapTemplate, positionMode: currentPositionMode)
       router.startNavigationSession(forTrip: trip, template: mapTemplate, isRestoring: true)
@@ -429,6 +453,11 @@ final class CarPlayService: NSObject {
       return
     }
 
+    if MWMRouter.isMikshatDirectActive() {
+      applyBaseRootTemplate()
+      return
+    }
+
     if let sessionData = router.restoredNavigationSession() {
       applyNavigationRootTemplate(trip: sessionData.0, routeInfo: sessionData.1)
     } else {
@@ -448,6 +477,7 @@ final class CarPlayService: NSObject {
     router.subscribeToEvents()
     isCarPlayRouterSubscribed = true
     self.router = router
+    startGuidanceObservation()
     return router
   }
 
@@ -582,6 +612,7 @@ final class CarPlayService: NSObject {
       isCarPlayRouterSubscribed = false
     }
     router.cancelNavigationSession()
+    stopGuidanceObservation()
     self.router = nil
     routingOwner = .device
     needsCarPlayRoutingRestore = false
@@ -667,11 +698,15 @@ final class CarPlayService: NSObject {
   /// Rebuilds the map buttons, whose focused images are resolved for the car's appearance.
   func updateMapButtonsAppearance() {
     // The trip finished alert hides all the buttons.
-    guard let rootMapTemplate, !rootMapTemplate.mapButtons.isEmpty else { return }
-    if rootMapTemplate.isPanningInterfaceVisible {
-      MapTemplateBuilder.configurePanUI(rootMapTemplate)
-    } else {
-      MapTemplateBuilder.setupMapButtons(rootMapTemplate, positionMode: currentPositionMode)
+    for template in interfaceController?.templates.compactMap({ $0 as? CPMapTemplate }) ?? [] {
+      guard !template.mapButtons.isEmpty else { continue }
+      let type = (template.userInfo as? MapInfo)?.type
+      if template.isPanningInterfaceVisible {
+        MapTemplateBuilder.configurePanUI(template)
+      } else {
+        let isPreview = type == CPConstants.TemplateType.preview || type == CPConstants.TemplateType.previewSettings
+        MapTemplateBuilder.setupMapButtons(template, positionMode: currentPositionMode, allowsPanning: !isPreview)
+      }
     }
   }
 
@@ -700,6 +735,7 @@ final class CarPlayService: NSObject {
       if success {
         restoreCarPlayTemplateUI()
         updatePhoneModeAlert()
+        synchronizeSharedGuidance()
       }
     }
     FrameworkHelper.rotateMap(0.0, animated: false)
@@ -718,6 +754,7 @@ final class CarPlayService: NSObject {
         restoreCarPlayTemplateUI()
         updatePhoneModeAlert()
         router?.startNavigationSession(forTrip: trip, template: mapTemplate, isRestoring: true)
+        synchronizeSharedGuidance()
       } else if error == nil {
         LOG(.warning, "CarPlay failed to install the navigation root template")
       }
@@ -771,6 +808,9 @@ final class CarPlayService: NSObject {
   func cancelCurrentTrip() {
     LOG(.info, "Cancel current trip")
     router?.cancelTrip()
+    sharedGuidance.reset()
+    tripMetrics.reset()
+    tripSnapshot = .empty
     hideSpeedState()
     updateMapTemplateUIToBase()
   }
@@ -915,6 +955,276 @@ final class CarPlayService: NSObject {
   }
 }
 
+// MARK: - Shared phone guidance and CarPlay controls
+
+extension CarPlayService: MWMLocationObserver {
+  private func startGuidanceObservation() {
+    guard guidanceTimer == nil else { return }
+    LocationManager.add(observer: self)
+    directGuidanceObserver = NotificationCenter.default.addObserver(
+      forName: MikshatNavigationCoordinator.visibilityChanged, object: nil, queue: .main
+    ) { [weak self] _ in
+      // Direct guidance posts before its phone dismissal finishes changing route points.
+      DispatchQueue.main.async { self?.synchronizeSharedGuidance() }
+    }
+    let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+      self?.synchronizeSharedGuidance()
+    }
+    guidanceTimer = timer
+    RunLoop.main.add(timer, forMode: .common)
+  }
+
+  private func stopGuidanceObservation() {
+    guidanceTimer?.invalidate()
+    guidanceTimer = nil
+    LocationManager.remove(observer: self)
+    if let directGuidanceObserver {
+      NotificationCenter.default.removeObserver(directGuidanceObserver)
+    }
+    directGuidanceObserver = nil
+    tripInformationTemplate = nil
+    sharedGuidance.reset()
+    tripMetrics.reset()
+    tripSnapshot = .empty
+    pendingNorthUp = nil
+  }
+
+  func onLocationUpdate(_ location: CLLocation) {
+    synchronizeSharedGuidance()
+  }
+
+  func onLocationError(_ error: MWMLocationStatus) {
+    synchronizeSharedGuidance()
+  }
+
+  private func currentGuidanceIdentity() -> CarPlayGuidanceIdentity? {
+    let manager = RoutingManager.routingManager
+    guard let end = manager.endPoint else { return nil }
+    let coordinate = CLLocationCoordinate2D(latitude: end.latitude, longitude: end.longitude)
+    if MWMRouter.isMikshatDirectActive(), manager.type == .ruler {
+      return CarPlayGuidanceIdentity(kind: .direct, coordinate: coordinate)
+    }
+    // A vehicle reroute can temporarily leave following mode while retaining its route.
+    let previous = sharedGuidance.current
+    let isSameDestination = previous?.latitude == coordinate.latitude && previous?.longitude == coordinate.longitude
+    let isContinuingVehicleTrip = previous?.kind == .vehicle && isSameDestination &&
+      router?.isRebuildingForCarPlay == true && manager.isRoutingActive
+    if manager.type == .vehicle, manager.isOnRoute || isContinuingVehicleTrip {
+      return CarPlayGuidanceIdentity(kind: .vehicle, coordinate: coordinate)
+    }
+    return nil
+  }
+
+  private func synchronizeSharedGuidance() {
+    guard window != nil || dashboardWindow != nil, let router else { return }
+    let identity = currentGuidanceIdentity()
+    let change = sharedGuidance.update(identity)
+    if change != .unchanged {
+      tripMetrics.reset()
+      if change == .started || change == .changed {
+        // Starting a new trip on the phone is the handoff; browsing an existing trip is not.
+        activateMainCarPlay()
+      }
+    }
+
+    guard let identity else {
+      if change == .ended {
+        router.cancelNavigationSession()
+        router.previewTrip = nil
+        hideSpeedState()
+        updateMapTemplateUIToBase()
+      }
+      tripSnapshot = .empty
+      refreshTripInformation(updateActions: change != .unchanged)
+      return
+    }
+
+    if mapState.attachedDisplay != .device, !isTemplateOperationInProgress {
+      let type: MWMRouterType = identity.kind == .direct ? .ruler : .vehicle
+      if let currentTrip = router.currentTrip,
+         router.isDirectNavigationSession != (identity.kind == .direct) || !router.matchesCurrentDestination(currentTrip, routeType: type) {
+        router.cancelNavigationSession()
+      }
+      if router.currentTrip == nil {
+        if identity.kind == .direct, let trip = router.restoredDirectTrip() {
+          router.previewTrip = trip
+          if let template = rootMapTemplate {
+            MapTemplateBuilder.configureNavigationUI(template, positionMode: currentPositionMode)
+            router.startDirectNavigationSession(forTrip: trip, template: template)
+            updateVisibleViewPortState(.navigation)
+          }
+        } else if let (trip, _) = router.restoredNavigationSession() {
+          router.previewTrip = trip
+          if let template = rootMapTemplate {
+            MapTemplateBuilder.configureNavigationUI(template, positionMode: currentPositionMode)
+            router.startNavigationSession(forTrip: trip, template: template, isRestoring: true)
+            updateVisibleViewPortState(.navigation)
+          }
+        }
+      }
+    }
+
+    let routeInfo = identity.kind == .vehicle ? RoutingManager.routingManager.routeInfo : nil
+    let directDestination = identity.kind == .direct
+      ? CLLocationCoordinate2D(latitude: identity.latitude, longitude: identity.longitude) : nil
+    let routeDistance = routeInfo.map { Measurement(value: $0.targetDistance, unit: $0.targetUnits).converted(to: .meters).value }
+    tripSnapshot = tripMetrics.update(
+      location: LocationManager.isLocationProhibited() ? nil : LocationManager.lastLocation(),
+      directDestination: directDestination,
+      routeDistance: routeDistance,
+      routeDuration: routeInfo?.timeToTarget
+    )
+    speedState.currentSpeedMps = tripSnapshot.speedMetersPerSecond ?? -1
+    speedState.speedLimitMps = routeInfo?.speedLimitMps
+    speedState.isVisible = true
+    if identity.kind == .direct {
+      speedState.isCameraOnRoute = false
+      speedState.cameraSpeedLimitMps = nil
+    }
+    renderSpeedState()
+    if change == .started || change == .changed {
+      pendingNorthUp = isNorthUp
+    }
+    if pendingNorthUp != nil {
+      reconcileMapOrientation(currentPositionMode)
+    }
+    if let trip = router.currentTrip, let template = rootMapTemplate {
+      let estimates = CPTravelEstimates(
+        distanceRemaining: Measurement(value: tripSnapshot.distanceMeters ?? -1, unit: UnitLength.meters),
+        timeRemaining: tripSnapshot.remainingTime ?? -1
+      )
+      template.updateEstimates(estimates, for: trip)
+    }
+    refreshTripInformation(updateActions: change != .unchanged)
+  }
+
+  func recenterMap() {
+    guard window != nil || dashboardWindow != nil else { return }
+    guard !LocationManager.isLocationProhibited() else {
+      pendingNorthUp = nil
+      showGuidanceMessage(L("mikshat_location_unavailable"))
+      return
+    }
+    activateMainCarPlay()
+    LocationManager.start()
+    pendingNorthUp = isNorthUp
+    if let template = rootMapTemplate, template.isPanningInterfaceVisible {
+      template.dismissPanningInterface(animated: true)
+      return
+    }
+    reconcileMapOrientation(currentPositionMode)
+  }
+
+  func toggleMapOrientation() {
+    UserDefaults.standard.set(!isNorthUp, forKey: "mikshat_carplay_north_up")
+    recenterMap()
+    updateMapButtonsAppearance()
+  }
+
+  private func reconcileMapOrientation(_ mode: MWMMyPositionMode) {
+    guard !LocationManager.isLocationProhibited() else {
+      pendingNorthUp = nil
+      return
+    }
+    guard mapState.attachedDisplay != .device, let northUp = pendingNorthUp else { return }
+    switch mode {
+    case .follow where northUp, .followAndRotate where !northUp:
+      pendingNorthUp = nil
+    case .pendingPosition:
+      break
+    case .notFollowNoPosition, .notFollow, .follow, .followAndRotate:
+      // The renderer changes mode asynchronously; its next callback completes the requested mode.
+      FrameworkHelper.switchMyPositionMode()
+    }
+  }
+
+  func showTripInformation() {
+    let information = CPInformationTemplate(
+      title: L("mikshat_carplay_trip_info"), layout: .twoColumn,
+      items: tripInformationItems(), actions: tripInformationActions()
+    )
+    tripInformationTemplate = information
+    pushTemplate(information, animated: true)
+  }
+
+  private func tripInformationActions() -> [CPTextButton] {
+    let done = CPTextButton(title: L("done"), textStyle: .normal) { [weak self] _ in
+      self?.popTemplate(animated: true)
+    }
+    let changeDestination = CPTextButton(title: L("change_destination"), textStyle: .normal) { [weak self] _ in
+      self?.pushTemplate(ListTemplateBuilder.buildListTemplate(for: .history), animated: true)
+    }
+    let stop = CPTextButton(title: L("navigation_stop_button"), textStyle: .cancel) { [weak self] _ in
+      guard let self else { return }
+      cancelCurrentTrip()
+      interfaceController?.popToRootTemplate(animated: true, completion: templateCompletion)
+    }
+    return isOnRoute ? [changeDestination, stop, done] : [changeDestination, done]
+  }
+
+  private func refreshTripInformation(updateActions: Bool = false) {
+    tripInformationTemplate?.items = tripInformationItems()
+    if updateActions {
+      tripInformationTemplate?.actions = tripInformationActions()
+    }
+  }
+
+  private func tripInformationItems() -> [CPInformationItem] {
+    let unknown = "—"
+    let speed = tripSnapshot.speedMetersPerSecond.map { Measure(asSpeed: $0) }
+    let speedText = speed.map { "\($0.valueAsString) \($0.unit)" } ?? unknown
+    let distance = tripSnapshot.distanceMeters.map { DistanceFormatter.distanceString(fromMeters: $0) } ?? unknown
+    let duration = tripSnapshot.remainingTime.map { DurationFormatter.routingDurationString(from: $0) } ?? unknown
+    let arrival = tripSnapshot.arrivalDate.map {
+      DateFormatter.localizedString(from: $0, dateStyle: .none, timeStyle: .short)
+    } ?? unknown
+    return [
+      CPInformationItem(title: L("mikshat_speed"), detail: speedText),
+      CPInformationItem(title: L("mikshat_remaining_distance"), detail: distance),
+      CPInformationItem(title: L("mikshat_remaining_time"), detail: duration),
+      CPInformationItem(title: L(sharedGuidance.current?.kind == .direct ? "mikshat_carplay_estimated_arrival" : "mikshat_arrival"), detail: arrival),
+    ]
+  }
+
+  func saveCurrentLocation() {
+    guard !isSavingLocation else { return }
+    guard let location = MikshatHeading.currentLocation, location.horizontalAccuracy <= 100,
+          let controller = interfaceController else {
+      showGuidanceMessage(L("mikshat_location_unavailable"))
+      return
+    }
+    isSavingLocation = true
+    Task { @MainActor [weak self, weak controller] in
+      guard let self else { return }
+      defer { isSavingLocation = false }
+      let store = MikshatSubscriptionStore.shared
+      store.start()
+      await store.refreshEntitlements()
+      guard let controller, interfaceController === controller else { return }
+      guard store.hasActiveSubscription else {
+        showGuidanceMessage(L("mikshat_carplay_subscription_on_phone"))
+        return
+      }
+      guard !LocationManager.isLocationProhibited(), MikshatHeading.isFresh(location) else {
+        showGuidanceMessage(L("mikshat_location_unavailable"))
+        return
+      }
+      let stamp = DateFormatter.localizedString(from: Date(), dateStyle: .short, timeStyle: .short)
+      let name = "\(L("mikshat_current_location")) • \(stamp)"
+      let bookmark = BookmarksManager.shared().saveLocation(location.coordinate, name: name)
+      showGuidanceMessage(L(bookmark == FrameworkHelper.invalidBookmarkId() ? "mikshat_carplay_save_failed" : "mikshat_location_saved"))
+    }
+  }
+
+  private func showGuidanceMessage(_ message: String) {
+    let done = CPAlertAction(title: L("ok"), style: .cancel) { [weak self] _ in
+      guard let self else { return }
+      interfaceController?.dismissTemplate(animated: true, completion: templateCompletion)
+    }
+    presentAlert(CPAlertTemplate(titleVariants: [message], actions: [done]), animated: true)
+  }
+}
+
 // MARK: - CPInterfaceControllerDelegate
 
 extension CarPlayService: CPInterfaceControllerDelegate {
@@ -965,7 +1275,11 @@ extension CarPlayService: CPInterfaceControllerDelegate {
     }
     if info.type == CPConstants.TemplateType.preview {
       // The alert only covers the preview: the route now belongs to the phone and must survive.
-      guard !mapState.isPhoneSelected else { return }
+      guard !mapState.isPhoneSelected, !MWMRouter.isMikshatDirectActive(),
+            RoutingManager.routingManager.type == .vehicle,
+            !RoutingManager.routingManager.isOnRoute,
+            let trip = router?.previewTrip,
+            router?.matchesCurrentDestination(trip, routeType: .vehicle) == true else { return }
       router?.completeRouteAndRemovePoints()
     }
   }
@@ -1022,7 +1336,7 @@ extension CarPlayService: CPMapTemplateDelegate {
     } else {
       MapTemplateBuilder.configureBaseUI(mapTemplate, positionMode: currentPositionMode, isOnRoute: isOnRoute)
     }
-    FrameworkHelper.switchMyPositionMode()
+    recenterMap()
   }
 
   func mapTemplate(_: CPMapTemplate, panEndedWith direction: CPMapTemplate.PanDirection) {
@@ -1040,6 +1354,11 @@ extension CarPlayService: CPMapTemplateDelegate {
   }
 
   func mapTemplate(_ mapTemplate: CPMapTemplate, startedTrip trip: CPTrip, using routeChoice: CPRouteChoice) {
+    guard !MWMRouter.isMikshatDirectActive(),
+          router?.matchesCurrentDestination(trip, routeType: .vehicle) == true else {
+      synchronizeSharedGuidance()
+      return
+    }
     guard let info = routeChoice.userInfo as? RouteInfo else {
       if let info = routeChoice.userInfo as? [String: Any],
          let code = info[CPConstants.Trip.errorCode] as? RouterResultCode,
@@ -1088,6 +1407,10 @@ extension CarPlayService: CPMapTemplateDelegate {
   func mapTemplate(_ mapTemplate: CPMapTemplate,
                    selectedPreviewFor trip: CPTrip,
                    using routeChoice: CPRouteChoice) {
+    guard !MWMRouter.isMikshatDirectActive() else {
+      synchronizeSharedGuidance()
+      return
+    }
     guard let previewTrip = router?.previewTrip, previewTrip == trip else {
       applyUndefinedEstimates(template: mapTemplate, trip: trip)
       router?.buildRoute(trip: trip)
@@ -1163,6 +1486,7 @@ extension CarPlayService: CarPlayRouterListener {
   }
 
   func didUpdateRouteInfo(_ routeInfo: RouteInfo, forTrip trip: CPTrip) {
+    guard !MWMRouter.isMikshatDirectActive() else { return }
     updateSpeedState(routeInfo: routeInfo)
     guard let router = router,
           let template = rootMapTemplate
@@ -1172,6 +1496,7 @@ extension CarPlayService: CarPlayRouterListener {
     router.updateEstimates(routeInfo)
     template.updateEstimates(routeInfo.tripTravelEstimates, for: trip)
     trip.routeChoices.first?.userInfo = routeInfo
+    synchronizeSharedGuidance()
   }
 
   func didFailureBuildRoute(forTrip trip: CPTrip, code: RouterResultCode, countries: [String]) {
@@ -1192,9 +1517,14 @@ extension CarPlayService: CarPlayRouterListener {
 
 extension CarPlayService: LocationModeListener {
   func processMyPositionStateModeEvent(_ mode: MWMMyPositionMode) {
+    if sharedGuidance.current != nil, mode == .follow || mode == .followAndRotate {
+      pendingNorthUp = isNorthUp
+    }
+    reconcileMapOrientation(mode)
     guard let rootMapTemplate else { return }
     MapTemplateBuilder.setupMapButtons(rootMapTemplate, positionMode: mode)
     MapTemplateBuilder.setupLeadingNavigationBarButtons(rootMapTemplate, positionMode: mode, isOnRoute: isOnRoute)
+    updateMapButtonsAppearance()
   }
 }
 

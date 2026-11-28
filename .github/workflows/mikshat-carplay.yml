@@ -1,0 +1,90 @@
+name: Mikshat CarPlay native validation
+
+'on':
+  push:
+    branches:
+      - feature/carplay-controls
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mikshat-carplay-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    name: CarPlay and phone regressions (${{ matrix.language }})
+    runs-on: xcode-27
+    timeout-minutes: 85
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ar, en]
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_27.0.app/Contents/Developer
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Record selected toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build/carplay-validation
+          xcodebuild -version | tee build/carplay-validation/toolchain.txt
+          printf 'MIKSHAT_XCODE_CACHE_ID=%s\n' "$(xcodebuild -version | tr -cs '[:alnum:]' '-')" >> "$GITHUB_ENV"
+      - name: Fetch pinned dependencies
+        run: git submodule update --init --recursive --depth 1 --jobs 8
+      - name: Prepare existing app resources
+        run: |
+          python3 mikshat/prepare_branding.py
+          python3 mikshat/prepare_satellite.py
+      - name: Verify Metal compiler
+        run: python3 mikshat/tests/update-native/prepare_metal.py build/carplay-metal
+      - name: Restore compatible compiled objects
+        uses: actions/cache/restore@v4
+        with:
+          path: build/SearchDerivedData
+          key: mikshat-carplay-derived-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.MIKSHAT_XCODE_CACHE_ID }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.language }}
+          restore-keys: |
+            mikshat-carplay-derived-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.MIKSHAT_XCODE_CACHE_ID }}-
+            mikshat-search-derived-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.MIKSHAT_XCODE_CACHE_ID }}-
+      - name: Restore unchanged cached input timestamps
+        run: python3 mikshat/tests/carplay/cache_inputs.py restore
+      - name: Build and verify CarPlay app-hosted tests
+        run: >-
+          python3 mikshat/tests/carplay/run_native.py
+          --language ${{ matrix.language }}
+          --output-dir build/carplay-validation/${{ matrix.language }}
+      - name: Preserve native evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mikshat-carplay-${{ matrix.language }}-ios27
+          path: |
+            build/carplay-validation/**/*.json
+            build/carplay-validation/**/*.log
+            build/carplay-validation/**/*.txt
+            build/carplay-metal/
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Preserve failed result bundles
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mikshat-carplay-results-${{ matrix.language }}-ios27
+          path: build/carplay-validation/**/*.xcresult/
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Record current source timestamps
+        if: always()
+        run: python3 mikshat/tests/carplay/cache_inputs.py record
+      - name: Save compiled objects
+        if: always() && matrix.language == 'ar' && hashFiles('build/SearchDerivedData/mikshat-input-mtimes.json') != ''
+        timeout-minutes: 4
+        uses: actions/cache/save@v4
+        with:
+          path: build/SearchDerivedData
+          key: mikshat-carplay-derived-v1-${{ runner.os }}-${{ runner.arch }}-${{ env.MIKSHAT_XCODE_CACHE_ID }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.language }}
