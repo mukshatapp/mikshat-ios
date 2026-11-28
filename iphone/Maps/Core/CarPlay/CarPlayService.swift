@@ -1623,6 +1623,7 @@ extension CarPlayService {
   func preparePreview(trips: [CPTrip]) {
     let mapTemplate = MapTemplateBuilder.buildTripPreviewTemplate(forTrips: trips)
     guard let interfaceController else { return }
+    let guidance = currentGuidanceIdentity()
     mapTemplate.mapDelegate = self
 
     guard interfaceController.templates.count > 1 else {
@@ -1633,7 +1634,8 @@ extension CarPlayService {
     interfaceController.popToRootTemplate(animated: false) { [weak self, weak interfaceController] success, error in
       guard let self, let interfaceController else { return }
       templateCompletion(success, error)
-      guard success, self.interfaceController === interfaceController else { return }
+      guard success, self.interfaceController === interfaceController,
+            currentGuidanceIdentity() == guidance else { return }
       pushTripPreview(mapTemplate, on: interfaceController)
     }
   }
@@ -1643,6 +1645,11 @@ extension CarPlayService {
   }
 
   func showPreview(mapTemplate: CPMapTemplate, trips: [CPTrip]) {
+    guard currentGuidanceIdentity() == nil else {
+      needsGuidanceRootPresentation = true
+      synchronizeSharedGuidance()
+      return
+    }
     let tripTextConfig = CPTripPreviewTextConfiguration(startButtonTitle: L("trip_start"),
                                                         additionalRoutesButtonTitle: nil,
                                                         overviewButtonTitle: nil)
