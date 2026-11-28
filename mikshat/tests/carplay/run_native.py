@@ -31,6 +31,13 @@ CARPLAY_CLASSES = {
     "CarPlaySharedGuidanceTests": 8,
 }
 RESPONSIVE_CLASS = "MikshatResponsiveNavigationTests"
+INTERRUPTED_CASE_EVENT = re.compile(
+    r"^(?P<event>Test Case[ \t]+(?P<quote>['\"])-\[[^\r\n'\"]+\](?P=quote))"
+    r"(?P<message>\d{4}-\d{2}-\d{2}[ \t]+\d{2}:\d{2}:\d{2}\.\d+[+-]\d{4}"
+    r"[^\r\n]*\[\d+:[0-9a-fA-F]+\][^\r\n]*)\r?\n"
+    r"[ \t]+(?P<outcome>(?:started|passed|failed|skipped|cancelled|canceled)\b[^\r\n]*)",
+    re.MULTILINE | re.IGNORECASE,
+)
 
 
 def required_cases():
@@ -91,7 +98,12 @@ def analyze(log, cases):
     spec.loader.exec_module(verifier)
     verifier.EXPECTED_CLASSES = {name: len(methods) for name, methods in cases.items()}
     text = log.read_text(errors="replace") if log.exists() else ""
+    # XCTest and NSLog can write between the quoted case identity and outcome.
+    # Keep the entire NSLog message so errors still block a successful result.
+    text, normalized_events = INTERRUPTED_CASE_EVENT.subn(
+        lambda match: match["message"] + "\n" + match["event"] + " " + match["outcome"], text)
     result = verifier.analyze(text)
+    result["interruptedCaseEventsNormalized"] = normalized_events
     expected = {(name, method) for name, methods in cases.items() for method in methods}
     observed = {identity for event in verifier.CASE_EVENT.finditer(text)
                 if (identity := verifier.case_identity(event[2])) is not None}

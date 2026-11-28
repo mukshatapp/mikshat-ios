@@ -28,6 +28,8 @@ jobs:
       LC_ALL: en_US.UTF-8
     steps:
       - uses: actions/checkout@v4
+      - name: Verify CarPlay log analysis
+        run: python3 -m unittest discover -s mikshat/tests/carplay -p 'test_*.py'
       - name: Record selected toolchain
         shell: bash
         run: |
