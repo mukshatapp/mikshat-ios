@@ -4380,13 +4380,7 @@
 		A61500500000000000000007 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = (
-				83BFAC5485A8EEC6A853B8D8 /* MapTemplateBuilderTests.swift in Sources */,
-				0D9ADF9C4DC411CFACC76C38 /* CarPlayRouterSharedSessionTests.swift in Sources */,
-				AFC72CFADC91F905A82E7ADE /* CarPlaySharedGuidanceTests.swift in Sources */,
-				974915D7804323123319A054 /* CarPlayTripMetricsTests.swift in Sources */,
-				3B04AD9FD06B0B0040BC5830 /* CarPlaySharedGuidanceState.swift in Sources */,
-				4093E4E34B2A3C9BD1C20553 /* CarPlayTripMetrics.swift in Sources */,);
+			files = ();
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		6741A9411BF340DE002C974C /* Resources */ = {
@@ -4537,6 +4531,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3B04AD9FD06B0B0040BC5830 /* CarPlaySharedGuidanceState.swift in Sources */,
+				4093E4E34B2A3C9BD1C20553 /* CarPlayTripMetrics.swift in Sources */,
 				A46210000000000000000001 /* PlacePageSourceMetadata.swift in Sources */,
 				66B8E47CF9C2DF46E0B129E6 /* MikshatSupplementaryMaps.swift in Sources */,
 				810B8AECC8C78FE64501460E /* MikshatSearchHistory.swift in Sources */,
@@ -5051,6 +5047,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				83BFAC5485A8EEC6A853B8D8 /* MapTemplateBuilderTests.swift in Sources */,
+				0D9ADF9C4DC411CFACC76C38 /* CarPlayRouterSharedSessionTests.swift in Sources */,
+				AFC72CFADC91F905A82E7ADE /* CarPlaySharedGuidanceTests.swift in Sources */,
+				974915D7804323123319A054 /* CarPlayTripMetricsTests.swift in Sources */,
 				A46210000000000000000003 /* PlacePageSourceMetadataTests.swift in Sources */,
 				A46210000000000000000005 /* MikshatRoutingEntryTests.mm in Sources */,
 				C924A14196D49D01DD0CAE97 /* MikshatSupplementaryMapsTests.swift in Sources */,
