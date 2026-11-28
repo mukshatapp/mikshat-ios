@@ -44,6 +44,7 @@ jobs:
           python3 tools/mukshat/test_legacy_transit_symbols.py --source-root .
           bash tools/mukshat/test_geographic_presentation.sh
           python3 tools/mukshat/test_detail_visibility.py
+          python3 tools/mukshat/generate_map_caption_labels.py --check
           g++ -std=c++23 -Wall -Wextra -Werror -I libs tools/mukshat/caption_fallback_test.cpp -o /tmp/caption-fallback-test
           /tmp/caption-fallback-test
           bash tools/mukshat/test_reserve_geometry.sh

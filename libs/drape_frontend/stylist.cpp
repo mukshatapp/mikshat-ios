@@ -5,7 +5,7 @@
 #include "drape_frontend/mukshat_caption_fallback.hpp"
 #include "drape_frontend/mukshat_feature_detail.hpp"
 
-#include "platform/localization.hpp"
+#include "drape_frontend/mukshat_map_caption_labels.hpp"
 #endif
 
 #include "indexer/classificator.hpp"
@@ -144,16 +144,7 @@ void CaptionDescription::Init(FeatureType & f, int8_t deviceLang, int zoomLevel,
   mukshat::PopulateUnnamedCaption(mukshat::ClassifyMapDetail(f), captionLang, arabic, m_mainText, m_auxText,
                                  m_mainTextLang, [](std::string_view type)
   {
-    // These are the existing translated feature-type resources from the
-    // Android consumer. Cache the Arabic-only fallbacks off the hot path.
-    static std::string const stream = platform::GetLocalizedTypeName("waterway-stream-intermittent");
-    static std::string const track = platform::GetLocalizedTypeName("highway-track");
-    static std::string const scrub = platform::GetLocalizedTypeName("natural-scrub");
-    if (type == "waterway-stream-intermittent")
-      return stream;
-    if (type == "highway-track")
-      return track;
-    return scrub;
+    return std::string(mukshat::ArabicMapCaptionForType(type));
   });
 #endif
   ASSERT(m_auxText.empty() || !m_mainText.empty(), ("auxText without mainText"));

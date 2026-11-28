@@ -1,5 +1,6 @@
 #include "drape_frontend/mukshat_caption_fallback.hpp"
 #include "drape_frontend/mukshat_geographic_presentation.hpp"
+#include "drape_frontend/mukshat_map_caption_labels.hpp"
 
 #include <cassert>
 #include <cmath>
@@ -25,18 +26,12 @@ int main()
   auto const localize = [&calls](std::string_view type)
   {
     ++calls;
-    if (type == "waterway-stream-intermittent")
-      return std::string("مسيل");
-    if (type == "highway-track")
-      return std::string("طريق ترابي");
-    if (type == "natural-scrub")
-      return std::string("فيضة");
-    return std::string();
+    return std::string(df::mukshat::ArabicMapCaptionForType(type));
   };
   for (auto const kind : {MapDetailKind::IntermittentStream, MapDetailKind::DirtRoad, MapDetailKind::Scrub,
                          MapDetailKind::Other, MapDetailKind::PowerLine})
   {
-    for (auto const * actualName : {"شعيب أم جرفن", "طريق القصيم", "فيضة الهيل", "أيكة", "Wadi Hanifa"})
+    for (auto const * actualName : {"شعيب أم جرفن", "طريق القصيم", "فيضة الهيل", "أيكة", "Wadi Hanifa", "Track", "Stream", "Copse"})
     {
       std::string main = actualName;
       std::string const aux = "اسم بديل";
@@ -79,6 +74,46 @@ int main()
     assert(main.empty() && mainLang == -1);
     checks += 3;
   }
+  {
+    // Reproduce the previous callback contract with the real English base
+    // type value. An Arabic map-language hint cannot turn an English UI
+    // resource lookup into an Arabic caption.
+    std::string oldMain;
+    std::string const aux;
+    int8_t oldLang = -1;
+    assert(df::mukshat::PopulateUnnamedCaption(MapDetailKind::DirtRoad, arabic, arabic, oldMain, aux, oldLang,
+                                               [](std::string_view) { return std::string("Track"); }));
+    assert(oldMain == "Track" && oldLang == arabic);
+    std::string fixedMain;
+    int8_t fixedLang = -1;
+    assert(df::mukshat::PopulateUnnamedCaption(MapDetailKind::DirtRoad, arabic, arabic, fixedMain, aux, fixedLang,
+                                               localize));
+    assert(fixedMain == "طريق ترابي" && fixedLang == arabic);
+    checks += 4;
+  }
+  // Counterexample: Android UI resources may be English while local Saudi
+  // map labels are Arabic. Map captions must not use that UI-localized value.
+  for (auto const kind : {MapDetailKind::IntermittentStream, MapDetailKind::DirtRoad, MapDetailKind::Scrub})
+  {
+    std::string main;
+    std::string const aux;
+    int8_t mainLang = -1;
+    auto const localArabic = df::mukshat::ResolveGenericCaptionLanguage(0, 0, -1, arabic);
+    assert(df::mukshat::PopulateUnnamedCaption(kind, localArabic, arabic, main, aux, mainLang, localize));
+    assert(main == df::mukshat::ArabicMapCaptionForType(df::mukshat::GenericCaptionType(kind)));
+    assert(main != "Track" && main != "Stream" && main != "Copse");
+    checks += 3;
+    main.clear();
+    mainLang = -1;
+    assert(!df::mukshat::PopulateUnnamedCaption(kind, 1, arabic, main, aux, mainLang, localize));
+    assert(main.empty() && mainLang == -1);
+    checks += 2;
+  }
+  assert(df::mukshat::ArabicMapCaptionForType("waterway-stream-intermittent") == "مسيل");
+  assert(df::mukshat::ArabicMapCaptionForType("highway-track") == "طريق ترابي");
+  assert(df::mukshat::ArabicMapCaptionForType("natural-scrub") == "فيضة");
+  assert(df::mukshat::ArabicMapCaptionForType("unrelated-type").empty());
+  checks += 4;
   for (auto const kind : {MapDetailKind::Other, MapDetailKind::PowerLine})
   {
     std::string main;

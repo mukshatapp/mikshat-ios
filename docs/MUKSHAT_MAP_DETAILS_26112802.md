@@ -16,13 +16,21 @@ Underground water and power exclusions remain intact. Map features still need
 to be present in the downloaded MWM and its spatial index; no missing source
 data is invented.
 
-Arabic unnamed captions use existing translated type keys after preferred real
-names have been selected. Primary and auxiliary names always win, including
-non-Arabic proper names. Intermittent stream, current brown-road and scrub
-fallbacks use respectively `waterway-stream-intermittent`, `highway-track` and
-`natural-scrub`. The reconstructed Android consumer generates their Arabic
-values from `tooling/map-details-26112802/localized-type-overrides.json`:
-مسيل / طريق ترابي / فيضة. Native source map names and classification are unchanged.
+Arabic unnamed captions are selected only after preferred real names have
+been selected. Primary and auxiliary names always win, including stored names
+such as Track, Stream and Copse. The three map-only Arabic captions are sourced
+from `data/strings/mukshat_map_captions.json` and generated into
+`mukshat_map_caption_labels.hpp`: مسيل / طريق ترابي / فيضة. They are independent
+of the Android UI resource locale and any stale UI-localized string cache.
+Explicit English map-language requests retain the existing behaviour. Local or
+unsupported map-language requests use the MWM region hint before the Arabic-only
+guard. Source feature names and classification are never rewritten.
+
+The Android consumer separately generates the corresponding Arabic feature-type
+UI resources from `tooling/map-details-26112802/localized-type-overrides.json`.
+A pure regression reproduces the prior Arabic-map/English-UI callback mismatch
+and verifies the new map-only caption path. It does not imply that a particular
+observed Track label was a fallback rather than a stored proper name.
 
 Caption size changes from 1.2 to 1.38; shield text receives its own 1.15 factor,
 so both grow by an additional 15% relative to the preceding release. Ruler and
@@ -33,6 +41,7 @@ Host checks:
 
 ```sh
 python3 tools/mukshat/test_detail_visibility.py
+python3 tools/mukshat/generate_map_caption_labels.py --check
 g++ -std=c++23 -Wall -Wextra -Werror -I libs tools/mukshat/caption_fallback_test.cpp -o /tmp/caption-test
 /tmp/caption-test
 bash tools/mukshat/test_geographic_presentation.sh
