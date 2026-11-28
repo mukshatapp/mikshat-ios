@@ -1,13 +1,6 @@
 #include "drape_frontend/stylist.hpp"
 #include "drape_frontend/protected_area_presentation.hpp"
 
-#if defined(MUKSHAT_LEGACY_SDK_ABI)
-#include "drape_frontend/mukshat_caption_fallback.hpp"
-#include "drape_frontend/mukshat_feature_detail.hpp"
-
-#include "drape_frontend/mukshat_map_caption_labels.hpp"
-#endif
-
 #include "indexer/classificator.hpp"
 #include "indexer/classificator_loader.hpp"
 #include "indexer/feature.hpp"
@@ -136,17 +129,6 @@ void CaptionDescription::Init(FeatureType & f, int8_t deviceLang, int zoomLevel,
   }
   m_mainText = out.GetPrimary();
   m_mainTextLang = localizeLang(out.primaryLang);
-#if defined(MUKSHAT_LEGACY_SDK_ABI)
-  static auto const arabic = StringUtf8Multilang::GetLangIndex("ar");
-  auto const captionLang =
-      mukshat::ResolveGenericCaptionLanguage(deviceLang, StringUtf8Multilang::kDefaultCode,
-                                            StringUtf8Multilang::kUnsupportedLanguageCode, m_mwmRegionLang);
-  mukshat::PopulateUnnamedCaption(mukshat::ClassifyMapDetail(f), captionLang, arabic, m_mainText, m_auxText,
-                                 m_mainTextLang, [](std::string_view type)
-  {
-    return std::string(mukshat::ArabicMapCaptionForType(type));
-  });
-#endif
   ASSERT(m_auxText.empty() || !m_mainText.empty(), ("auxText without mainText"));
 
   uint8_t constexpr kLongCaptionsMaxZoom = 4;

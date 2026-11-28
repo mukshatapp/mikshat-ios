@@ -2562,8 +2562,13 @@ void Framework::OnTapEvent(place_page::BuildInfo const & buildInfo)
 
   auto placePageInfo = BuildPlacePageInfo(buildInfo);
 
-  if (m_routingManager.IsRoutingActive() && m_routingManager.GetRenderRouterType() == routing::RouterType::Ruler &&
-      !placePageInfo.IsRoutePoint())
+  // The legacy Android map API opens saved places without editing live guidance.
+  bool mayExtendRuler = true;
+#if defined(MUKSHAT_LEGACY_SDK_ABI)
+  mayExtendRuler = buildInfo.m_source == place_page::BuildInfo::Source::User;
+#endif
+  if (mayExtendRuler && m_routingManager.IsRoutingActive() &&
+      m_routingManager.GetRenderRouterType() == routing::RouterType::Ruler && !placePageInfo.IsRoutePoint())
   {
     DeactivateMapSelection();
 
@@ -4318,3 +4323,4 @@ void Framework::ResetDonations()
   settings::Set(kDonationTapTimeKey, 0);
   settings::Set(kDonationTapCountKey, 0);
 }
+
