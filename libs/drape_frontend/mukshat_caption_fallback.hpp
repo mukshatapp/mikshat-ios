@@ -9,6 +9,12 @@
 
 namespace df::mukshat
 {
+inline constexpr int8_t ResolveGenericCaptionLanguage(int8_t requestedLang, int8_t localLang, int8_t unsupportedLang,
+                                                       int8_t regionLang)
+{
+  return requestedLang == localLang || requestedLang == unsupportedLang ? regionLang : requestedLang;
+}
+
 inline constexpr std::string_view GenericCaptionType(MapDetailKind kind)
 {
   switch (kind)

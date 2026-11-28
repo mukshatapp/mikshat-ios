@@ -138,7 +138,10 @@ void CaptionDescription::Init(FeatureType & f, int8_t deviceLang, int zoomLevel,
   m_mainTextLang = localizeLang(out.primaryLang);
 #if defined(MUKSHAT_LEGACY_SDK_ABI)
   static auto const arabic = StringUtf8Multilang::GetLangIndex("ar");
-  mukshat::PopulateUnnamedCaption(mukshat::ClassifyMapDetail(f), deviceLang, arabic, m_mainText, m_auxText,
+  auto const captionLang =
+      mukshat::ResolveGenericCaptionLanguage(deviceLang, StringUtf8Multilang::kDefaultCode,
+                                            StringUtf8Multilang::kUnsupportedLanguageCode, m_mwmRegionLang);
+  mukshat::PopulateUnnamedCaption(mukshat::ClassifyMapDetail(f), captionLang, arabic, m_mainText, m_auxText,
                                  m_mainTextLang, [](std::string_view type)
   {
     // These are the existing translated feature-type resources from the

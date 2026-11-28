@@ -13,6 +13,15 @@ int main()
   int checks = 0;
   int calls = 0;
   int8_t constexpr arabic = 7;
+  assert(df::mukshat::ResolveGenericCaptionLanguage(0, 0, -1, arabic) == arabic);
+  assert(df::mukshat::ResolveGenericCaptionLanguage(1, 0, -1, arabic) == 1);
+  assert(df::mukshat::ResolveGenericCaptionLanguage(arabic, 0, -1, 1) == arabic);
+  assert(df::mukshat::ResolveGenericCaptionLanguage(0, 0, -1, 1) == 1);
+  assert(df::mukshat::ResolveGenericCaptionLanguage(-1, 0, -1, arabic) == arabic);
+  assert(df::mukshat::ResolveGenericCaptionLanguage(-1, 0, -1, 1) == 1);
+  assert(df::mukshat::ResolveGenericCaptionLanguage(0, 0, -1, -1) == -1);
+  assert(df::mukshat::ResolveGenericCaptionLanguage(1, 0, -1, -1) == 1);
+  checks += 8;
   auto const localize = [&calls](std::string_view type)
   {
     ++calls;
