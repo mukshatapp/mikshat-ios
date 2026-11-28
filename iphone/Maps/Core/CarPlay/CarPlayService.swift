@@ -60,6 +60,7 @@ final class CarPlayService: NSObject {
   private var directGuidanceObserver: NSObjectProtocol?
   private weak var tripInformationTemplate: CPInformationTemplate?
   private var pendingNorthUp: Bool?
+  private var needsGuidanceRootPresentation = false
   private var isSavingLocation = false
 
   var isNorthUp: Bool {
@@ -738,7 +739,9 @@ final class CarPlayService: NSObject {
         synchronizeSharedGuidance()
       }
     }
-    FrameworkHelper.rotateMap(0.0, animated: false)
+    if effectiveDisplay != .device {
+      FrameworkHelper.rotateMap(0.0, animated: false)
+    }
   }
 
   private func applyNavigationRootTemplate(trip: CPTrip, routeInfo: RouteInfo) {
@@ -885,7 +888,9 @@ final class CarPlayService: NSObject {
     }
     MapTemplateBuilder.configureBaseUI(mapTemplate, positionMode: currentPositionMode, isOnRoute: isOnRoute)
     updateVisibleViewPortState(.default)
-    FrameworkHelper.rotateMap(0.0, animated: true)
+    if effectiveDisplay != .device {
+      FrameworkHelper.rotateMap(0.0, animated: true)
+    }
   }
 
   func updateMapTemplateUIToTripFinished(_ trip: CPTrip) {
@@ -987,6 +992,7 @@ extension CarPlayService: MWMLocationObserver {
     tripMetrics.reset()
     tripSnapshot = .empty
     pendingNorthUp = nil
+    needsGuidanceRootPresentation = false
   }
 
   func onLocationUpdate(_ location: CLLocation) {
@@ -1022,12 +1028,16 @@ extension CarPlayService: MWMLocationObserver {
     if change != .unchanged {
       tripMetrics.reset()
       if change == .started || change == .changed {
+        needsGuidanceRootPresentation = true
+        preparedToPreviewTrips = []
+        pendingNorthUp = isNorthUp
         // Starting a new trip on the phone is the handoff; browsing an existing trip is not.
         activateMainCarPlay()
       }
     }
 
     guard let identity else {
+      needsGuidanceRootPresentation = false
       if change == .ended {
         router.cancelNavigationSession()
         router.previewTrip = nil
@@ -1038,6 +1048,8 @@ extension CarPlayService: MWMLocationObserver {
       refreshTripInformation(updateActions: change != .unchanged)
       return
     }
+
+    guard prepareRootForSharedGuidance() else { return }
 
     if mapState.attachedDisplay != .device, !isTemplateOperationInProgress {
       let type: MWMRouterType = identity.kind == .direct ? .ruler : .vehicle
@@ -1082,9 +1094,6 @@ extension CarPlayService: MWMLocationObserver {
       speedState.cameraSpeedLimitMps = nil
     }
     renderSpeedState()
-    if change == .started || change == .changed {
-      pendingNorthUp = isNorthUp
-    }
     if pendingNorthUp != nil {
       reconcileMapOrientation(currentPositionMode)
     }
@@ -1096,6 +1105,41 @@ extension CarPlayService: MWMLocationObserver {
       template.updateEstimates(estimates, for: trip)
     }
     refreshTripInformation(updateActions: change != .unchanged)
+  }
+
+  private func prepareRootForSharedGuidance() -> Bool {
+    guard needsGuidanceRootPresentation, let controller = interfaceController else { return true }
+    guard !isTemplateOperationInProgress else { return false }
+    if let presentedTemplate = controller.presentedTemplate {
+      isTemplateOperationInProgress = true
+      controller.dismissTemplate(animated: false) { [weak self, weak controller] success, error in
+        guard let self, interfaceController === controller else { return }
+        isTemplateOperationInProgress = false
+        templateCompletion(success, error)
+        if success {
+          if phoneModeAlert === presentedTemplate {
+            phoneModeAlert = nil
+          }
+          synchronizeSharedGuidance()
+        }
+      }
+      return false
+    }
+    guard controller.templates.count > 1 else {
+      needsGuidanceRootPresentation = false
+      return true
+    }
+    isTemplateOperationInProgress = true
+    controller.popToRootTemplate(animated: false) { [weak self, weak controller] success, error in
+      guard let self, interfaceController === controller else { return }
+      isTemplateOperationInProgress = false
+      templateCompletion(success, error)
+      if success {
+        needsGuidanceRootPresentation = false
+        synchronizeSharedGuidance()
+      }
+    }
+    return false
   }
 
   func recenterMap() {
@@ -1354,7 +1398,7 @@ extension CarPlayService: CPMapTemplateDelegate {
   }
 
   func mapTemplate(_ mapTemplate: CPMapTemplate, startedTrip trip: CPTrip, using routeChoice: CPRouteChoice) {
-    guard !MWMRouter.isMikshatDirectActive(),
+    guard !MWMRouter.isMikshatDirectActive(), !RoutingManager.routingManager.isOnRoute,
           router?.matchesCurrentDestination(trip, routeType: .vehicle) == true else {
       synchronizeSharedGuidance()
       return
@@ -1407,7 +1451,7 @@ extension CarPlayService: CPMapTemplateDelegate {
   func mapTemplate(_ mapTemplate: CPMapTemplate,
                    selectedPreviewFor trip: CPTrip,
                    using routeChoice: CPRouteChoice) {
-    guard !MWMRouter.isMikshatDirectActive() else {
+    guard !MWMRouter.isMikshatDirectActive(), !RoutingManager.routingManager.isOnRoute else {
       synchronizeSharedGuidance()
       return
     }
@@ -1438,9 +1482,10 @@ extension CarPlayService: CPSearchTemplateDelegate {
       completion?()
       return
     }
+    let guidance = currentGuidanceIdentity()
     searchService.searchText(text, forInputLocale: inputLocale) { [weak self] results in
       completion?()
-      guard let self, let results else { return }
+      guard let self, let results, currentGuidanceIdentity() == guidance else { return }
       self.pushTemplate(ListTemplateBuilder.buildListTemplate(for: .searchResults(results: results)), animated: true)
     }
   }
@@ -1652,7 +1697,12 @@ extension CarPlayService {
   }
 
   func showRerouteAlert(trips: [CPTrip]) {
+    let guidance = currentGuidanceIdentity()
     let yesAction = CPAlertAction(title: L("yes"), style: .default, handler: { [unowned self] _ in
+      guard currentGuidanceIdentity() == guidance else {
+        interfaceController?.dismissTemplate(animated: true, completion: templateCompletion)
+        return
+      }
       router?.cancelTrip()
       updateMapTemplateUIToBase()
       preparedToPreviewTrips = trips
@@ -1709,7 +1759,13 @@ extension CarPlayService {
   }
 
   func showRecoverRouteAlert(trip: CPTrip, isTypeCorrect: Bool) {
+    let guidance = currentGuidanceIdentity()
     let yesAction = CPAlertAction(title: L("ok"), style: .default, handler: { [unowned self] _ in
+      guard currentGuidanceIdentity() == guidance,
+            router?.matchesCurrentDestination(trip, routeType: RoutingManager.routingManager.type) == true else {
+        interfaceController?.dismissTemplate(animated: true, completion: templateCompletion)
+        return
+      }
       var info = trip.userInfo as? [String: MWMRoutePoint]
 
       if let startPoint = MWMRoutePoint(lastLocationAndType: .start,
@@ -1722,6 +1778,11 @@ extension CarPlayService {
       interfaceController?.dismissTemplate(animated: true, completion: templateCompletion)
     })
     let noAction = CPAlertAction(title: L("cancel"), style: .cancel, handler: { [unowned self] _ in
+      guard currentGuidanceIdentity() == guidance,
+            router?.matchesCurrentDestination(trip, routeType: RoutingManager.routingManager.type) == true else {
+        interfaceController?.dismissTemplate(animated: true, completion: templateCompletion)
+        return
+      }
       FrameworkHelper.rotateMap(0.0, animated: false)
       router?.completeRouteAndRemovePoints()
       interfaceController?.dismissTemplate(animated: true, completion: templateCompletion)

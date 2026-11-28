@@ -182,7 +182,8 @@ final class MapTemplateBuilder {
   private class func orientationImages(symbolName: String) -> (UIImage, UIImage) {
     let symbol = UIImage(systemName: symbolName,
                          withConfiguration: UIImage.SymbolConfiguration(pointSize: 32, weight: .semibold))!
-    return (symbol.withTintColor(.black, renderingMode: .alwaysOriginal),
+    let color = UIColor.label.resolvedColor(with: CarPlayService.shared.templateTraitCollection)
+    return (symbol.withTintColor(color, renderingMode: .alwaysOriginal),
             symbol.withTintColor(.white, renderingMode: .alwaysOriginal))
   }
 

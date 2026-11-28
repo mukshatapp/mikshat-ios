@@ -43,6 +43,20 @@ final class MapTemplateBuilderTests: XCTestCase {
     XCTAssertEqual(template.trailingNavigationBarButtons.map(\.title), [L("done")])
   }
 
+  func testTripPreviewKeepsGPSAndOrientationWithoutReplacingItsPreviewState() {
+    let template = MapTemplateBuilder.buildTripPreviewTemplate(forTrips: [])
+    XCTAssertEqual((template.userInfo as? MapInfo)?.type, CPConstants.TemplateType.preview)
+    XCTAssertEqual(template.mapButtons.count, 2)
+    XCTAssertEqual(template.mapButtons.first?.accessibilityLabel, L("mikshat_carplay_gps"))
+    XCTAssertFalse(template.hidesButtonsWithNavigationBar)
+
+    MapTemplateBuilder.setupMapButtons(template, positionMode: .followAndRotate, northUp: false, allowsPanning: false)
+
+    XCTAssertEqual(template.mapButtons.count, 2)
+    XCTAssertEqual(template.mapButtons.last?.accessibilityLabel, L("mikshat_carplay_heading_up"))
+    XCTAssertEqual((template.userInfo as? MapInfo)?.type, CPConstants.TemplateType.preview)
+  }
+
   func testNavigationIncludesSaveInformationAndStopWithinButtonLimits() {
     let template = MapTemplateBuilder.buildNavigationTemplate(positionMode: .followAndRotate)
 
